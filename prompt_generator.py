@@ -1,127 +1,139 @@
 import base64
-from io import BytesIO
+import json
 from llm_client import LLMClient
-from typing import Dict, Tuple
+from typing import Dict
+from config import QUALITY_LEVELS
+
 
 class PromptGenerator:
     def __init__(self, llm_client: LLMClient):
         self.llm_client = llm_client
 
-    def image_to_base64(self, image_bytes: bytes) -> str:
-        """画像をBase64に変換"""
-        return base64.b64encode(image_bytes).decode('utf-8')
+    def _parse_json_response(self, text: str) -> Dict:
+        """LLMのレスポンスからJSONを抽出"""
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0]
+        return json.loads(text.strip())
 
-    def generate_prompts(self, image_bytes: bytes) -> Dict[str, str]:
-        """
-        画像からポジティブ・ネガティブプロンプトを生成
-        """
+    def _build_style_instruction(self, style: str, tone: str, quality: str) -> str:
+        """カスタマイズ設定をプロンプト指示文に変換"""
+        quality_tag = QUALITY_LEVELS.get(quality, QUALITY_LEVELS["standard"])
+        style_map = {
+            "photorealistic": "写実的な写真スタイル",
+            "anime": "アニメ・マンガスタイル",
+            "painting": "油絵・水彩画などの絵画スタイル",
+            "watercolor": "水彩画スタイル",
+            "concept_art": "コンセプトアート・ファンタジースタイル",
+            "sketch": "スケッチ・線画スタイル",
+            "pixel_art": "ピクセルアートスタイル",
+            "3d_render": "3DCGレンダリングスタイル",
+        }
+        tone_map = {
+            "natural": "自然な色調",
+            "vibrant": "鮮やかな色彩",
+            "warm": "温かみのある暖色系",
+            "cool": "クールな寒色系",
+            "dark": "暗い・ダークな雰囲気",
+            "soft": "柔らかく穏やかな雰囲気",
+            "dramatic": "ドラマチックで迫力のある雰囲気",
+            "cinematic": "映画のような雰囲気",
+        }
+        parts = []
+        if style and style in style_map:
+            parts.append(f"スタイル: {style_map[style]}")
+        if tone and tone in tone_map:
+            parts.append(f"トーン: {tone_map[tone]}")
+        if quality_tag:
+            parts.append(f'品質タグを含める: "{quality_tag}"')
+        return "\n".join(parts)
+
+    def _call_llm(self, prompt: str) -> Dict:
+        response_text = self.llm_client.generate_response(prompt)
+        if not response_text:
+            raise ValueError("LLMからレスポンスがありません")
+        return self._parse_json_response(response_text)
+
+    def generate_prompts(
+        self,
+        image_bytes: bytes,
+        style: str = "",
+        tone: str = "",
+        quality: str = "high",
+        preset_suffix_positive: str = "",
+        preset_suffix_negative: str = ""
+    ) -> Dict[str, str]:
+        """画像からポジティブ・ネガティブプロンプトを生成"""
         try:
-            # 画像解析用プロンプト
-            analysis_prompt = """
-以下の画像を分析して、Stable Diffusion用のプロンプトを生成してください。
+            style_instruction = self._build_style_instruction(style, tone, quality)
+            customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
 
-JSON形式で以下のように返してください：
-{
-  "positive": "ポジティブプロンプト (詳細な画像の説明、スタイル、品質など)",
-  "negative": "ネガティブプロンプト (避けたい要素、低品質な要素など)"
-}
+            analysis_prompt = f"""Stable Diffusion用のプロンプトを生成してください。{customization}
 
-ポジティブプロンプトは以下を含める：
-- 被写体の詳細な説明
-- スタイル/アート形式
-- 画質やテクニック
-- ムード/アトモスフィア
-
-ネガティブプロンプトは以下を含める：
-- 避けたい品質の問題
-- 不要な要素
-- 一般的なアーティファクト
-
-注意: JSON形式のみを返してください。追加テキストは不要です。
-"""
-
-            # LLMにプロンプト生成を依頼
-            response_text = self.llm_client.generate_response(analysis_prompt)
-
-            if not response_text:
-                raise ValueError("LLMからレスポンスがありません")
-
-            # JSONレスポンスを解析
-            import json
-
-            # JSONを抽出（markdown code block対応）
-            json_str = response_text
-            if "```json" in response_text:
-                json_str = response_text.split("```json")[1].split("```")[0]
-            elif "```" in response_text:
-                json_str = response_text.split("```")[1].split("```")[0]
-
-            result = json.loads(json_str.strip())
-
-            return {
-                "positive": result.get("positive", ""),
-                "negative": result.get("negative", ""),
-                "status": "success"
-            }
-
-        except json.JSONDecodeError as e:
-            return {
-                "positive": "",
-                "negative": "",
-                "error": f"JSON parse error: {str(e)}",
-                "status": "error"
-            }
-        except Exception as e:
-            return {
-                "positive": "",
-                "negative": "",
-                "error": str(e),
-                "status": "error"
-            }
-
-    def generate_prompts_text_only(self, description: str) -> Dict[str, str]:
-        """
-        テキスト説明からプロンプトを生成（デモ用）
-        """
-        try:
-            prompt = f"""
-以下の画像の説明に基づいて、Stable Diffusion用のプロンプトを生成してください。
-
-説明: {description}
-
-JSON形式で以下のように返してください：
+JSON形式のみで返してください：
 {{
-  "positive": "ポジティブプロンプト",
-  "negative": "ネガティブプロンプト"
+  "positive": "ポジティブプロンプト (英語のカンマ区切りタグ形式)",
+  "negative": "ネガティブプロンプト (英語のカンマ区切りタグ形式)"
 }}
 
-注意: JSON形式のみを返してください。
-"""
+ポジティブ: 被写体の詳細説明、スタイルタグ、品質タグ、ムード・雰囲気を含める
+ネガティブ: lowres, bad anatomy, bad hands, text, error, worst quality, low quality, blurryなどを含める
 
-            response_text = self.llm_client.generate_response(prompt)
+注意: JSONのみ返してください。"""
 
-            if not response_text:
-                raise ValueError("LLMからレスポンスがありません")
+            result = self._call_llm(analysis_prompt)
+            positive = result.get("positive", "")
+            negative = result.get("negative", "")
 
-            import json
-            json_str = response_text
-            if "```json" in response_text:
-                json_str = response_text.split("```json")[1].split("```")[0]
-            elif "```" in response_text:
-                json_str = response_text.split("```")[1].split("```")[0]
+            if preset_suffix_positive:
+                positive = f"{positive}, {preset_suffix_positive}"
+            if preset_suffix_negative:
+                negative = f"{negative}, {preset_suffix_negative}"
 
-            result = json.loads(json_str.strip())
+            return {"positive": positive, "negative": negative, "status": "success"}
 
-            return {
-                "positive": result.get("positive", ""),
-                "negative": result.get("negative", ""),
-                "status": "success"
-            }
+        except json.JSONDecodeError as e:
+            return {"positive": "", "negative": "", "error": f"JSON parse error: {str(e)}", "status": "error"}
+        except Exception as e:
+            return {"positive": "", "negative": "", "error": str(e), "status": "error"}
+
+    def generate_prompts_text_only(
+        self,
+        description: str,
+        style: str = "",
+        tone: str = "",
+        quality: str = "high",
+        preset_suffix_positive: str = "",
+        preset_suffix_negative: str = ""
+    ) -> Dict[str, str]:
+        """テキスト説明からプロンプトを生成"""
+        try:
+            style_instruction = self._build_style_instruction(style, tone, quality)
+            customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
+
+            prompt = f"""以下の説明に基づいてStable Diffusion用のプロンプトを生成してください。
+
+説明: {description}{customization}
+
+JSON形式のみで返してください：
+{{
+  "positive": "ポジティブプロンプト (英語のカンマ区切りタグ形式)",
+  "negative": "ネガティブプロンプト (英語のカンマ区切りタグ形式)"
+}}
+
+注意: JSONのみ返してください。"""
+
+            result = self._call_llm(prompt)
+            positive = result.get("positive", "")
+            negative = result.get("negative", "")
+
+            if preset_suffix_positive:
+                positive = f"{positive}, {preset_suffix_positive}"
+            if preset_suffix_negative:
+                negative = f"{negative}, {preset_suffix_negative}"
+
+            return {"positive": positive, "negative": negative, "status": "success"}
 
         except Exception as e:
-            return {
-                "positive": "",
-                "negative": "",
-                "error": str(e),
-                "status": "error"
-            }
+            return {"positive": "", "negative": "", "error": str(e), "status": "error"}
