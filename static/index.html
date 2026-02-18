@@ -3,111 +3,376 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image to Stable Diffusion Prompt Generator</title>
+    <title>Image to SD Prompt Generator</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎨 Image to SD Prompt</h1>
-            <p class="subtitle">Convert your images to Stable Diffusion prompts</p>
-        </header>
-
-        <div class="main-content">
-            <!-- ステータス表示 -->
-            <div id="status-box" class="status-box hidden">
-                <div id="status-message"></div>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>🎨 Img2SD</h1>
+                <p>Prompt Generator</p>
             </div>
-
-            <!-- タブナビゲーション -->
-            <div class="tabs">
-                <button class="tab-button active" data-tab="image-tab">
-                    📤 Image Upload
-                </button>
-                <button class="tab-button" data-tab="text-tab">
-                    ✍️ Text Description
-                </button>
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" data-page="generate">📤 Generate</button>
+                <button class="nav-btn" data-page="batch">🗂️ Batch</button>
+                <button class="nav-btn" data-page="history">📋 History</button>
+                <button class="nav-btn" data-page="presets">🎨 Presets</button>
+                <button class="nav-btn" data-page="sd">🖼️ SD Generate</button>
+            </nav>
+            <div class="sidebar-status">
+                <div class="status-indicator" id="llm-status">
+                    <span class="dot"></span><span class="label">LLM</span>
+                </div>
+                <div class="status-indicator" id="sd-status">
+                    <span class="dot"></span><span class="label">SD API</span>
+                </div>
             </div>
+        </aside>
 
-            <!-- Image Tab -->
-            <div id="image-tab" class="tab-content active">
-                <div class="upload-section">
-                    <div class="upload-area" id="upload-area">
-                        <div class="upload-icon">📸</div>
-                        <p>Click or drag image here</p>
-                        <small>Supported: JPG, PNG, WebP, GIF (Max 10MB)</small>
+        <!-- Main Content -->
+        <main class="main-area">
+            <!-- Toast -->
+            <div id="toast" class="toast hidden"></div>
+
+            <!-- ======================== GENERATE PAGE ======================== -->
+            <section id="page-generate" class="page active">
+                <div class="page-header">
+                    <h2>Generate Prompt</h2>
+                    <p>画像またはテキストからプロンプトを生成</p>
+                </div>
+
+                <div class="page-body two-col">
+                    <!-- Left: Input -->
+                    <div class="col">
+                        <!-- Source Tabs -->
+                        <div class="inner-tabs">
+                            <button class="inner-tab active" data-inner="tab-img">📸 Image</button>
+                            <button class="inner-tab" data-inner="tab-txt">✍️ Text</button>
+                        </div>
+
+                        <!-- Image input -->
+                        <div id="tab-img" class="inner-content active">
+                            <div class="upload-area" id="upload-area">
+                                <div class="upload-icon">📸</div>
+                                <p>クリックまたはドラッグ&ドロップ</p>
+                                <small>JPG, PNG, WebP, GIF (最大 10MB)</small>
+                            </div>
+                            <input type="file" id="image-input" accept="image/*" hidden>
+                            <div id="preview-wrap" class="preview-wrap hidden">
+                                <img id="preview-image" src="" alt="Preview">
+                                <button id="clear-image-btn" class="btn btn-sm btn-ghost">✕ クリア</button>
+                            </div>
+                        </div>
+
+                        <!-- Text input -->
+                        <div id="tab-txt" class="inner-content">
+                            <label class="field-label">画像の説明:</label>
+                            <textarea id="description-input" rows="5" placeholder="生成したい画像を説明してください..."></textarea>
+                        </div>
+
+                        <!-- Customization Panel -->
+                        <div class="customization-panel">
+                            <h3>⚙️ カスタマイズ</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>スタイル</label>
+                                    <select id="select-style">
+                                        <option value="">-- なし --</option>
+                                        <option value="photorealistic">Photorealistic</option>
+                                        <option value="anime">Anime</option>
+                                        <option value="painting">Painting</option>
+                                        <option value="watercolor">Watercolor</option>
+                                        <option value="concept_art">Concept Art</option>
+                                        <option value="sketch">Sketch</option>
+                                        <option value="pixel_art">Pixel Art</option>
+                                        <option value="3d_render">3D Render</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>トーン</label>
+                                    <select id="select-tone">
+                                        <option value="">-- なし --</option>
+                                        <option value="natural">Natural</option>
+                                        <option value="vibrant">Vibrant</option>
+                                        <option value="warm">Warm</option>
+                                        <option value="cool">Cool</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="soft">Soft</option>
+                                        <option value="dramatic">Dramatic</option>
+                                        <option value="cinematic">Cinematic</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>品質</label>
+                                    <select id="select-quality">
+                                        <option value="standard">Standard</option>
+                                        <option value="high" selected>High</option>
+                                        <option value="ultra">Ultra</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>プリセット</label>
+                                    <select id="select-preset">
+                                        <option value="">-- なし --</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button id="generate-btn" class="btn btn-primary btn-block" disabled>
+                            ✨ プロンプト生成
+                        </button>
                     </div>
-                    <input type="file" id="image-input" accept="image/*" hidden>
+
+                    <!-- Right: Results -->
+                    <div class="col">
+                        <div id="loading-generate" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p>LLMで生成中...</p>
+                        </div>
+
+                        <div id="result-box" class="result-box hidden">
+                            <div class="prompt-card positive">
+                                <div class="prompt-card-header">
+                                    <span>✅ Positive Prompt</span>
+                                    <button class="copy-btn" data-target="pos-prompt">Copy</button>
+                                </div>
+                                <textarea id="pos-prompt" class="prompt-ta"></textarea>
+                            </div>
+                            <div class="prompt-card negative">
+                                <div class="prompt-card-header">
+                                    <span>❌ Negative Prompt</span>
+                                    <button class="copy-btn" data-target="neg-prompt">Copy</button>
+                                </div>
+                                <textarea id="neg-prompt" class="prompt-ta"></textarea>
+                            </div>
+                            <div class="result-actions">
+                                <button id="copy-all-btn" class="btn btn-secondary">📋 全コピー</button>
+                                <button id="send-to-sd-btn" class="btn btn-accent">🖼️ SDで生成</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+            </section>
 
-                <div id="preview-section" class="preview-section hidden">
-                    <img id="preview-image" src="" alt="Preview">
-                    <button id="clear-image-btn" class="btn btn-secondary">Clear Image</button>
+            <!-- ======================== BATCH PAGE ======================== -->
+            <section id="page-batch" class="page">
+                <div class="page-header">
+                    <h2>Batch Processing</h2>
+                    <p>複数画像を一括処理</p>
                 </div>
+                <div class="page-body">
+                    <div class="upload-area multi" id="batch-upload-area">
+                        <div class="upload-icon">🗂️</div>
+                        <p>複数の画像をドラッグ&ドロップ (最大10枚)</p>
+                        <small>JPG, PNG, WebP, GIF (各最大 10MB)</small>
+                    </div>
+                    <input type="file" id="batch-input" accept="image/*" multiple hidden>
 
-                <button id="generate-btn" class="btn btn-primary" disabled>
-                    Generate Prompts
-                </button>
-            </div>
+                    <div id="batch-file-list" class="batch-file-list hidden"></div>
 
-            <!-- Text Tab -->
-            <div id="text-tab" class="tab-content hidden">
-                <div class="text-input-section">
-                    <label for="description-input">Image Description:</label>
-                    <textarea id="description-input" placeholder="Describe the image you want to generate prompts for..."></textarea>
-                    <button id="generate-text-btn" class="btn btn-primary">
-                        Generate from Text
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>スタイル</label>
+                            <select id="batch-style">
+                                <option value="">-- なし --</option>
+                                <option value="photorealistic">Photorealistic</option>
+                                <option value="anime">Anime</option>
+                                <option value="painting">Painting</option>
+                                <option value="watercolor">Watercolor</option>
+                                <option value="concept_art">Concept Art</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>品質</label>
+                            <select id="batch-quality">
+                                <option value="standard">Standard</option>
+                                <option value="high" selected>High</option>
+                                <option value="ultra">Ultra</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>プリセット</label>
+                            <select id="batch-preset">
+                                <option value="">-- なし --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button id="batch-generate-btn" class="btn btn-primary" disabled>
+                        ✨ 一括生成
                     </button>
-                </div>
-            </div>
 
-            <!-- Loading Spinner -->
-            <div id="loading-spinner" class="loading-spinner hidden">
-                <div class="spinner"></div>
-                <p>Generating prompts...</p>
-            </div>
-
-            <!-- Results Section -->
-            <div id="results-section" class="results-section hidden">
-                <h2>Generated Prompts</h2>
-
-                <div class="prompt-box">
-                    <div class="prompt-header">
-                        <h3>✅ Positive Prompt</h3>
-                        <button class="copy-btn" data-target="positive-prompt">Copy</button>
+                    <div id="batch-loading" class="loading-box hidden">
+                        <div class="spinner"></div>
+                        <p id="batch-progress-text">処理中...</p>
                     </div>
-                    <textarea id="positive-prompt" class="prompt-textarea" readonly></textarea>
-                </div>
 
-                <div class="prompt-box">
-                    <div class="prompt-header">
-                        <h3>❌ Negative Prompt</h3>
-                        <button class="copy-btn" data-target="negative-prompt">Copy</button>
+                    <div id="batch-results" class="batch-results hidden"></div>
+                </div>
+            </section>
+
+            <!-- ======================== HISTORY PAGE ======================== -->
+            <section id="page-history" class="page">
+                <div class="page-header">
+                    <h2>History</h2>
+                    <p>生成履歴の管理</p>
+                    <div class="header-actions">
+                        <button id="refresh-history-btn" class="btn btn-sm btn-secondary">🔄 更新</button>
+                        <button id="clear-history-btn" class="btn btn-sm btn-danger">🗑️ 全削除</button>
                     </div>
-                    <textarea id="negative-prompt" class="prompt-textarea" readonly></textarea>
+                </div>
+                <div class="page-body">
+                    <div id="history-loading" class="loading-box hidden">
+                        <div class="spinner"></div>
+                    </div>
+                    <div id="history-empty" class="empty-state hidden">
+                        <p>履歴がありません</p>
+                    </div>
+                    <div id="history-list" class="history-list"></div>
+                </div>
+            </section>
+
+            <!-- ======================== PRESETS PAGE ======================== -->
+            <section id="page-presets" class="page">
+                <div class="page-header">
+                    <h2>Presets</h2>
+                    <p>プリセットの管理</p>
+                    <button id="add-preset-btn" class="btn btn-sm btn-primary">+ 追加</button>
+                </div>
+                <div class="page-body">
+                    <div id="presets-list" class="presets-list"></div>
                 </div>
 
-                <div class="action-buttons">
-                    <button id="copy-all-btn" class="btn btn-secondary">Copy All Prompts</button>
-                    <button id="clear-results-btn" class="btn btn-secondary">Generate New</button>
+                <!-- Add Preset Modal -->
+                <div id="preset-modal" class="modal hidden">
+                    <div class="modal-box">
+                        <h3>新しいプリセット</h3>
+                        <div class="form-group">
+                            <label>名前 *</label>
+                            <input type="text" id="preset-name" placeholder="My Preset">
+                        </div>
+                        <div class="form-group">
+                            <label>説明</label>
+                            <input type="text" id="preset-desc" placeholder="プリセットの説明">
+                        </div>
+                        <div class="form-group">
+                            <label>Positive Suffix *</label>
+                            <textarea id="preset-pos" rows="3" placeholder="追加するポジティブタグ..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Negative Suffix *</label>
+                            <textarea id="preset-neg" rows="3" placeholder="追加するネガティブタグ..."></textarea>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>スタイル</label>
+                                <select id="preset-style">
+                                    <option value="">-- なし --</option>
+                                    <option value="photorealistic">Photorealistic</option>
+                                    <option value="anime">Anime</option>
+                                    <option value="painting">Painting</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>品質</label>
+                                <select id="preset-quality">
+                                    <option value="standard">Standard</option>
+                                    <option value="high" selected>High</option>
+                                    <option value="ultra">Ultra</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-actions">
+                            <button id="save-preset-btn" class="btn btn-primary">保存</button>
+                            <button id="cancel-preset-btn" class="btn btn-ghost">キャンセル</button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Error Section -->
-            <div id="error-section" class="error-section hidden">
-                <h3>❌ Error</h3>
-                <p id="error-message"></p>
-                <button id="clear-error-btn" class="btn btn-secondary">Dismiss</button>
-            </div>
-        </div>
+            <!-- ======================== SD GENERATE PAGE ======================== -->
+            <section id="page-sd" class="page">
+                <div class="page-header">
+                    <h2>SD Generate</h2>
+                    <p>Stable Diffusion APIで直接生成</p>
+                    <div id="sd-api-badge" class="badge badge-gray">Checking...</div>
+                </div>
+                <div class="page-body two-col">
+                    <!-- Left: Settings -->
+                    <div class="col">
+                        <div class="form-group">
+                            <label>Positive Prompt</label>
+                            <textarea id="sd-positive" rows="4" placeholder="ポジティブプロンプト..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Negative Prompt</label>
+                            <textarea id="sd-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Width</label>
+                                <select id="sd-width">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Height</label>
+                                <select id="sd-height">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Steps</label>
+                                <input type="number" id="sd-steps" value="20" min="5" max="150">
+                            </div>
+                            <div class="form-group">
+                                <label>CFG Scale</label>
+                                <input type="number" id="sd-cfg" value="7" min="1" max="30" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Sampler</label>
+                                <select id="sd-sampler">
+                                    <option>Euler a</option>
+                                    <option>Euler</option>
+                                    <option>DPM++ 2M Karras</option>
+                                    <option>DDIM</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Batch Size</label>
+                                <input type="number" id="sd-batch" value="1" min="1" max="4">
+                            </div>
+                            <div class="form-group">
+                                <label>Seed (-1=random)</label>
+                                <input type="number" id="sd-seed" value="-1">
+                            </div>
+                        </div>
+                        <button id="sd-generate-btn" class="btn btn-accent btn-block">
+                            🖼️ 画像生成
+                        </button>
+                    </div>
 
-        <!-- Footer -->
-        <footer>
-            <p>
-                Powered by Local LLM (LM Studio / Lemonade Server)
-                <span id="config-info"></span>
-            </p>
-        </footer>
+                    <!-- Right: Output -->
+                    <div class="col">
+                        <div id="sd-loading" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p>生成中... (しばらくお待ちください)</p>
+                        </div>
+                        <div id="sd-results" class="sd-results hidden">
+                            <h3>生成された画像</h3>
+                            <div id="sd-images" class="sd-images"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <script src="/static/script.js"></script>
