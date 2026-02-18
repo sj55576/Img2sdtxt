@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to Stable Diffusion Prompt Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 Image to SD Prompt</h1>
+            <p class="subtitle">Convert your images to Stable Diffusion prompts</p>
+        </header>
+
+        <div class="main-content">
+            <!-- ステータス表示 -->
+            <div id="status-box" class="status-box hidden">
+                <div id="status-message"></div>
+            </div>
+
+            <!-- タブナビゲーション -->
+            <div class="tabs">
+                <button class="tab-button active" data-tab="image-tab">
+                    📤 Image Upload
+                </button>
+                <button class="tab-button" data-tab="text-tab">
+                    ✍️ Text Description
+                </button>
+            </div>
+
+            <!-- Image Tab -->
+            <div id="image-tab" class="tab-content active">
+                <div class="upload-section">
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-icon">📸</div>
+                        <p>Click or drag image here</p>
+                        <small>Supported: JPG, PNG, WebP, GIF (Max 10MB)</small>
+                    </div>
+                    <input type="file" id="image-input" accept="image/*" hidden>
+                </div>
+
+                <div id="preview-section" class="preview-section hidden">
+                    <img id="preview-image" src="" alt="Preview">
+                    <button id="clear-image-btn" class="btn btn-secondary">Clear Image</button>
+                </div>
+
+                <button id="generate-btn" class="btn btn-primary" disabled>
+                    Generate Prompts
+                </button>
+            </div>
+
+            <!-- Text Tab -->
+            <div id="text-tab" class="tab-content hidden">
+                <div class="text-input-section">
+                    <label for="description-input">Image Description:</label>
+                    <textarea id="description-input" placeholder="Describe the image you want to generate prompts for..."></textarea>
+                    <button id="generate-text-btn" class="btn btn-primary">
+                        Generate from Text
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="loading-spinner hidden">
+                <div class="spinner"></div>
+                <p>Generating prompts...</p>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results-section" class="results-section hidden">
+                <h2>Generated Prompts</h2>
+
+                <div class="prompt-box">
+                    <div class="prompt-header">
+                        <h3>✅ Positive Prompt</h3>
+                        <button class="copy-btn" data-target="positive-prompt">Copy</button>
+                    </div>
+                    <textarea id="positive-prompt" class="prompt-textarea" readonly></textarea>
+                </div>
+
+                <div class="prompt-box">
+                    <div class="prompt-header">
+                        <h3>❌ Negative Prompt</h3>
+                        <button class="copy-btn" data-target="negative-prompt">Copy</button>
+                    </div>
+                    <textarea id="negative-prompt" class="prompt-textarea" readonly></textarea>
+                </div>
+
+                <div class="action-buttons">
+                    <button id="copy-all-btn" class="btn btn-secondary">Copy All Prompts</button>
+                    <button id="clear-results-btn" class="btn btn-secondary">Generate New</button>
+                </div>
+            </div>
+
+            <!-- Error Section -->
+            <div id="error-section" class="error-section hidden">
+                <h3>❌ Error</h3>
+                <p id="error-message"></p>
+                <button id="clear-error-btn" class="btn btn-secondary">Dismiss</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>
+                Powered by Local LLM (LM Studio / Lemonade Server)
+                <span id="config-info"></span>
+            </p>
+        </footer>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
