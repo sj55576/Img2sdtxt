@@ -69,7 +69,7 @@ class PromptGenerator:
             style_instruction = self._build_style_instruction(style, tone, quality)
             customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
 
-            analysis_prompt = f"""Stable Diffusion用のプロンプトを生成してください。{customization}
+            analysis_prompt = f"""提供された画像を分析して、Stable Diffusion用のプロンプトを生成してください。{customization}
 
 JSON形式のみで返してください：
 {{
@@ -82,7 +82,11 @@ JSON形式のみで返してください：
 
 注意: JSONのみ返してください。"""
 
-            result = self._call_llm(analysis_prompt)
+            response_text = self.llm_client.generate_response_with_image(analysis_prompt, image_bytes)
+            if not response_text:
+                raise ValueError("LLMからレスポンスがありません")
+            result = self._parse_json_response(response_text)
+
             positive = result.get("positive", "")
             negative = result.get("negative", "")
 

@@ -303,6 +303,23 @@
                 <div class="page-body two-col">
                     <!-- Left: Settings -->
                     <div class="col">
+                        <!-- Model & LoRA Panel -->
+                        <div class="customization-panel">
+                            <h3>🎯 モデル・LoRA設定</h3>
+                            <div class="form-group">
+                                <label>モデル</label>
+                                <select id="sd-model">
+                                    <option value="">-- デフォルト --</option>
+                                </select>
+                                <small>利用可能なチェックポイントを選択</small>
+                            </div>
+                            <div class="form-group">
+                                <label>LoRA</label>
+                                <input type="text" id="sd-loras" placeholder="lora1:1.0,lora2:0.8 または &lt;lora:lora1:1.0&gt;&lt;lora:lora2:0.8&gt;">
+                                <small>複数指定可（カンマ区切りまたは&lt;lora:name:weight&gt;形式）</small>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label>Positive Prompt</label>
                             <textarea id="sd-positive" rows="4" placeholder="ポジティブプロンプト..."></textarea>

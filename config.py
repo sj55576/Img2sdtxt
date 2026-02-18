@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,6 +10,7 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gpt-3.5-turbo")
 
 # Stable Diffusion API Configuration
 SD_API_URL = os.getenv("SD_API_URL", "http://localhost:7860")
+SD_OUTPUT_DIR = Path(__file__).parent / "outputs"
 
 # API Server Configuration
 API_HOST = os.getenv("API_HOST", "0.0.0.0")

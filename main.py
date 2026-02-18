@@ -282,13 +282,15 @@ async def sd_status():
     available = sd_client.is_available()
     model = ""
     samplers = []
+    models = []
     if available:
         try:
             model = sd_client.get_current_model()
             samplers = sd_client.get_samplers()
+            models = sd_client.get_model_list()
         except Exception:
             pass
-    return {"available": available, "model": model, "samplers": samplers}
+    return {"available": available, "model": model, "samplers": samplers, "models": models}
 
 
 @app.post("/api/sd/generate")
@@ -298,19 +300,52 @@ async def sd_generate(request_data: dict):
     if not positive:
         raise HTTPException(status_code=400, detail="Positive prompt is required.")
 
+    width = int(request_data.get("width", 512))
+    height = int(request_data.get("height", 512))
+    steps = int(request_data.get("steps", 20))
+    cfg_scale = float(request_data.get("cfg_scale", 7.0))
+    sampler = request_data.get("sampler", "Euler a")
+    seed = int(request_data.get("seed", -1))
+    batch_size = min(int(request_data.get("batch_size", 1)), 4)
+    model = request_data.get("model", "")
+    loras = request_data.get("loras", "")
+
     try:
         images = sd_client.txt2img(
             positive=positive,
             negative=negative,
-            width=int(request_data.get("width", 512)),
-            height=int(request_data.get("height", 512)),
-            steps=int(request_data.get("steps", 20)),
-            cfg_scale=float(request_data.get("cfg_scale", 7.0)),
-            sampler=request_data.get("sampler", "Euler a"),
-            seed=int(request_data.get("seed", -1)),
-            batch_size=min(int(request_data.get("batch_size", 1)), 4)
+            width=width,
+            height=height,
+            steps=steps,
+            cfg_scale=cfg_scale,
+            sampler=sampler,
+            seed=seed,
+            batch_size=batch_size,
+            model=model,
+            loras=loras
         )
-        return {"success": True, "images": images, "count": len(images)}
+
+        # 画像を自動保存
+        saved_files = sd_client.save_images(
+            images=images,
+            positive=positive,
+            negative=negative,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg_scale=cfg_scale,
+            sampler=sampler,
+            seed=seed,
+            model=model,
+            loras=loras
+        )
+
+        return {
+            "success": True,
+            "images": images,
+            "count": len(images),
+            "saved_files": saved_files
+        }
     except ConnectionError:
         raise HTTPException(status_code=503, detail="Stable Diffusion API is not available.")
     except TimeoutError:

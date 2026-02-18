@@ -73,9 +73,21 @@ async function checkSDStatus() {
             sdEl.querySelector('.label').textContent = 'SD ✓';
             badge.className = 'badge badge-green';
             badge.textContent = 'Connected';
+
+            // Sampler更新
             if (d.samplers?.length) {
                 const sel = document.getElementById('sd-sampler');
                 sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+            }
+
+            // モデル一覧を更新
+            if (d.models?.length) {
+                const modelSel = document.getElementById('sd-model');
+                modelSel.innerHTML = '<option value="">-- デフォルト --</option>' +
+                    d.models.map(m => {
+                        const name = m.model_name || m.title || '';
+                        return `<option value="${name}">${name}</option>`;
+                    }).join('');
             }
         } else {
             sdEl.classList.add('error');
@@ -525,7 +537,9 @@ async function runSDGenerate() {
         cfg_scale: parseFloat(document.getElementById('sd-cfg').value),
         sampler: document.getElementById('sd-sampler').value,
         batch_size: parseInt(document.getElementById('sd-batch').value),
-        seed: parseInt(document.getElementById('sd-seed').value)
+        seed: parseInt(document.getElementById('sd-seed').value),
+        model: document.getElementById('sd-model').value.trim(),
+        loras: document.getElementById('sd-loras').value.trim()
     };
 
     try {
