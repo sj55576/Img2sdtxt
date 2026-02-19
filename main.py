@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+import base64
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -338,6 +339,80 @@ async def sd_generate(request_data: dict):
             seed=seed,
             model=model,
             loras=loras
+        )
+
+        return {
+            "success": True,
+            "images": images,
+            "count": len(images),
+            "saved_files": saved_files
+        }
+    except ConnectionError:
+        raise HTTPException(status_code=503, detail="Stable Diffusion API is not available.")
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Generation timed out.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/sd/img2img")
+async def sd_img2img(
+    file: UploadFile = File(...),
+    positive: str = Form(...),
+    negative: str = Form(""),
+    denoising_strength: float = Form(0.75),
+    width: int = Form(512),
+    height: int = Form(512),
+    steps: int = Form(20),
+    cfg_scale: float = Form(7.0),
+    sampler: str = Form("Euler a"),
+    seed: int = Form(-1),
+    batch_size: int = Form(1),
+    resize_mode: int = Form(0),
+    model: str = Form(""),
+    loras: str = Form("")
+):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image type.")
+
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=400, detail="Image too large (max 10MB).")
+
+    init_image = base64.b64encode(contents).decode("utf-8")
+
+    try:
+        images = sd_client.img2img(
+            init_image=init_image,
+            positive=positive,
+            negative=negative,
+            denoising_strength=denoising_strength,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg_scale=cfg_scale,
+            sampler=sampler,
+            seed=seed,
+            batch_size=min(batch_size, 4),
+            resize_mode=resize_mode,
+            model=model,
+            loras=loras
+        )
+
+        saved_files = sd_client.save_images(
+            images=images,
+            positive=positive,
+            negative=negative,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg_scale=cfg_scale,
+            sampler=sampler,
+            seed=seed,
+            model=model,
+            loras=loras,
+            mode="img2img",
+            denoising_strength=denoising_strength
         )
 
         return {

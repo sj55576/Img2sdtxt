@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupHistoryPage();
     setupPresetsPage();
     setupSDPage();
+    setupImg2ImgPage();
     checkStatus();
 });
 
@@ -35,6 +36,7 @@ function setupNavigation() {
             if (page === 'history') loadHistory();
             if (page === 'presets') loadPresets();
             if (page === 'sd') checkSDStatus();
+            if (page === 'img2img') checkImg2ImgStatus();
         });
     });
 }
@@ -146,6 +148,7 @@ function setupGeneratePage() {
     });
     document.getElementById('copy-all-btn').addEventListener('click', copyAllPrompts);
     document.getElementById('send-to-sd-btn').addEventListener('click', sendToSDPage);
+    document.getElementById('send-to-img2img-btn').addEventListener('click', sendToImg2ImgPage);
 
     // Load presets into select
     loadPresetsIntoSelects();
@@ -235,6 +238,13 @@ function sendToSDPage() {
     document.getElementById('sd-negative').value = document.getElementById('neg-prompt').value;
     document.querySelector('[data-page="sd"]').click();
     checkSDStatus();
+}
+
+function sendToImg2ImgPage() {
+    document.getElementById('i2i-positive').value = document.getElementById('pos-prompt').value;
+    document.getElementById('i2i-negative').value = document.getElementById('neg-prompt').value;
+    document.querySelector('[data-page="img2img"]').click();
+    checkImg2ImgStatus();
 }
 
 function copyAllPrompts() {
@@ -572,6 +582,134 @@ function downloadImage(base64, index) {
     a.href = `data:image/png;base64,${base64}`;
     a.download = `sd_generated_${index}.png`;
     a.click();
+}
+
+/* =====================================================================
+   Img2Img Page
+   ===================================================================== */
+let i2iSelectedImage = null;
+
+function setupImg2ImgPage() {
+    const uploadArea = document.getElementById('i2i-upload-area');
+    const imageInput = document.getElementById('i2i-image-input');
+
+    uploadArea.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', e => handleI2IImageSelect(e.target.files[0]));
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        if (e.dataTransfer.files[0]) handleI2IImageSelect(e.dataTransfer.files[0]);
+    });
+
+    document.getElementById('i2i-clear-btn').addEventListener('click', clearI2IImage);
+    document.getElementById('i2i-generate-btn').addEventListener('click', runImg2Img);
+}
+
+function handleI2IImageSelect(file) {
+    if (!file || !file.type.startsWith('image/')) { toast('画像ファイルを選択してください', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast('ファイルサイズが10MBを超えています', 'error'); return; }
+    i2iSelectedImage = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('i2i-preview-image').src = e.target.result;
+        document.getElementById('i2i-preview-wrap').classList.remove('hidden');
+        document.getElementById('i2i-upload-area').classList.add('hidden');
+        document.getElementById('i2i-generate-btn').disabled = false;
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearI2IImage() {
+    i2iSelectedImage = null;
+    document.getElementById('i2i-image-input').value = '';
+    document.getElementById('i2i-preview-wrap').classList.add('hidden');
+    document.getElementById('i2i-upload-area').classList.remove('hidden');
+    document.getElementById('i2i-generate-btn').disabled = true;
+}
+
+async function checkImg2ImgStatus() {
+    const badge = document.getElementById('i2i-api-badge');
+    badge.className = 'badge badge-gray';
+    badge.textContent = 'Checking...';
+    try {
+        const r = await fetch('/api/sd/status');
+        const d = await r.json();
+        if (d.available) {
+            badge.className = 'badge badge-green';
+            badge.textContent = 'Connected';
+
+            if (d.samplers?.length) {
+                const sel = document.getElementById('i2i-sampler');
+                sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+            }
+            if (d.models?.length) {
+                const modelSel = document.getElementById('i2i-model');
+                modelSel.innerHTML = '<option value="">-- デフォルト --</option>' +
+                    d.models.map(m => {
+                        const name = m.model_name || m.title || '';
+                        return `<option value="${name}">${name}</option>`;
+                    }).join('');
+            }
+        } else {
+            badge.className = 'badge badge-red';
+            badge.textContent = 'Disconnected';
+        }
+    } catch {
+        badge.className = 'badge badge-red';
+        badge.textContent = 'Error';
+    }
+}
+
+async function runImg2Img() {
+    if (!i2iSelectedImage) { toast('入力画像を選択してください', 'error'); return; }
+
+    const positive = document.getElementById('i2i-positive').value.trim();
+    if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
+
+    const loading = document.getElementById('i2i-loading');
+    const results = document.getElementById('i2i-results');
+    const imagesEl = document.getElementById('i2i-images');
+
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+
+    const fd = new FormData();
+    fd.append('file', i2iSelectedImage);
+    fd.append('positive', positive);
+    fd.append('negative', document.getElementById('i2i-negative').value.trim());
+    fd.append('denoising_strength', document.getElementById('i2i-denoising').value);
+    fd.append('resize_mode', document.getElementById('i2i-resize-mode').value);
+    fd.append('width', document.getElementById('i2i-width').value);
+    fd.append('height', document.getElementById('i2i-height').value);
+    fd.append('steps', document.getElementById('i2i-steps').value);
+    fd.append('cfg_scale', document.getElementById('i2i-cfg').value);
+    fd.append('sampler', document.getElementById('i2i-sampler').value);
+    fd.append('batch_size', document.getElementById('i2i-batch').value);
+    fd.append('seed', document.getElementById('i2i-seed').value);
+    fd.append('model', document.getElementById('i2i-model').value.trim());
+    fd.append('loras', document.getElementById('i2i-loras').value.trim());
+
+    try {
+        const r = await fetch('/api/sd/img2img', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error((await r.json()).detail);
+        const d = await r.json();
+
+        imagesEl.innerHTML = d.images.map((img, i) => `
+            <div class="sd-image-wrap">
+                <img src="data:image/png;base64,${img}" alt="Generated ${i + 1}">
+                <button class="sd-image-download" onclick="downloadImage('${img}', ${i + 1})">⬇ 保存</button>
+            </div>
+        `).join('');
+
+        results.classList.remove('hidden');
+        toast(`${d.count}枚の画像を生成しました`, 'success');
+    } catch (e) {
+        toast(e.message || '生成に失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
+    }
 }
 
 /* =====================================================================

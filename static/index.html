@@ -20,6 +20,7 @@
                 <button class="nav-btn" data-page="history">📋 History</button>
                 <button class="nav-btn" data-page="presets">🎨 Presets</button>
                 <button class="nav-btn" data-page="sd">🖼️ SD Generate</button>
+                <button class="nav-btn" data-page="img2img">🔄 Img2Img</button>
             </nav>
             <div class="sidebar-status">
                 <div class="status-indicator" id="llm-status">
@@ -151,6 +152,7 @@
                             <div class="result-actions">
                                 <button id="copy-all-btn" class="btn btn-secondary">📋 全コピー</button>
                                 <button id="send-to-sd-btn" class="btn btn-accent">🖼️ SDで生成</button>
+                                <button id="send-to-img2img-btn" class="btn btn-accent">🔄 Img2Imgへ</button>
                             </div>
                         </div>
                     </div>
@@ -385,6 +387,132 @@
                         <div id="sd-results" class="sd-results hidden">
                             <h3>生成された画像</h3>
                             <div id="sd-images" class="sd-images"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- ======================== IMG2IMG PAGE ======================== -->
+            <section id="page-img2img" class="page">
+                <div class="page-header">
+                    <h2>Img2Img</h2>
+                    <p>入力画像を元にStable Diffusionで変換生成</p>
+                    <div id="i2i-api-badge" class="badge badge-gray">Checking...</div>
+                </div>
+                <div class="page-body two-col">
+                    <!-- Left: Input -->
+                    <div class="col">
+                        <!-- Input Image -->
+                        <div class="form-group" style="margin-bottom:12px;">
+                            <label>入力画像</label>
+                            <div class="upload-area" id="i2i-upload-area">
+                                <div class="upload-icon">🖼️</div>
+                                <p>クリックまたはドラッグ&ドロップ</p>
+                                <small>JPG, PNG, WebP, GIF (最大 10MB)</small>
+                            </div>
+                            <input type="file" id="i2i-image-input" accept="image/*" hidden>
+                            <div id="i2i-preview-wrap" class="preview-wrap hidden">
+                                <img id="i2i-preview-image" src="" alt="Preview">
+                                <button id="i2i-clear-btn" class="btn btn-sm btn-ghost">✕ クリア</button>
+                            </div>
+                        </div>
+
+                        <!-- Prompts -->
+                        <div class="form-group">
+                            <label>Positive Prompt</label>
+                            <textarea id="i2i-positive" rows="4" placeholder="ポジティブプロンプト..."></textarea>
+                        </div>
+                        <div class="form-group" style="margin-top:10px;">
+                            <label>Negative Prompt</label>
+                            <textarea id="i2i-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                        </div>
+
+                        <!-- Model & LoRA -->
+                        <div class="customization-panel">
+                            <h3>🎯 モデル・LoRA設定</h3>
+                            <div class="form-group">
+                                <label>モデル</label>
+                                <select id="i2i-model">
+                                    <option value="">-- デフォルト --</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-top:10px;">
+                                <label>LoRA</label>
+                                <input type="text" id="i2i-loras" placeholder="lora1:1.0,lora2:0.8">
+                            </div>
+                        </div>
+
+                        <!-- Parameters -->
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Denoising Strength</label>
+                                <input type="number" id="i2i-denoising" value="0.75" min="0" max="1" step="0.05">
+                                <small style="color:var(--text-muted);font-size:0.75rem;">0=変化なし 1=完全変換</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Resize Mode</label>
+                                <select id="i2i-resize-mode">
+                                    <option value="0">そのままリサイズ</option>
+                                    <option value="1">クロップ&リサイズ</option>
+                                    <option value="2">リサイズ&フィル</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Width</label>
+                                <select id="i2i-width">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Height</label>
+                                <select id="i2i-height">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Steps</label>
+                                <input type="number" id="i2i-steps" value="20" min="5" max="150">
+                            </div>
+                            <div class="form-group">
+                                <label>CFG Scale</label>
+                                <input type="number" id="i2i-cfg" value="7" min="1" max="30" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Sampler</label>
+                                <select id="i2i-sampler">
+                                    <option>Euler a</option>
+                                    <option>Euler</option>
+                                    <option>DPM++ 2M Karras</option>
+                                    <option>DDIM</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Batch Size</label>
+                                <input type="number" id="i2i-batch" value="1" min="1" max="4">
+                            </div>
+                            <div class="form-group">
+                                <label>Seed (-1=random)</label>
+                                <input type="number" id="i2i-seed" value="-1">
+                            </div>
+                        </div>
+
+                        <button id="i2i-generate-btn" class="btn btn-accent btn-block" disabled>
+                            🔄 Img2Img 生成
+                        </button>
+                    </div>
+
+                    <!-- Right: Output -->
+                    <div class="col">
+                        <div id="i2i-loading" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p>変換生成中... (しばらくお待ちください)</p>
+                        </div>
+                        <div id="i2i-results" class="sd-results hidden">
+                            <h3>生成された画像</h3>
+                            <div id="i2i-images" class="sd-images"></div>
                         </div>
                     </div>
                 </div>

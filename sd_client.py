@@ -132,6 +132,74 @@ class SDClient:
         except Exception as e:
             raise Exception(f"SD API error: {str(e)}")
 
+    def img2img(
+        self,
+        init_image: str,
+        positive: str,
+        negative: str,
+        denoising_strength: float = 0.75,
+        width: int = 512,
+        height: int = 512,
+        steps: int = 20,
+        cfg_scale: float = 7.0,
+        sampler: str = "Euler a",
+        seed: int = -1,
+        batch_size: int = 1,
+        resize_mode: int = 0,
+        model: str = "",
+        loras: str = ""
+    ) -> List[str]:
+        """
+        画像から画像を生成し、Base64エンコードされた画像リストを返す
+        init_image: Base64エンコードされた入力画像
+        denoising_strength: 変化の強さ (0.0=変化なし, 1.0=完全変換)
+        resize_mode: 0=そのままリサイズ, 1=クロップ&リサイズ, 2=リサイズ&フィル
+        """
+        if model:
+            self.set_model(model)
+
+        # LoRAをプロンプトに追加
+        final_positive = positive
+        if loras:
+            if ":" in loras and not loras.startswith("<lora:"):
+                lora_parts = loras.split(",")
+                lora_tags = "".join([f"<lora:{part.strip()}>" for part in lora_parts])
+            else:
+                lora_tags = loras
+            final_positive = f"{lora_tags}, {positive}"
+
+        payload = {
+            "init_images": [init_image],
+            "prompt": final_positive,
+            "negative_prompt": negative,
+            "denoising_strength": denoising_strength,
+            "width": width,
+            "height": height,
+            "steps": steps,
+            "cfg_scale": cfg_scale,
+            "sampler_name": sampler,
+            "seed": seed,
+            "batch_size": batch_size,
+            "resize_mode": resize_mode,
+            "restore_faces": False,
+            "save_images": False
+        }
+        try:
+            r = requests.post(
+                f"{self.base_url}/sdapi/v1/img2img",
+                json=payload,
+                timeout=180
+            )
+            r.raise_for_status()
+            result = r.json()
+            return result.get("images", [])
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
+        except requests.exceptions.Timeout:
+            raise TimeoutError("Stable Diffusion img2img generation timed out")
+        except Exception as e:
+            raise Exception(f"SD API error: {str(e)}")
+
     def get_samplers(self) -> List[str]:
         try:
             r = requests.get(f"{self.base_url}/sdapi/v1/samplers", timeout=10)
@@ -152,19 +220,23 @@ class SDClient:
         sampler: str = "Euler a",
         seed: int = -1,
         model: str = "",
-        loras: str = ""
+        loras: str = "",
+        mode: str = "txt2img",
+        denoising_strength: float = 0.75
     ) -> List[Dict]:
         """
         生成された画像（Base64エンコード）を保存
         メタデータ付きのJSONファイルも同時に保存
+        mode: "txt2img" または "img2img"
         """
         saved_files = []
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        prefix = "i2i" if mode == "img2img" else "sd"
 
         try:
             for idx, image_base64 in enumerate(images):
                 # ファイル名生成
-                filename = f"sd_{timestamp}_{idx:03d}.png"
+                filename = f"{prefix}_{timestamp}_{idx:03d}.png"
                 filepath = SD_OUTPUT_DIR / filename
 
                 # Base64をデコードして保存
@@ -179,25 +251,30 @@ class SDClient:
                 })
 
             # メタデータ（生成パラメータ）をJSONで保存
+            params = {
+                "positive_prompt": positive,
+                "negative_prompt": negative,
+                "width": width,
+                "height": height,
+                "steps": steps,
+                "cfg_scale": cfg_scale,
+                "sampler": sampler,
+                "seed": seed,
+                "model": model,
+                "loras": loras
+            }
+            if mode == "img2img":
+                params["denoising_strength"] = denoising_strength
+
             metadata = {
                 "timestamp": timestamp,
+                "mode": mode,
                 "image_count": len(images),
-                "parameters": {
-                    "positive_prompt": positive,
-                    "negative_prompt": negative,
-                    "width": width,
-                    "height": height,
-                    "steps": steps,
-                    "cfg_scale": cfg_scale,
-                    "sampler": sampler,
-                    "seed": seed,
-                    "model": model,
-                    "loras": loras
-                },
+                "parameters": params,
                 "files": saved_files
             }
 
-            metadata_filename = f"sd_{timestamp}_metadata.json"
+            metadata_filename = f"{prefix}_{timestamp}_metadata.json"
             metadata_filepath = SD_OUTPUT_DIR / metadata_filename
             with open(metadata_filepath, "w", encoding="utf-8") as f:
                 json.dump(metadata, f, indent=2, ensure_ascii=False)
