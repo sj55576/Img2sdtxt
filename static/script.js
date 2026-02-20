@@ -18,6 +18,20 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSDPage();
     setupImg2ImgPage();
     checkStatus();
+
+    // Prevent default drag and drop behavior on document
+    document.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    document.addEventListener('dragleave', e => {
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    document.addEventListener('drop', e => {
+        e.preventDefault();
+        e.stopPropagation();
+    });
 });
 
 /* =====================================================================
@@ -609,44 +623,132 @@ let i2iSelectedImage = null;
 function setupImg2ImgPage() {
     const uploadArea = document.getElementById('i2i-upload-area');
     const imageInput = document.getElementById('i2i-image-input');
+    const clearBtn = document.getElementById('i2i-clear-btn');
+    const generateBtn = document.getElementById('i2i-generate-btn');
+    const enableHrCheckbox = document.getElementById('i2i-enable-hr');
+    const hrSettings = document.getElementById('i2i-hr-settings');
 
-    uploadArea.addEventListener('click', () => imageInput.click());
-    imageInput.addEventListener('change', e => handleI2IImageSelect(e.target.files[0]));
-    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
-    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
-    uploadArea.addEventListener('drop', e => {
+    console.log('[IMG2IMG] setupImg2ImgPage called');
+    console.log('[IMG2IMG] uploadArea:', uploadArea);
+    console.log('[IMG2IMG] imageInput:', imageInput);
+
+    if (!uploadArea || !imageInput) {
+        console.error('[IMG2IMG] Upload elements not found!');
+        return;
+    }
+
+    // Click to upload
+    uploadArea.addEventListener('click', () => {
+        console.log('[IMG2IMG] Click on upload area');
+        imageInput.click();
+    });
+
+    // File input change
+    imageInput.addEventListener('change', e => {
+        console.log('[IMG2IMG] File input changed:', e.target.files);
+        handleI2IImageSelect(e.target.files[0]);
+    });
+
+    // Drag over
+    uploadArea.addEventListener('dragover', e => {
+        console.log('[IMG2IMG] Dragover');
         e.preventDefault();
-        uploadArea.classList.remove('drag-over');
-        if (e.dataTransfer.files[0]) handleI2IImageSelect(e.dataTransfer.files[0]);
+        e.stopPropagation();
+        uploadArea.classList.add('drag-over');
     });
 
-    document.getElementById('i2i-clear-btn').addEventListener('click', clearI2IImage);
-    document.getElementById('i2i-generate-btn').addEventListener('click', runImg2Img);
-    document.getElementById('i2i-enable-hr').addEventListener('change', e => {
-        document.getElementById('i2i-hr-settings').classList.toggle('hidden', !e.target.checked);
+    // Drag leave
+    uploadArea.addEventListener('dragleave', e => {
+        console.log('[IMG2IMG] Dragleave');
+        e.preventDefault();
+        e.stopPropagation();
+        uploadArea.classList.remove('drag-over');
     });
+
+    // Drop
+    uploadArea.addEventListener('drop', e => {
+        console.log('[IMG2IMG] Drop event:', e.dataTransfer.files);
+        e.preventDefault();
+        e.stopPropagation();
+        uploadArea.classList.remove('drag-over');
+        if (e.dataTransfer.files[0]) {
+            handleI2IImageSelect(e.dataTransfer.files[0]);
+        }
+    });
+
+    if (clearBtn) clearBtn.addEventListener('click', clearI2IImage);
+    if (generateBtn) generateBtn.addEventListener('click', runImg2Img);
+    if (enableHrCheckbox && hrSettings) {
+        enableHrCheckbox.addEventListener('change', e => {
+            hrSettings.classList.toggle('hidden', !e.target.checked);
+        });
+    }
+
+    console.log('[IMG2IMG] setupImg2ImgPage completed');
 }
 
 function handleI2IImageSelect(file) {
-    if (!file || !file.type.startsWith('image/')) { toast('画像ファイルを選択してください', 'error'); return; }
-    if (file.size > 10 * 1024 * 1024) { toast('ファイルサイズが10MBを超えています', 'error'); return; }
+    console.log('[IMG2IMG] handleI2IImageSelect called with file:', file);
+
+    if (!file) {
+        console.error('[IMG2IMG] No file provided');
+        toast('画像ファイルを選択してください', 'error');
+        return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+        console.error('[IMG2IMG] Invalid file type:', file.type);
+        toast('画像ファイルを選択してください', 'error');
+        return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+        console.error('[IMG2IMG] File too large:', file.size);
+        toast('ファイルサイズが10MBを超えています', 'error');
+        return;
+    }
+
     i2iSelectedImage = file;
+    console.log('[IMG2IMG] File stored, reading as DataURL');
+
     const reader = new FileReader();
     reader.onload = e => {
-        document.getElementById('i2i-preview-image').src = e.target.result;
-        document.getElementById('i2i-preview-wrap').classList.remove('hidden');
-        document.getElementById('i2i-upload-area').classList.add('hidden');
-        document.getElementById('i2i-generate-btn').disabled = false;
+        console.log('[IMG2IMG] FileReader onload completed');
+        const previewImg = document.getElementById('i2i-preview-image');
+        const previewWrap = document.getElementById('i2i-preview-wrap');
+        const uploadArea = document.getElementById('i2i-upload-area');
+        const genBtn = document.getElementById('i2i-generate-btn');
+
+        if (previewImg) previewImg.src = e.target.result;
+        if (previewWrap) previewWrap.classList.remove('hidden');
+        if (uploadArea) uploadArea.classList.add('hidden');
+        if (genBtn) genBtn.disabled = false;
+
+        console.log('[IMG2IMG] Preview updated');
+        toast('画像を読み込みました', 'success');
+    };
+    reader.onerror = () => {
+        console.error('[IMG2IMG] FileReader error');
+        toast('ファイルの読み込みに失敗しました', 'error');
     };
     reader.readAsDataURL(file);
 }
 
 function clearI2IImage() {
+    console.log('[IMG2IMG] clearI2IImage called');
     i2iSelectedImage = null;
-    document.getElementById('i2i-image-input').value = '';
-    document.getElementById('i2i-preview-wrap').classList.add('hidden');
-    document.getElementById('i2i-upload-area').classList.remove('hidden');
-    document.getElementById('i2i-generate-btn').disabled = true;
+
+    const imageInput = document.getElementById('i2i-image-input');
+    const previewWrap = document.getElementById('i2i-preview-wrap');
+    const uploadArea = document.getElementById('i2i-upload-area');
+    const genBtn = document.getElementById('i2i-generate-btn');
+
+    if (imageInput) imageInput.value = '';
+    if (previewWrap) previewWrap.classList.add('hidden');
+    if (uploadArea) uploadArea.classList.remove('hidden');
+    if (genBtn) genBtn.disabled = true;
+
+    console.log('[IMG2IMG] Image cleared');
 }
 
 async function checkImg2ImgStatus() {
