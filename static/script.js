@@ -91,6 +91,14 @@ async function checkSDStatus() {
                         return `<option value="${name}">${name}</option>`;
                     }).join('');
             }
+
+            // アップスケーラー一覧を更新
+            if (d.upscalers?.length) {
+                const upscalerSel = document.getElementById('sd-hr-upscaler');
+                upscalerSel.innerHTML = d.upscalers.map(u =>
+                    `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
+                ).join('');
+            }
         } else {
             sdEl.classList.add('error');
             sdEl.querySelector('.label').textContent = 'SD ✗';
@@ -525,6 +533,9 @@ function closePresetModal() {
    ===================================================================== */
 function setupSDPage() {
     document.getElementById('sd-generate-btn').addEventListener('click', runSDGenerate);
+    document.getElementById('sd-enable-hr').addEventListener('change', e => {
+        document.getElementById('sd-hr-settings').classList.toggle('hidden', !e.target.checked);
+    });
 }
 
 async function runSDGenerate() {
@@ -538,6 +549,7 @@ async function runSDGenerate() {
     loading.classList.remove('hidden');
     results.classList.add('hidden');
 
+    const enableHr = document.getElementById('sd-enable-hr').checked;
     const payload = {
         positive,
         negative: document.getElementById('sd-negative').value.trim(),
@@ -549,7 +561,12 @@ async function runSDGenerate() {
         batch_size: parseInt(document.getElementById('sd-batch').value),
         seed: parseInt(document.getElementById('sd-seed').value),
         model: document.getElementById('sd-model').value.trim(),
-        loras: document.getElementById('sd-loras').value.trim()
+        loras: document.getElementById('sd-loras').value.trim(),
+        enable_hr: enableHr,
+        hr_scale: parseFloat(document.getElementById('sd-hr-scale').value),
+        hr_upscaler: document.getElementById('sd-hr-upscaler').value,
+        hr_second_pass_steps: parseInt(document.getElementById('sd-hr-steps').value),
+        hr_denoising_strength: parseFloat(document.getElementById('sd-hr-denoising').value)
     };
 
     try {
@@ -605,6 +622,9 @@ function setupImg2ImgPage() {
 
     document.getElementById('i2i-clear-btn').addEventListener('click', clearI2IImage);
     document.getElementById('i2i-generate-btn').addEventListener('click', runImg2Img);
+    document.getElementById('i2i-enable-hr').addEventListener('change', e => {
+        document.getElementById('i2i-hr-settings').classList.toggle('hidden', !e.target.checked);
+    });
 }
 
 function handleI2IImageSelect(file) {
@@ -652,6 +672,14 @@ async function checkImg2ImgStatus() {
                         return `<option value="${name}">${name}</option>`;
                     }).join('');
             }
+
+            // アップスケーラー一覧を更新
+            if (d.upscalers?.length) {
+                const upscalerSel = document.getElementById('i2i-hr-upscaler');
+                upscalerSel.innerHTML = d.upscalers.map(u =>
+                    `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
+                ).join('');
+            }
         } else {
             badge.className = 'badge badge-red';
             badge.textContent = 'Disconnected';
@@ -690,6 +718,11 @@ async function runImg2Img() {
     fd.append('seed', document.getElementById('i2i-seed').value);
     fd.append('model', document.getElementById('i2i-model').value.trim());
     fd.append('loras', document.getElementById('i2i-loras').value.trim());
+    fd.append('enable_hr', document.getElementById('i2i-enable-hr').checked ? 'true' : 'false');
+    fd.append('hr_scale', document.getElementById('i2i-hr-scale').value);
+    fd.append('hr_upscaler', document.getElementById('i2i-hr-upscaler').value);
+    fd.append('hr_second_pass_steps', document.getElementById('i2i-hr-steps').value);
+    fd.append('hr_denoising_strength', document.getElementById('i2i-hr-denoising').value);
 
     try {
         const r = await fetch('/api/sd/img2img', { method: 'POST', body: fd });

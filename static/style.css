@@ -244,6 +244,19 @@ textarea { resize: vertical; }
 .toast.info { background: var(--primary); color: white; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
+/* ---- Upscale Settings ---- */
+.checkbox-label {
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer; font-size: 0.9rem;
+    font-weight: 500; color: var(--text);
+    text-transform: none; letter-spacing: normal;
+}
+.checkbox-label input[type="checkbox"] {
+    width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0;
+}
+.hr-settings { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.hr-settings small { font-size: 0.72rem; color: var(--text-muted); }
+
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
     .page-body.two-col { grid-template-columns: 1fr; }
