@@ -373,6 +373,53 @@
                                 <input type="number" id="sd-seed" value="-1">
                             </div>
                         </div>
+                        <!-- Upscaling Settings (Hires.fix) -->
+                        <div class="customization-panel">
+                            <h3>🔍 アップスケール設定 (Hires.fix)</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="sd-enable-hr">
+                                    <span>Hires.fix を有効化（高解像度アップスケール）</span>
+                                </label>
+                            </div>
+                            <div id="sd-hr-settings" class="hr-settings hidden">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>スケール倍率</label>
+                                        <select id="sd-hr-scale">
+                                            <option value="1.5">1.5x</option>
+                                            <option value="2" selected>2x</option>
+                                            <option value="2.5">2.5x</option>
+                                            <option value="3">3x</option>
+                                            <option value="4">4x</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>アップスケーラー</label>
+                                        <select id="sd-hr-upscaler">
+                                            <option>R-ESRGAN 4x+</option>
+                                            <option>R-ESRGAN 4x+ Anime6B</option>
+                                            <option>ESRGAN_4x</option>
+                                            <option>Latent</option>
+                                            <option>Latent (bicubic)</option>
+                                            <option>SwinIR 4x</option>
+                                            <option>LDSR</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Hiresステップ数</label>
+                                        <input type="number" id="sd-hr-steps" value="0" min="0" max="150">
+                                        <small>0 = メインと同じステップ数</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>デノイジング強度</label>
+                                        <input type="number" id="sd-hr-denoising" value="0.7" min="0" max="1" step="0.05">
+                                        <small>0=忠実に拡大, 1=大きく変化</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <button id="sd-generate-btn" class="btn btn-accent btn-block">
                             🖼️ 画像生成
                         </button>
@@ -496,6 +543,53 @@
                             <div class="form-group">
                                 <label>Seed (-1=random)</label>
                                 <input type="number" id="i2i-seed" value="-1">
+                            </div>
+                        </div>
+
+                        <!-- Upscaling Settings (Hires.fix) -->
+                        <div class="customization-panel">
+                            <h3>🔍 アップスケール設定 (Hires.fix)</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="i2i-enable-hr">
+                                    <span>Hires.fix を有効化（高解像度アップスケール）</span>
+                                </label>
+                            </div>
+                            <div id="i2i-hr-settings" class="hr-settings hidden">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label>スケール倍率</label>
+                                        <select id="i2i-hr-scale">
+                                            <option value="1.5">1.5x</option>
+                                            <option value="2" selected>2x</option>
+                                            <option value="2.5">2.5x</option>
+                                            <option value="3">3x</option>
+                                            <option value="4">4x</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>アップスケーラー</label>
+                                        <select id="i2i-hr-upscaler">
+                                            <option>R-ESRGAN 4x+</option>
+                                            <option>R-ESRGAN 4x+ Anime6B</option>
+                                            <option>ESRGAN_4x</option>
+                                            <option>Latent</option>
+                                            <option>Latent (bicubic)</option>
+                                            <option>SwinIR 4x</option>
+                                            <option>LDSR</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Hiresステップ数</label>
+                                        <input type="number" id="i2i-hr-steps" value="0" min="0" max="150">
+                                        <small>0 = メインと同じステップ数</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>デノイジング強度</label>
+                                        <input type="number" id="i2i-hr-denoising" value="0.7" min="0" max="1" step="0.05">
+                                        <small>0=忠実に拡大, 1=大きく変化</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

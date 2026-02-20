@@ -284,14 +284,25 @@ async def sd_status():
     model = ""
     samplers = []
     models = []
+    upscalers = []
     if available:
         try:
             model = sd_client.get_current_model()
             samplers = sd_client.get_samplers()
             models = sd_client.get_model_list()
+            upscalers = sd_client.get_upscalers()
         except Exception:
             pass
-    return {"available": available, "model": model, "samplers": samplers, "models": models}
+    return {"available": available, "model": model, "samplers": samplers, "models": models, "upscalers": upscalers}
+
+
+@app.get("/api/sd/upscalers")
+async def sd_upscalers():
+    try:
+        upscalers = sd_client.get_upscalers()
+        return {"success": True, "upscalers": upscalers}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 @app.post("/api/sd/generate")
@@ -310,6 +321,11 @@ async def sd_generate(request_data: dict):
     batch_size = min(int(request_data.get("batch_size", 1)), 4)
     model = request_data.get("model", "")
     loras = request_data.get("loras", "")
+    enable_hr = bool(request_data.get("enable_hr", False))
+    hr_scale = float(request_data.get("hr_scale", 2.0))
+    hr_upscaler = request_data.get("hr_upscaler", "R-ESRGAN 4x+")
+    hr_second_pass_steps = int(request_data.get("hr_second_pass_steps", 0))
+    hr_denoising_strength = float(request_data.get("hr_denoising_strength", 0.7))
 
     try:
         images = sd_client.txt2img(
@@ -323,7 +339,12 @@ async def sd_generate(request_data: dict):
             seed=seed,
             batch_size=batch_size,
             model=model,
-            loras=loras
+            loras=loras,
+            enable_hr=enable_hr,
+            hr_scale=hr_scale,
+            hr_upscaler=hr_upscaler,
+            hr_second_pass_steps=hr_second_pass_steps,
+            hr_denoising_strength=hr_denoising_strength
         )
 
         # 画像を自動保存
@@ -370,7 +391,12 @@ async def sd_img2img(
     batch_size: int = Form(1),
     resize_mode: int = Form(0),
     model: str = Form(""),
-    loras: str = Form("")
+    loras: str = Form(""),
+    enable_hr: bool = Form(False),
+    hr_scale: float = Form(2.0),
+    hr_upscaler: str = Form("R-ESRGAN 4x+"),
+    hr_second_pass_steps: int = Form(0),
+    hr_denoising_strength: float = Form(0.7)
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")
@@ -396,7 +422,12 @@ async def sd_img2img(
             batch_size=min(batch_size, 4),
             resize_mode=resize_mode,
             model=model,
-            loras=loras
+            loras=loras,
+            enable_hr=enable_hr,
+            hr_scale=hr_scale,
+            hr_upscaler=hr_upscaler,
+            hr_second_pass_steps=hr_second_pass_steps,
+            hr_denoising_strength=hr_denoising_strength
         )
 
         saved_files = sd_client.save_images(

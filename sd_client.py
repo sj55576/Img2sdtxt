@@ -67,6 +67,17 @@ class SDClient:
         except Exception as e:
             raise Exception(f"Failed to get models: {str(e)}")
 
+    def get_upscalers(self) -> List[str]:
+        try:
+            r = requests.get(f"{self.base_url}/sdapi/v1/upscalers", timeout=10)
+            r.raise_for_status()
+            return [u["name"] for u in r.json()]
+        except Exception:
+            return ["Latent", "Latent (antialiased)", "Latent (bicubic)", "Latent (bicubic antialiased)",
+                    "Latent (nearest)", "None", "Lanczos", "Nearest",
+                    "ESRGAN_4x", "LDSR", "R-ESRGAN 4x+", "R-ESRGAN 4x+ Anime6B",
+                    "ScuNET GAN", "ScuNET PSNR", "SwinIR 4x"]
+
     def txt2img(
         self,
         positive: str,
@@ -79,12 +90,22 @@ class SDClient:
         seed: int = -1,
         batch_size: int = 1,
         model: str = "",
-        loras: str = ""
+        loras: str = "",
+        enable_hr: bool = False,
+        hr_scale: float = 2.0,
+        hr_upscaler: str = "R-ESRGAN 4x+",
+        hr_second_pass_steps: int = 0,
+        hr_denoising_strength: float = 0.7
     ) -> List[str]:
         """
         テキストから画像を生成し、Base64エンコードされた画像リストを返す
         model: 使用するモデル名（指定時は自動切り替え）
         loras: LoRA指定。形式: "lora1:1.0,lora2:0.8" または "<lora:lora1:1.0><lora:lora2:0.8>"
+        enable_hr: Hires.fix を有効化（アップスケール生成）
+        hr_scale: アップスケール倍率
+        hr_upscaler: アップスケーラー名
+        hr_second_pass_steps: Hires.fix 第2パスのステップ数（0=メインと同じ）
+        hr_denoising_strength: Hires.fix のデノイジング強度
         """
         # モデルの切り替え（指定された場合）
         if model:
@@ -114,7 +135,12 @@ class SDClient:
             "seed": seed,
             "batch_size": batch_size,
             "restore_faces": False,
-            "save_images": False
+            "save_images": False,
+            "enable_hr": enable_hr,
+            "hr_scale": hr_scale,
+            "hr_upscaler": hr_upscaler,
+            "hr_second_pass_steps": hr_second_pass_steps,
+            "denoising_strength": hr_denoising_strength if enable_hr else 0.7
         }
         try:
             r = requests.post(
@@ -147,13 +173,23 @@ class SDClient:
         batch_size: int = 1,
         resize_mode: int = 0,
         model: str = "",
-        loras: str = ""
+        loras: str = "",
+        enable_hr: bool = False,
+        hr_scale: float = 2.0,
+        hr_upscaler: str = "R-ESRGAN 4x+",
+        hr_second_pass_steps: int = 0,
+        hr_denoising_strength: float = 0.7
     ) -> List[str]:
         """
         画像から画像を生成し、Base64エンコードされた画像リストを返す
         init_image: Base64エンコードされた入力画像
         denoising_strength: 変化の強さ (0.0=変化なし, 1.0=完全変換)
         resize_mode: 0=そのままリサイズ, 1=クロップ&リサイズ, 2=リサイズ&フィル
+        enable_hr: Hires.fix を有効化（アップスケール生成）
+        hr_scale: アップスケール倍率
+        hr_upscaler: アップスケーラー名
+        hr_second_pass_steps: Hires.fix 第2パスのステップ数
+        hr_denoising_strength: Hires.fix のデノイジング強度
         """
         if model:
             self.set_model(model)
@@ -182,7 +218,12 @@ class SDClient:
             "batch_size": batch_size,
             "resize_mode": resize_mode,
             "restore_faces": False,
-            "save_images": False
+            "save_images": False,
+            "enable_hr": enable_hr,
+            "hr_scale": hr_scale,
+            "hr_upscaler": hr_upscaler,
+            "hr_second_pass_steps": hr_second_pass_steps,
+            "hr_denoising_strength": hr_denoising_strength
         }
         try:
             r = requests.post(
