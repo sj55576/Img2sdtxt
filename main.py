@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 import base64
+import json
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -467,6 +468,49 @@ async def sd_models():
         return {"success": True, "models": [m.get("model_name", m.get("title", "")) for m in models]}
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+
+# ------------------------------------------------------------------ #
+# Last Parameter History
+# ------------------------------------------------------------------ #
+
+_DATA_DIR = Path(__file__).parent / "data"
+_LAST_PARAMS_FILE = _DATA_DIR / "last_params.json"
+_VALID_FEATURES = {"generate", "sd", "img2img"}
+
+
+def _read_last_params() -> dict:
+    if _LAST_PARAMS_FILE.exists():
+        try:
+            return json.loads(_LAST_PARAMS_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def _write_last_params(data: dict):
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _LAST_PARAMS_FILE.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+@app.get("/api/last-params/{feature}")
+async def get_last_params(feature: str):
+    if feature not in _VALID_FEATURES:
+        raise HTTPException(status_code=400, detail="Invalid feature name.")
+    data = _read_last_params()
+    return {"success": True, "params": data.get(feature, {})}
+
+
+@app.post("/api/last-params/{feature}")
+async def save_last_params(feature: str, request_data: dict):
+    if feature not in _VALID_FEATURES:
+        raise HTTPException(status_code=400, detail="Invalid feature name.")
+    data = _read_last_params()
+    data[feature] = request_data
+    _write_last_params(data)
+    return {"success": True}
 
 
 if __name__ == "__main__":
