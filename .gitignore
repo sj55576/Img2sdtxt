@@ -4,3 +4,5 @@ __pycache__/
 data/
 outputs/
 tmpclaude-*
+venv/
+.vscode/

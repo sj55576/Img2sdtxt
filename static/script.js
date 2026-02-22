@@ -19,6 +19,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupImg2ImgPage();
     checkStatus();
 
+    // Initialize SD and Img2Img selectors early for parameter restoration
+    checkSDStatus();
+    checkImg2ImgStatus();
+
     // Prevent default drag and drop behavior on document
     document.addEventListener('dragover', e => {
         e.preventDefault();
@@ -134,6 +138,7 @@ async function checkSDStatus() {
    Generate Page
    ===================================================================== */
 function setupGeneratePage() {
+    console.log('[INIT] setupGeneratePage');
     // Inner tabs
     document.querySelectorAll('.inner-tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -179,6 +184,7 @@ function setupGeneratePage() {
     loadPresetsIntoSelects();
 
     // Restore last used parameters
+    console.log('[INIT] Calling loadLastParams(generate)');
     loadLastParams('generate');
 }
 
@@ -561,13 +567,15 @@ function closePresetModal() {
    SD Generate Page
    ===================================================================== */
 function setupSDPage() {
+    console.log('[INIT] setupSDPage');
     document.getElementById('sd-generate-btn').addEventListener('click', runSDGenerate);
     document.getElementById('sd-enable-hr').addEventListener('change', e => {
         document.getElementById('sd-hr-settings').classList.toggle('hidden', !e.target.checked);
     });
 
-    // Restore last used parameters
-    loadLastParams('sd');
+    // Restore last used parameters (with delay for async operations)
+    console.log('[INIT] Calling loadLastParams(sd)');
+    setTimeout(() => loadLastParams('sd'), 100);
 }
 
 async function runSDGenerate() {
@@ -650,6 +658,7 @@ function setupImg2ImgPage() {
     const hrSettings = document.getElementById('i2i-hr-settings');
 
     console.log('[IMG2IMG] setupImg2ImgPage called');
+    console.log('[INIT] setupImg2ImgPage');
     console.log('[IMG2IMG] uploadArea:', uploadArea);
     console.log('[IMG2IMG] imageInput:', imageInput);
 
@@ -707,8 +716,9 @@ function setupImg2ImgPage() {
 
     console.log('[IMG2IMG] setupImg2ImgPage completed');
 
-    // Restore last used parameters
-    loadLastParams('img2img');
+    // Restore last used parameters (with delay for selector population)
+    console.log('[INIT] Calling loadLastParams(img2img)');
+    setTimeout(() => loadLastParams('img2img'), 150);
 }
 
 function handleI2IImageSelect(file) {
@@ -904,38 +914,70 @@ async function runImg2Img() {
    ===================================================================== */
 async function saveLastParams(feature, params) {
     try {
-        await fetch(`/api/last-params/${feature}`, {
+        const r = await fetch(`/api/last-params/${feature}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)
         });
+        console.log(`[PARAMS] Saved ${feature}:`, params);
     } catch (e) {
-        // 保存失敗は無視
+        console.error(`[PARAMS] Save failed for ${feature}:`, e);
     }
 }
 
 async function loadLastParams(feature) {
     try {
+        console.log(`[PARAMS] Loading ${feature}...`);
         const r = await fetch(`/api/last-params/${feature}`);
-        if (!r.ok) return;
+        if (!r.ok) {
+            console.warn(`[PARAMS] API response not OK for ${feature}:`, r.status);
+            return;
+        }
         const d = await r.json();
+        console.log(`[PARAMS] Loaded ${feature}:`, d);
         if (d.params && Object.keys(d.params).length > 0) {
+            console.log(`[PARAMS] Applying ${feature} with`, Object.keys(d.params).length, 'keys');
             applyLastParams(feature, d.params);
+        } else {
+            console.warn(`[PARAMS] No params found for ${feature}`);
         }
     } catch (e) {
-        // 読み込み失敗は無視
+        console.error(`[PARAMS] Load failed for ${feature}:`, e);
     }
 }
 
 function applyLastParams(feature, params) {
     const setVal = (id, val) => {
         const el = document.getElementById(id);
-        if (el && val !== undefined && val !== null) el.value = val;
+        if (el && val !== undefined && val !== null) {
+            // For select elements, try to set value directly first
+            if (el.tagName === 'SELECT') {
+                // If option exists, set it directly
+                if (el.querySelector(`option[value="${val}"]`)) {
+                    el.value = val;
+                    console.log(`[PARAMS] Set ${id} = ${val}`);
+                    return;
+                } else if (val && !el.dataset.pendingValue) {
+                    // Otherwise, use pendingValue for later
+                    el.dataset.pendingValue = val;
+                    console.log(`[PARAMS] Set pending ${id} = ${val}`);
+                    return;
+                }
+            }
+            // For text inputs and other elements
+            el.value = val;
+            console.log(`[PARAMS] Set ${id} = ${val}`);
+        }
     };
     const setPending = (id, val) => {
         const el = document.getElementById(id);
-        if (el && val !== undefined && val !== null) el.dataset.pendingValue = val;
+        if (el && val !== undefined && val !== null) {
+            el.dataset.pendingValue = val;
+            console.log(`[PARAMS] Set pending ${id} = ${val}`);
+        }
     };
+
+    console.log(`[PARAMS] applyLastParams(${feature})`);
 
     if (feature === 'generate') {
         setVal('select-style', params.style);
@@ -952,18 +994,19 @@ function applyLastParams(feature, params) {
         setVal('sd-cfg', params.cfg_scale);
         setVal('sd-batch', params.batch_size);
         setVal('sd-seed', params.seed);
-        setPending('sd-model', params.model);
+        setVal('sd-model', params.model);
         setVal('sd-loras', params.loras);
         setVal('sd-hr-scale', params.hr_scale);
         setVal('sd-hr-steps', params.hr_second_pass_steps);
         setVal('sd-hr-denoising', params.hr_denoising_strength);
-        setPending('sd-sampler', params.sampler);
-        setPending('sd-hr-upscaler', params.hr_upscaler);
+        setVal('sd-sampler', params.sampler);
+        setVal('sd-hr-upscaler', params.hr_upscaler);
         if (params.enable_hr !== undefined) {
             const hrChk = document.getElementById('sd-enable-hr');
             if (hrChk) {
                 hrChk.checked = params.enable_hr;
                 document.getElementById('sd-hr-settings').classList.toggle('hidden', !params.enable_hr);
+                console.log(`[PARAMS] Set sd-enable-hr = ${params.enable_hr}`);
             }
         }
 
@@ -978,18 +1021,19 @@ function applyLastParams(feature, params) {
         setVal('i2i-cfg', params.cfg_scale);
         setVal('i2i-batch', params.batch_size);
         setVal('i2i-seed', params.seed);
-        setPending('i2i-model', params.model);
+        setVal('i2i-model', params.model);
         setVal('i2i-loras', params.loras);
         setVal('i2i-hr-scale', params.hr_scale);
         setVal('i2i-hr-steps', params.hr_second_pass_steps);
         setVal('i2i-hr-denoising', params.hr_denoising_strength);
-        setPending('i2i-sampler', params.sampler);
-        setPending('i2i-hr-upscaler', params.hr_upscaler);
+        setVal('i2i-sampler', params.sampler);
+        setVal('i2i-hr-upscaler', params.hr_upscaler);
         if (params.enable_hr !== undefined) {
             const hrChk = document.getElementById('i2i-enable-hr');
             if (hrChk) {
                 hrChk.checked = params.enable_hr;
                 document.getElementById('i2i-hr-settings').classList.toggle('hidden', !params.enable_hr);
+                console.log(`[PARAMS] Set i2i-enable-hr = ${params.enable_hr}`);
             }
         }
     }
