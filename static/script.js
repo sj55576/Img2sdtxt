@@ -94,6 +94,7 @@ async function checkSDStatus() {
             if (d.samplers?.length) {
                 const sel = document.getElementById('sd-sampler');
                 sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
             }
 
             // モデル一覧を更新
@@ -104,6 +105,7 @@ async function checkSDStatus() {
                         const name = m.model_name || m.title || '';
                         return `<option value="${name}">${name}</option>`;
                     }).join('');
+                if (modelSel.dataset.pendingValue) { modelSel.value = modelSel.dataset.pendingValue; delete modelSel.dataset.pendingValue; }
             }
 
             // アップスケーラー一覧を更新
@@ -112,6 +114,7 @@ async function checkSDStatus() {
                 upscalerSel.innerHTML = d.upscalers.map(u =>
                     `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
                 ).join('');
+                if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
             }
         } else {
             sdEl.classList.add('error');
@@ -174,6 +177,9 @@ function setupGeneratePage() {
 
     // Load presets into select
     loadPresetsIntoSelects();
+
+    // Restore last used parameters
+    loadLastParams('generate');
 }
 
 function handleSingleImageSelect(file) {
@@ -218,6 +224,9 @@ async function generatePrompt() {
     const tone = document.getElementById('select-tone').value;
     const quality = document.getElementById('select-quality').value;
     const presetId = document.getElementById('select-preset').value;
+
+    // Save parameters for next startup
+    saveLastParams('generate', { style, tone, quality, preset_id: presetId });
 
     try {
         let data;
@@ -550,6 +559,9 @@ function setupSDPage() {
     document.getElementById('sd-enable-hr').addEventListener('change', e => {
         document.getElementById('sd-hr-settings').classList.toggle('hidden', !e.target.checked);
     });
+
+    // Restore last used parameters
+    loadLastParams('sd');
 }
 
 async function runSDGenerate() {
@@ -582,6 +594,9 @@ async function runSDGenerate() {
         hr_second_pass_steps: parseInt(document.getElementById('sd-hr-steps').value),
         hr_denoising_strength: parseFloat(document.getElementById('sd-hr-denoising').value)
     };
+
+    // Save parameters for next startup
+    saveLastParams('sd', payload);
 
     try {
         const r = await fetch('/api/sd/generate', {
@@ -685,6 +700,9 @@ function setupImg2ImgPage() {
     }
 
     console.log('[IMG2IMG] setupImg2ImgPage completed');
+
+    // Restore last used parameters
+    loadLastParams('img2img');
 }
 
 function handleI2IImageSelect(file) {
@@ -765,6 +783,7 @@ async function checkImg2ImgStatus() {
             if (d.samplers?.length) {
                 const sel = document.getElementById('i2i-sampler');
                 sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
             }
             if (d.models?.length) {
                 const modelSel = document.getElementById('i2i-model');
@@ -773,6 +792,7 @@ async function checkImg2ImgStatus() {
                         const name = m.model_name || m.title || '';
                         return `<option value="${name}">${name}</option>`;
                     }).join('');
+                if (modelSel.dataset.pendingValue) { modelSel.value = modelSel.dataset.pendingValue; delete modelSel.dataset.pendingValue; }
             }
 
             // アップスケーラー一覧を更新
@@ -781,6 +801,7 @@ async function checkImg2ImgStatus() {
                 upscalerSel.innerHTML = d.upscalers.map(u =>
                     `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
                 ).join('');
+                if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
             }
         } else {
             badge.className = 'badge badge-red';
@@ -805,26 +826,50 @@ async function runImg2Img() {
     loading.classList.remove('hidden');
     results.classList.add('hidden');
 
+    const i2iEnableHr = document.getElementById('i2i-enable-hr').checked;
+    const i2iParams = {
+        negative: document.getElementById('i2i-negative').value.trim(),
+        denoising_strength: parseFloat(document.getElementById('i2i-denoising').value),
+        resize_mode: parseInt(document.getElementById('i2i-resize-mode').value),
+        width: parseInt(document.getElementById('i2i-width').value),
+        height: parseInt(document.getElementById('i2i-height').value),
+        steps: parseInt(document.getElementById('i2i-steps').value),
+        cfg_scale: parseFloat(document.getElementById('i2i-cfg').value),
+        sampler: document.getElementById('i2i-sampler').value,
+        batch_size: parseInt(document.getElementById('i2i-batch').value),
+        seed: parseInt(document.getElementById('i2i-seed').value),
+        model: document.getElementById('i2i-model').value.trim(),
+        loras: document.getElementById('i2i-loras').value.trim(),
+        enable_hr: i2iEnableHr,
+        hr_scale: parseFloat(document.getElementById('i2i-hr-scale').value),
+        hr_upscaler: document.getElementById('i2i-hr-upscaler').value,
+        hr_second_pass_steps: parseInt(document.getElementById('i2i-hr-steps').value),
+        hr_denoising_strength: parseFloat(document.getElementById('i2i-hr-denoising').value)
+    };
+
+    // Save parameters for next startup
+    saveLastParams('img2img', i2iParams);
+
     const fd = new FormData();
     fd.append('file', i2iSelectedImage);
     fd.append('positive', positive);
-    fd.append('negative', document.getElementById('i2i-negative').value.trim());
-    fd.append('denoising_strength', document.getElementById('i2i-denoising').value);
-    fd.append('resize_mode', document.getElementById('i2i-resize-mode').value);
-    fd.append('width', document.getElementById('i2i-width').value);
-    fd.append('height', document.getElementById('i2i-height').value);
-    fd.append('steps', document.getElementById('i2i-steps').value);
-    fd.append('cfg_scale', document.getElementById('i2i-cfg').value);
-    fd.append('sampler', document.getElementById('i2i-sampler').value);
-    fd.append('batch_size', document.getElementById('i2i-batch').value);
-    fd.append('seed', document.getElementById('i2i-seed').value);
-    fd.append('model', document.getElementById('i2i-model').value.trim());
-    fd.append('loras', document.getElementById('i2i-loras').value.trim());
-    fd.append('enable_hr', document.getElementById('i2i-enable-hr').checked ? 'true' : 'false');
-    fd.append('hr_scale', document.getElementById('i2i-hr-scale').value);
-    fd.append('hr_upscaler', document.getElementById('i2i-hr-upscaler').value);
-    fd.append('hr_second_pass_steps', document.getElementById('i2i-hr-steps').value);
-    fd.append('hr_denoising_strength', document.getElementById('i2i-hr-denoising').value);
+    fd.append('negative', i2iParams.negative);
+    fd.append('denoising_strength', i2iParams.denoising_strength);
+    fd.append('resize_mode', i2iParams.resize_mode);
+    fd.append('width', i2iParams.width);
+    fd.append('height', i2iParams.height);
+    fd.append('steps', i2iParams.steps);
+    fd.append('cfg_scale', i2iParams.cfg_scale);
+    fd.append('sampler', i2iParams.sampler);
+    fd.append('batch_size', i2iParams.batch_size);
+    fd.append('seed', i2iParams.seed);
+    fd.append('model', i2iParams.model);
+    fd.append('loras', i2iParams.loras);
+    fd.append('enable_hr', i2iEnableHr ? 'true' : 'false');
+    fd.append('hr_scale', i2iParams.hr_scale);
+    fd.append('hr_upscaler', i2iParams.hr_upscaler);
+    fd.append('hr_second_pass_steps', i2iParams.hr_second_pass_steps);
+    fd.append('hr_denoising_strength', i2iParams.hr_denoising_strength);
 
     try {
         const r = await fetch('/api/sd/img2img', { method: 'POST', body: fd });
@@ -844,6 +889,100 @@ async function runImg2Img() {
         toast(e.message || '生成に失敗しました', 'error');
     } finally {
         loading.classList.add('hidden');
+    }
+}
+
+/* =====================================================================
+   Last Parameter History
+   ===================================================================== */
+async function saveLastParams(feature, params) {
+    try {
+        await fetch(`/api/last-params/${feature}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+    } catch (e) {
+        // 保存失敗は無視
+    }
+}
+
+async function loadLastParams(feature) {
+    try {
+        const r = await fetch(`/api/last-params/${feature}`);
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.params && Object.keys(d.params).length > 0) {
+            applyLastParams(feature, d.params);
+        }
+    } catch (e) {
+        // 読み込み失敗は無視
+    }
+}
+
+function applyLastParams(feature, params) {
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && val !== undefined && val !== null) el.value = val;
+    };
+    const setPending = (id, val) => {
+        const el = document.getElementById(id);
+        if (el && val !== undefined && val !== null) el.dataset.pendingValue = val;
+    };
+
+    if (feature === 'generate') {
+        setVal('select-style', params.style);
+        setVal('select-tone', params.tone);
+        setVal('select-quality', params.quality);
+        setVal('select-preset', params.preset_id);
+
+    } else if (feature === 'sd') {
+        setVal('sd-negative', params.negative);
+        setVal('sd-width', params.width);
+        setVal('sd-height', params.height);
+        setVal('sd-steps', params.steps);
+        setVal('sd-cfg', params.cfg_scale);
+        setVal('sd-batch', params.batch_size);
+        setVal('sd-seed', params.seed);
+        setVal('sd-model', params.model);
+        setVal('sd-loras', params.loras);
+        setVal('sd-hr-scale', params.hr_scale);
+        setVal('sd-hr-steps', params.hr_second_pass_steps);
+        setVal('sd-hr-denoising', params.hr_denoising_strength);
+        setPending('sd-sampler', params.sampler);
+        setPending('sd-hr-upscaler', params.hr_upscaler);
+        if (params.enable_hr !== undefined) {
+            const hrChk = document.getElementById('sd-enable-hr');
+            if (hrChk) {
+                hrChk.checked = params.enable_hr;
+                document.getElementById('sd-hr-settings').classList.toggle('hidden', !params.enable_hr);
+            }
+        }
+
+    } else if (feature === 'img2img') {
+        setVal('i2i-negative', params.negative);
+        setVal('i2i-denoising', params.denoising_strength);
+        setVal('i2i-resize-mode', params.resize_mode);
+        setVal('i2i-width', params.width);
+        setVal('i2i-height', params.height);
+        setVal('i2i-steps', params.steps);
+        setVal('i2i-cfg', params.cfg_scale);
+        setVal('i2i-batch', params.batch_size);
+        setVal('i2i-seed', params.seed);
+        setVal('i2i-model', params.model);
+        setVal('i2i-loras', params.loras);
+        setVal('i2i-hr-scale', params.hr_scale);
+        setVal('i2i-hr-steps', params.hr_second_pass_steps);
+        setVal('i2i-hr-denoising', params.hr_denoising_strength);
+        setPending('i2i-sampler', params.sampler);
+        setPending('i2i-hr-upscaler', params.hr_upscaler);
+        if (params.enable_hr !== undefined) {
+            const hrChk = document.getElementById('i2i-enable-hr');
+            if (hrChk) {
+                hrChk.checked = params.enable_hr;
+                document.getElementById('i2i-hr-settings').classList.toggle('hidden', !params.enable_hr);
+            }
+        }
     }
 }
 
