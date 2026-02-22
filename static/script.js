@@ -496,7 +496,13 @@ function refreshPresetSelects() {
     ).join('');
     ['select-preset', 'batch-preset'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.innerHTML = options;
+        if (el) {
+            el.innerHTML = options;
+            if (el.dataset.pendingValue) {
+                el.value = el.dataset.pendingValue;
+                delete el.dataset.pendingValue;
+            }
+        }
     });
 }
 
@@ -828,6 +834,7 @@ async function runImg2Img() {
 
     const i2iEnableHr = document.getElementById('i2i-enable-hr').checked;
     const i2iParams = {
+        positive,
         negative: document.getElementById('i2i-negative').value.trim(),
         denoising_strength: parseFloat(document.getElementById('i2i-denoising').value),
         resize_mode: parseInt(document.getElementById('i2i-resize-mode').value),
@@ -934,9 +941,10 @@ function applyLastParams(feature, params) {
         setVal('select-style', params.style);
         setVal('select-tone', params.tone);
         setVal('select-quality', params.quality);
-        setVal('select-preset', params.preset_id);
+        setPending('select-preset', params.preset_id);
 
     } else if (feature === 'sd') {
+        setVal('sd-positive', params.positive);
         setVal('sd-negative', params.negative);
         setVal('sd-width', params.width);
         setVal('sd-height', params.height);
@@ -944,7 +952,7 @@ function applyLastParams(feature, params) {
         setVal('sd-cfg', params.cfg_scale);
         setVal('sd-batch', params.batch_size);
         setVal('sd-seed', params.seed);
-        setVal('sd-model', params.model);
+        setPending('sd-model', params.model);
         setVal('sd-loras', params.loras);
         setVal('sd-hr-scale', params.hr_scale);
         setVal('sd-hr-steps', params.hr_second_pass_steps);
@@ -960,6 +968,7 @@ function applyLastParams(feature, params) {
         }
 
     } else if (feature === 'img2img') {
+        setVal('i2i-positive', params.positive);
         setVal('i2i-negative', params.negative);
         setVal('i2i-denoising', params.denoising_strength);
         setVal('i2i-resize-mode', params.resize_mode);
@@ -969,7 +978,7 @@ function applyLastParams(feature, params) {
         setVal('i2i-cfg', params.cfg_scale);
         setVal('i2i-batch', params.batch_size);
         setVal('i2i-seed', params.seed);
-        setVal('i2i-model', params.model);
+        setPending('i2i-model', params.model);
         setVal('i2i-loras', params.loras);
         setVal('i2i-hr-scale', params.hr_scale);
         setVal('i2i-hr-steps', params.hr_second_pass_steps);
