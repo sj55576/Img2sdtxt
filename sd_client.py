@@ -271,14 +271,20 @@ class SDClient:
         mode: "txt2img" または "img2img"
         """
         saved_files = []
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        date_str = now.strftime("%Y-%m-%d")
         prefix = "i2i" if mode == "img2img" else "sd"
+
+        # 日付ごとのサブフォルダを作成
+        date_dir = SD_OUTPUT_DIR / date_str
+        date_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             for idx, image_base64 in enumerate(images):
                 # ファイル名生成
                 filename = f"{prefix}_{timestamp}_{idx:03d}.png"
-                filepath = SD_OUTPUT_DIR / filename
+                filepath = date_dir / filename
 
                 # Base64をデコードして保存
                 image_bytes = base64.b64decode(image_base64)
@@ -316,11 +322,11 @@ class SDClient:
             }
 
             metadata_filename = f"{prefix}_{timestamp}_metadata.json"
-            metadata_filepath = SD_OUTPUT_DIR / metadata_filename
+            metadata_filepath = date_dir / metadata_filename
             with open(metadata_filepath, "w", encoding="utf-8") as f:
                 json.dump(metadata, f, indent=2, ensure_ascii=False)
 
-            print(f"✓ Saved {len(images)} image(s) to {SD_OUTPUT_DIR}")
+            print(f"✓ Saved {len(images)} image(s) to {date_dir}")
             print(f"✓ Metadata saved to {metadata_filename}")
 
             return saved_files
