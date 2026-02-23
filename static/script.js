@@ -166,6 +166,15 @@ function setupGeneratePage() {
 
     document.getElementById('clear-image-btn').addEventListener('click', clearSingleImage);
 
+    // Random folder load
+    const randomFolderInput = document.getElementById('random-folder-input');
+    document.getElementById('random-folder-btn').addEventListener('click', () => randomFolderInput.click());
+    randomFolderInput.addEventListener('change', e => {
+        const file = pickRandomImageFromFolder(e.target.files);
+        if (file) handleSingleImageSelect(file);
+        randomFolderInput.value = '';
+    });
+
     // Text input enable button
     document.getElementById('description-input').addEventListener('input', updateGenerateBtn);
 
@@ -708,6 +717,18 @@ function setupImg2ImgPage() {
 
     if (clearBtn) clearBtn.addEventListener('click', clearI2IImage);
     if (generateBtn) generateBtn.addEventListener('click', runImg2Img);
+
+    // Random folder load
+    const i2iRandomFolderInput = document.getElementById('i2i-random-folder-input');
+    const i2iRandomFolderBtn = document.getElementById('i2i-random-folder-btn');
+    if (i2iRandomFolderBtn && i2iRandomFolderInput) {
+        i2iRandomFolderBtn.addEventListener('click', () => i2iRandomFolderInput.click());
+        i2iRandomFolderInput.addEventListener('change', e => {
+            const file = pickRandomImageFromFolder(e.target.files);
+            if (file) handleI2IImageSelect(file);
+            i2iRandomFolderInput.value = '';
+        });
+    }
     if (enableHrCheckbox && hrSettings) {
         enableHrCheckbox.addEventListener('change', e => {
             hrSettings.classList.toggle('hidden', !e.target.checked);
@@ -1042,6 +1063,22 @@ function applyLastParams(feature, params) {
 /* =====================================================================
    Utilities
    ===================================================================== */
+
+/**
+ * フォルダ内の画像ファイルをランダムに1枚選択して返す。
+ * 画像が見つからない場合は null を返す。
+ */
+function pickRandomImageFromFolder(files) {
+    if (!files || files.length === 0) return null;
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!imageFiles.length) {
+        toast('フォルダ内に画像ファイルが見つかりませんでした', 'error');
+        return null;
+    }
+    const idx = Math.floor(Math.random() * imageFiles.length);
+    return imageFiles[idx];
+}
+
 function copyText(elementId, btn) {
     const el = document.getElementById(elementId);
     navigator.clipboard.writeText(el.value).then(() => {
