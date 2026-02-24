@@ -286,15 +286,26 @@ async def sd_status():
     samplers = []
     models = []
     upscalers = []
+    loras = []
     if available:
         try:
             model = sd_client.get_current_model()
             samplers = sd_client.get_samplers()
             models = sd_client.get_model_list()
             upscalers = sd_client.get_upscalers()
+            loras = sd_client.get_loras()
         except Exception:
             pass
-    return {"available": available, "model": model, "samplers": samplers, "models": models, "upscalers": upscalers}
+    return {"available": available, "model": model, "samplers": samplers, "models": models, "upscalers": upscalers, "loras": loras}
+
+
+@app.get("/api/sd/loras")
+async def sd_loras_list():
+    try:
+        loras = sd_client.get_loras()
+        return {"success": True, "loras": loras}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 @app.get("/api/sd/upscalers")

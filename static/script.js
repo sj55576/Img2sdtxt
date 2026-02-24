@@ -120,6 +120,18 @@ async function checkSDStatus() {
                 ).join('');
                 if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
             }
+
+            // LoRA一覧を更新
+            if (d.loras?.length) {
+                const loraSel = document.getElementById('sd-lora-select');
+                loraSel.innerHTML = '<option value="">-- LoRA選択 --</option>' +
+                    d.loras.map(l => {
+                        const name = l.name || '';
+                        const alias = l.alias || name;
+                        const display = alias !== name ? `${alias} (${name})` : name;
+                        return `<option value="${name}">${display}</option>`;
+                    }).join('');
+            }
         } else {
             sdEl.classList.add('error');
             sdEl.querySelector('.label').textContent = 'SD ✗';
@@ -132,6 +144,17 @@ async function checkSDStatus() {
         badge.className = 'badge badge-red';
         badge.textContent = 'Error';
     }
+}
+
+function addLora(prefix) {
+    const sel = document.getElementById(`${prefix}-lora-select`);
+    const name = sel.value;
+    if (!name) { return; }
+    const weight = parseFloat(document.getElementById(`${prefix}-lora-weight`).value) || 1.0;
+    const tag = `<lora:${name}:${weight}>`;
+    const lorasInput = document.getElementById(`${prefix}-loras`);
+    lorasInput.value = lorasInput.value ? lorasInput.value + tag : tag;
+    sel.value = '';
 }
 
 /* =====================================================================
@@ -839,6 +862,18 @@ async function checkImg2ImgStatus() {
                     `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
                 ).join('');
                 if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
+            }
+
+            // LoRA一覧を更新
+            if (d.loras?.length) {
+                const loraSel = document.getElementById('i2i-lora-select');
+                loraSel.innerHTML = '<option value="">-- LoRA選択 --</option>' +
+                    d.loras.map(l => {
+                        const name = l.name || '';
+                        const alias = l.alias || name;
+                        const display = alias !== name ? `${alias} (${name})` : name;
+                        return `<option value="${name}">${display}</option>`;
+                    }).join('');
             }
         } else {
             badge.className = 'badge badge-red';
