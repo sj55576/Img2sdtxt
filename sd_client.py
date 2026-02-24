@@ -67,6 +67,15 @@ class SDClient:
         except Exception as e:
             raise Exception(f"Failed to get models: {str(e)}")
 
+    def get_loras(self) -> List[Dict]:
+        """利用可能なLoRA一覧を取得"""
+        try:
+            r = requests.get(f"{self.base_url}/sdapi/v1/loras", timeout=10)
+            r.raise_for_status()
+            return r.json()
+        except Exception:
+            return []
+
     def get_upscalers(self) -> List[str]:
         try:
             r = requests.get(f"{self.base_url}/sdapi/v1/upscalers", timeout=10)
