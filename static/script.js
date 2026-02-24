@@ -122,16 +122,7 @@ async function checkSDStatus() {
             }
 
             // LoRA一覧を更新
-            if (d.loras?.length) {
-                const loraSel = document.getElementById('sd-lora-select');
-                loraSel.innerHTML = '<option value="">-- LoRA選択 --</option>' +
-                    d.loras.map(l => {
-                        const name = l.name || '';
-                        const alias = l.alias || name;
-                        const display = alias !== name ? `${alias} (${name})` : name;
-                        return `<option value="${name}">${display}</option>`;
-                    }).join('');
-            }
+            await loadLoras('sd');
         } else {
             sdEl.classList.add('error');
             sdEl.querySelector('.label').textContent = 'SD ✗';
@@ -143,6 +134,26 @@ async function checkSDStatus() {
         sdEl.classList.add('error');
         badge.className = 'badge badge-red';
         badge.textContent = 'Error';
+    }
+}
+
+async function loadLoras(prefix) {
+    try {
+        const r = await fetch('/api/sd/loras');
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!d.success) return;
+        const loraSel = document.getElementById(`${prefix}-lora-select`);
+        if (!loraSel) return;
+        loraSel.innerHTML = '<option value="">-- LoRA選択 --</option>' +
+            (d.loras || []).map(l => {
+                const name = l.name || '';
+                const alias = l.alias || name;
+                const display = alias !== name ? `${alias} (${name})` : name;
+                return `<option value="${name}">${display}</option>`;
+            }).join('');
+    } catch (e) {
+        console.error(`[LORA] Failed to load LoRAs for ${prefix}:`, e);
     }
 }
 
@@ -865,16 +876,7 @@ async function checkImg2ImgStatus() {
             }
 
             // LoRA一覧を更新
-            if (d.loras?.length) {
-                const loraSel = document.getElementById('i2i-lora-select');
-                loraSel.innerHTML = '<option value="">-- LoRA選択 --</option>' +
-                    d.loras.map(l => {
-                        const name = l.name || '';
-                        const alias = l.alias || name;
-                        const display = alias !== name ? `${alias} (${name})` : name;
-                        return `<option value="${name}">${display}</option>`;
-                    }).join('');
-            }
+            await loadLoras('i2i');
         } else {
             badge.className = 'badge badge-red';
             badge.textContent = 'Disconnected';

@@ -72,8 +72,13 @@ class SDClient:
         try:
             r = requests.get(f"{self.base_url}/sdapi/v1/loras", timeout=10)
             r.raise_for_status()
-            return r.json()
-        except Exception:
+            result = r.json()
+            if isinstance(result, list):
+                return result
+            print(f"[get_loras] Unexpected response format: {type(result)}")
+            return []
+        except Exception as e:
+            print(f"[get_loras] Failed to fetch LoRAs from {self.base_url}/sdapi/v1/loras: {e}")
             return []
 
     def get_upscalers(self) -> List[str]:
