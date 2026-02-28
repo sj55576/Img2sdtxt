@@ -74,6 +74,72 @@ DEFAULT_PRESETS = [
         "tone": "natural",
         "quality": "ultra",
         "is_default": True
+    },
+    {
+        "id": "realistic_portrait",
+        "name": "Realistic Portrait",
+        "description": "リアルポートレート（高精細な人物描写）",
+        "positive_suffix": "photorealistic, realistic skin texture, detailed face, natural pores, sharp focus, 85mm f/1.4, DSLR, 8k uhd, subsurface scattering, natural lighting",
+        "negative_suffix": "cartoon, anime, painting, illustration, cgi, 3d render, doll, plastic skin, blurry, deformed face, bad anatomy, extra fingers, mutated hands, poorly drawn face",
+        "style": "photorealistic",
+        "tone": "natural",
+        "quality": "ultra",
+        "is_default": True
+    },
+    {
+        "id": "fashion_photo",
+        "name": "Fashion Photo",
+        "description": "ファッションフォト（雑誌風の人物撮影）",
+        "positive_suffix": "fashion photography, editorial, high fashion, vogue style, professional model, studio lighting, sharp focus, glamorous, color grading, 50mm lens, full body shot",
+        "negative_suffix": "casual, amateur, low quality, blurry, bad anatomy, deformed, cartoon, anime, poorly drawn face, extra limbs, disfigured",
+        "style": "photorealistic",
+        "tone": "vibrant",
+        "quality": "ultra",
+        "is_default": True
+    },
+    {
+        "id": "cinematic_portrait",
+        "name": "Cinematic Portrait",
+        "description": "シネマティックポートレート（映画的な人物描写）",
+        "positive_suffix": "cinematic lighting, film grain, anamorphic lens flare, shallow depth of field, dramatic shadows, color grading, movie still, photorealistic face, detailed skin, 35mm film",
+        "negative_suffix": "flat lighting, overexposed, cartoon, anime, painting, cgi, bad anatomy, deformed face, extra fingers, mutated hands, poorly drawn",
+        "style": "photorealistic",
+        "tone": "cinematic",
+        "quality": "ultra",
+        "is_default": True
+    },
+    {
+        "id": "street_snap",
+        "name": "Street Snap",
+        "description": "ストリートスナップ（自然な日常の人物写真）",
+        "positive_suffix": "street photography, candid shot, natural pose, urban background, realistic, ambient lighting, 35mm lens, documentary style, authentic, photojournalistic",
+        "negative_suffix": "studio, posed, artificial, cartoon, anime, painting, blurry, bad anatomy, deformed, extra limbs, poorly drawn face, overprocessed",
+        "style": "photorealistic",
+        "tone": "natural",
+        "quality": "high",
+        "is_default": True
+    },
+    {
+        "id": "studio_portrait",
+        "name": "Studio Portrait",
+        "description": "スタジオポートレート（プロのスタジオ撮影）",
+        "positive_suffix": "studio photography, professional lighting, Rembrandt lighting, softbox, beauty dish, clean background, sharp focus, detailed face, realistic skin, headshot, 105mm lens",
+        "negative_suffix": "outdoor, natural light, cartoon, anime, painting, blurry, bad anatomy, deformed face, extra fingers, poorly drawn, low quality, watermark",
+        "style": "photorealistic",
+        "tone": "natural",
+        "quality": "ultra",
+        "is_default": True
+    },
+    {
+        "id": "natural_light_portrait",
+        "name": "Natural Light Portrait",
+        "description": "自然光ポートレート（屋外の柔らかい自然光）",
+        "positive_suffix": "natural light photography, golden hour, soft sunlight, outdoor portrait, warm tones, realistic face, detailed skin texture, lens bokeh, 85mm f/1.8, gentle shadows",
+        "negative_suffix": "studio lighting, flash, harsh shadows, cartoon, anime, painting, cgi, bad anatomy, deformed face, extra fingers, poorly drawn, artificial lighting",
+        "style": "photorealistic",
+        "tone": "warm",
+        "quality": "ultra",
+        "is_default": True
     }
 ]
 
