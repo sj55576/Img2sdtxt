@@ -21,6 +21,7 @@
                 <button class="nav-btn" data-page="presets">🎨 Presets</button>
                 <button class="nav-btn" data-page="sd">🖼️ SD Generate</button>
                 <button class="nav-btn" data-page="img2img">🔄 Img2Img</button>
+                <button class="nav-btn" data-page="gallery">🗃️ Gallery</button>
             </nav>
             <div class="sidebar-status">
                 <div class="status-indicator" id="llm-status">
@@ -634,6 +635,56 @@
                     </div>
                 </div>
             </section>
+            <!-- ======================== GALLERY PAGE ======================== -->
+            <section id="page-gallery" class="page">
+                <div class="page-header">
+                    <h2>Gallery</h2>
+                    <p>過去に生成した画像の一覧</p>
+                    <div class="header-actions">
+                        <select id="gallery-filter-mode" class="gallery-filter-select">
+                            <option value="">すべて</option>
+                            <option value="txt2img">SD Generate</option>
+                            <option value="img2img">Img2Img</option>
+                        </select>
+                        <select id="gallery-filter-date" class="gallery-filter-select">
+                            <option value="">全日付</option>
+                        </select>
+                        <button id="refresh-gallery-btn" class="btn btn-sm btn-secondary">🔄 更新</button>
+                    </div>
+                </div>
+                <div class="page-body">
+                    <div id="gallery-loading" class="loading-box hidden">
+                        <div class="spinner"></div>
+                        <p>読み込み中...</p>
+                    </div>
+                    <div id="gallery-empty" class="empty-state hidden">
+                        <p>生成済み画像がありません</p>
+                        <small>SD GenerateまたはImg2Imgで画像を生成すると、ここに表示されます</small>
+                    </div>
+                    <div id="gallery-grid" class="gallery-grid"></div>
+                </div>
+            </section>
+
+            <!-- Gallery Image Modal -->
+            <div id="gallery-modal" class="modal hidden">
+                <div class="modal-box gallery-modal-box">
+                    <div class="gallery-modal-header">
+                        <h3 id="gallery-modal-title">画像詳細</h3>
+                        <button id="gallery-modal-close" class="btn btn-sm btn-ghost">✕ 閉じる</button>
+                    </div>
+                    <div class="gallery-modal-body">
+                        <div class="gallery-modal-image-wrap">
+                            <img id="gallery-modal-image" src="" alt="Generated Image">
+                        </div>
+                        <div class="gallery-modal-meta">
+                            <div id="gallery-modal-params" class="gallery-params"></div>
+                            <div class="gallery-modal-actions">
+                                <a id="gallery-modal-download" href="" download class="btn btn-primary">⬇ ダウンロード</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 

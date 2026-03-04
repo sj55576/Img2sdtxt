@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from config import (
     API_HOST, API_PORT, DEBUG,
@@ -39,6 +39,10 @@ sd_client = SDClient()
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+outputs_dir = Path(__file__).parent / "outputs"
+outputs_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/outputs", StaticFiles(directory=str(outputs_dir)), name="outputs")
 
 
 # ------------------------------------------------------------------ #
@@ -529,6 +533,63 @@ async def save_last_params(feature: str, request_data: dict):
     print(f"[API] File path: {_LAST_PARAMS_FILE}")
     print(f"[API] File exists: {_LAST_PARAMS_FILE.exists()}")
     return {"success": True}
+
+
+# ------------------------------------------------------------------ #
+# Outputs Gallery
+# ------------------------------------------------------------------ #
+
+@app.get("/api/outputs")
+async def list_outputs(date: Optional[str] = None, mode: Optional[str] = None):
+    """outputsフォルダの生成済み画像一覧を返す"""
+    _OUTPUTS_DIR = Path(__file__).parent / "outputs"
+    if not _OUTPUTS_DIR.exists():
+        return {"success": True, "images": [], "dates": []}
+
+    images = []
+    dates = sorted(
+        [d.name for d in _OUTPUTS_DIR.iterdir() if d.is_dir()],
+        reverse=True
+    )
+
+    target_dates = [date] if date else dates
+
+    for date_str in target_dates:
+        date_dir = _OUTPUTS_DIR / date_str
+        if not date_dir.is_dir():
+            continue
+
+        # メタデータJSONを読み込む
+        metadata_map = {}
+        for meta_file in sorted(date_dir.glob("*_metadata.json")):
+            try:
+                meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                ts = meta.get("timestamp", "")
+                metadata_map[ts] = meta
+            except Exception:
+                pass
+
+        for img_file in sorted(date_dir.glob("*.png"), reverse=True):
+            fname = img_file.name
+            # ファイル名からタイムスタンプとモードを解析: {prefix}_{timestamp}_{idx}.png
+            parts = fname.replace(".png", "").split("_")
+            file_mode = "img2img" if parts[0] == "i2i" else "txt2img"
+            if mode and file_mode != mode:
+                continue
+
+            timestamp = "_".join(parts[1:3]) if len(parts) >= 3 else ""
+            meta = metadata_map.get(timestamp, {})
+
+            images.append({
+                "date": date_str,
+                "filename": fname,
+                "url": f"/outputs/{date_str}/{fname}",
+                "mode": file_mode,
+                "timestamp": timestamp,
+                "parameters": meta.get("parameters", {}),
+            })
+
+    return {"success": True, "images": images, "dates": dates}
 
 
 if __name__ == "__main__":

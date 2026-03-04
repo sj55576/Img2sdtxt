@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPresetsPage();
     setupSDPage();
     setupImg2ImgPage();
+    setupGalleryPage();
     checkStatus();
 
     // Initialize SD and Img2Img selectors early for parameter restoration
@@ -55,6 +56,7 @@ function setupNavigation() {
             if (page === 'presets') loadPresets();
             if (page === 'sd') checkSDStatus();
             if (page === 'img2img') checkImg2ImgStatus();
+            if (page === 'gallery') loadGallery();
         });
     });
 }
@@ -1135,4 +1137,126 @@ function toast(msg, type = 'info') {
 
 function escHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* =====================================================================
+   Gallery Page
+   ===================================================================== */
+function setupGalleryPage() {
+    document.getElementById('refresh-gallery-btn').addEventListener('click', loadGallery);
+    document.getElementById('gallery-filter-mode').addEventListener('change', loadGallery);
+    document.getElementById('gallery-filter-date').addEventListener('change', loadGallery);
+    document.getElementById('gallery-modal-close').addEventListener('click', closeGalleryModal);
+    document.getElementById('gallery-modal').addEventListener('click', e => {
+        if (e.target === document.getElementById('gallery-modal')) closeGalleryModal();
+    });
+}
+
+async function loadGallery() {
+    const loading = document.getElementById('gallery-loading');
+    const empty = document.getElementById('gallery-empty');
+    const grid = document.getElementById('gallery-grid');
+    const modeFilter = document.getElementById('gallery-filter-mode').value;
+    const dateFilter = document.getElementById('gallery-filter-date').value;
+
+    loading.classList.remove('hidden');
+    empty.classList.add('hidden');
+    grid.innerHTML = '';
+
+    try {
+        const params = new URLSearchParams();
+        if (modeFilter) params.set('mode', modeFilter);
+        if (dateFilter) params.set('date', dateFilter);
+
+        const r = await fetch('/api/outputs?' + params.toString());
+        if (!r.ok) throw new Error('Failed to load gallery');
+        const d = await r.json();
+
+        // Update date filter options
+        const dateSelect = document.getElementById('gallery-filter-date');
+        const currentDate = dateSelect.value;
+        dateSelect.innerHTML = '<option value="">全日付</option>';
+        d.dates.forEach(date => {
+            const opt = document.createElement('option');
+            opt.value = date;
+            opt.textContent = date;
+            if (date === currentDate) opt.selected = true;
+            dateSelect.appendChild(opt);
+        });
+
+        if (!d.images || d.images.length === 0) {
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        grid.innerHTML = d.images.map(img => {
+            const modeLabel = img.mode === 'img2img' ? 'Img2Img' : 'SD';
+            const modeClass = img.mode === 'img2img' ? 'badge-img2img' : 'badge-sd';
+            const prompt = img.parameters.positive_prompt || '';
+            const shortPrompt = prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt;
+            return `
+                <div class="gallery-item" onclick="openGalleryModal(${JSON.stringify(JSON.stringify(img))})">
+                    <div class="gallery-thumb-wrap">
+                        <img class="gallery-thumb" src="${escHtml(img.url)}" alt="${escHtml(img.filename)}" loading="lazy">
+                        <span class="gallery-mode-badge ${escHtml(modeClass)}">${escHtml(modeLabel)}</span>
+                    </div>
+                    <div class="gallery-item-info">
+                        <div class="gallery-item-date">${escHtml(img.date)}</div>
+                        ${shortPrompt ? `<div class="gallery-item-prompt">${escHtml(shortPrompt)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        toast('ギャラリーの読み込みに失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
+
+function openGalleryModal(imgJson) {
+    const img = JSON.parse(imgJson);
+    const modal = document.getElementById('gallery-modal');
+    const modalImg = document.getElementById('gallery-modal-image');
+    const modalTitle = document.getElementById('gallery-modal-title');
+    const modalDownload = document.getElementById('gallery-modal-download');
+    const modalParams = document.getElementById('gallery-modal-params');
+
+    modalImg.src = img.url;
+    modalTitle.textContent = img.filename;
+    modalDownload.href = img.url;
+    modalDownload.download = img.filename;
+
+    const p = img.parameters || {};
+    const rows = [
+        ['モード', img.mode === 'img2img' ? 'Img2Img' : 'SD Generate'],
+        ['日付', img.date],
+        ['Positive', p.positive_prompt || ''],
+        ['Negative', p.negative_prompt || ''],
+        ['Model', p.model || '(default)'],
+        ['Size', p.width && p.height ? `${p.width}×${p.height}` : ''],
+        ['Steps', p.steps || ''],
+        ['CFG Scale', p.cfg_scale || ''],
+        ['Sampler', p.sampler || ''],
+        ['Seed', p.seed !== undefined ? p.seed : ''],
+        ['LoRA', p.loras || ''],
+    ].filter(([, v]) => v !== '' && v !== undefined && v !== null);
+
+    if (img.mode === 'img2img' && p.denoising_strength !== undefined) {
+        rows.push(['Denoising', p.denoising_strength]);
+    }
+
+    modalParams.innerHTML = rows.map(([label, value]) => `
+        <div class="gallery-param-row">
+            <span class="gallery-param-label">${escHtml(label)}</span>
+            <span class="gallery-param-value">${escHtml(String(value))}</span>
+        </div>
+    `).join('');
+
+    modal.classList.remove('hidden');
+}
+
+function closeGalleryModal() {
+    document.getElementById('gallery-modal').classList.add('hidden');
+    document.getElementById('gallery-modal-image').src = '';
 }
