@@ -293,9 +293,9 @@ async def sd_status():
             samplers = sd_client.get_samplers()
             models = sd_client.get_model_list()
             upscalers = sd_client.get_upscalers()
-            loras = sd_client.get_loras()
         except Exception:
             pass
+        loras = sd_client.get_loras()
     return {"available": available, "model": model, "samplers": samplers, "models": models, "upscalers": upscalers, "loras": loras}
 
 
