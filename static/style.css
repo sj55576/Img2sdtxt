@@ -301,6 +301,7 @@ textarea { resize: vertical; }
 }
 .badge-sd { background: rgba(99,102,241,0.85); color: white; }
 .badge-img2img { background: rgba(139,92,246,0.85); color: white; }
+.badge-inpaint { background: rgba(16,185,129,0.85); color: white; }
 
 .gallery-item-info { padding: 8px 10px; }
 .gallery-item-date { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; }
@@ -334,6 +335,81 @@ textarea { resize: vertical; }
 .gallery-param-value { font-size: 0.8rem; color: var(--text); word-break: break-all; line-height: 1.4; }
 .gallery-modal-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .gallery-modal-actions .btn { flex: 1; text-decoration: none; text-align: center; }
+
+/* ---- Inpainting Canvas ---- */
+.inpaint-canvas-wrap { margin-bottom: 12px; }
+.inpaint-canvas-wrap.hidden { display: none; }
+
+.inpaint-canvas-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    cursor: crosshair;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    margin-bottom: 8px;
+}
+#inpaint-base-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+#inpaint-mask-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    pointer-events: none;
+}
+
+.inpaint-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+}
+.inpaint-tool-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.inpaint-tool-group + .inpaint-tool-group {
+    padding-left: 8px;
+    border-left: 1px solid var(--border);
+}
+.active-tool { outline: 2px solid var(--accent); }
+.inpaint-brush-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 500;
+}
+.inpaint-brush-slider {
+    width: 80px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+.inpaint-opacity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
 
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
