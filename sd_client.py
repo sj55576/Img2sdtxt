@@ -255,6 +255,85 @@ class SDClient:
         except Exception as e:
             raise Exception(f"SD API error: {str(e)}")
 
+    def inpaint(
+        self,
+        init_image: str,
+        mask: str,
+        positive: str,
+        negative: str,
+        denoising_strength: float = 0.75,
+        width: int = 512,
+        height: int = 512,
+        steps: int = 20,
+        cfg_scale: float = 7.0,
+        sampler: str = "Euler a",
+        seed: int = -1,
+        batch_size: int = 1,
+        mask_blur: int = 4,
+        inpainting_fill: int = 1,
+        inpaint_full_res: bool = True,
+        inpaint_full_res_padding: int = 32,
+        model: str = "",
+        loras: str = ""
+    ) -> List[str]:
+        """
+        インペインティング（マスク領域を描き直す）を実施し、Base64エンコードされた画像リストを返す
+        init_image: Base64エンコードされた入力画像
+        mask: Base64エンコードされたマスク画像（白=描き直す領域, 黒=保持する領域）
+        denoising_strength: 変化の強さ (0.0=変化なし, 1.0=完全変換)
+        mask_blur: マスクのぼかし半径
+        inpainting_fill: 0=塗りつぶし, 1=元画像, 2=潜在ノイズ, 3=潜在ゼロ
+        inpaint_full_res: マスク領域のみをフル解像度でインペイント
+        inpaint_full_res_padding: マスク領域周囲のパディング
+        """
+        if model:
+            self.set_model(model)
+
+        final_positive = positive
+        if loras:
+            if ":" in loras and not loras.startswith("<lora:"):
+                lora_parts = loras.split(",")
+                lora_tags = "".join([f"<lora:{part.strip()}>" for part in lora_parts])
+            else:
+                lora_tags = loras
+            final_positive = f"{lora_tags}, {positive}"
+
+        payload = {
+            "init_images": [init_image],
+            "mask": mask,
+            "prompt": final_positive,
+            "negative_prompt": negative,
+            "denoising_strength": denoising_strength,
+            "width": width,
+            "height": height,
+            "steps": steps,
+            "cfg_scale": cfg_scale,
+            "sampler_name": sampler,
+            "seed": seed,
+            "batch_size": batch_size,
+            "mask_blur": mask_blur,
+            "inpainting_fill": inpainting_fill,
+            "inpaint_full_res": inpaint_full_res,
+            "inpaint_full_res_padding": inpaint_full_res_padding,
+            "restore_faces": False,
+            "save_images": False
+        }
+        try:
+            r = requests.post(
+                f"{self.base_url}/sdapi/v1/img2img",
+                json=payload,
+                timeout=180
+            )
+            r.raise_for_status()
+            result = r.json()
+            return result.get("images", [])
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
+        except requests.exceptions.Timeout:
+            raise TimeoutError("Stable Diffusion inpainting timed out")
+        except Exception as e:
+            raise Exception(f"SD API error: {str(e)}")
+
     def get_samplers(self) -> List[str]:
         try:
             r = requests.get(f"{self.base_url}/sdapi/v1/samplers", timeout=10)
@@ -282,13 +361,18 @@ class SDClient:
         """
         生成された画像（Base64エンコード）を保存
         メタデータ付きのJSONファイルも同時に保存
-        mode: "txt2img" または "img2img"
+        mode: "txt2img", "img2img", または "inpaint"
         """
         saved_files = []
         now = datetime.now()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
         date_str = now.strftime("%Y-%m-%d")
-        prefix = "i2i" if mode == "img2img" else "sd"
+        if mode == "img2img":
+            prefix = "i2i"
+        elif mode == "inpaint":
+            prefix = "inp"
+        else:
+            prefix = "sd"
 
         # 日付ごとのサブフォルダを作成
         date_dir = SD_OUTPUT_DIR / date_str
@@ -324,7 +408,7 @@ class SDClient:
                 "model": model,
                 "loras": loras
             }
-            if mode == "img2img":
+            if mode in ("img2img", "inpaint"):
                 params["denoising_strength"] = denoising_strength
 
             metadata = {

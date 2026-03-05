@@ -458,6 +458,88 @@ async def sd_img2img(
             seed=seed,
             model=model,
             loras=loras,
+            mode="inpaint",
+            denoising_strength=denoising_strength
+        )
+
+        return {
+            "success": True,
+            "images": images,
+            "count": len(images),
+            "saved_files": saved_files
+        }
+    except ConnectionError:
+        raise HTTPException(status_code=503, detail="Stable Diffusion API is not available.")
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Generation timed out.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/sd/inpaint")
+async def sd_inpaint(
+    file: UploadFile = File(...),
+    mask: str = Form(...),
+    positive: str = Form(...),
+    negative: str = Form(""),
+    denoising_strength: float = Form(0.75),
+    width: int = Form(512),
+    height: int = Form(512),
+    steps: int = Form(20),
+    cfg_scale: float = Form(7.0),
+    sampler: str = Form("Euler a"),
+    seed: int = Form(-1),
+    batch_size: int = Form(1),
+    mask_blur: int = Form(4),
+    inpainting_fill: int = Form(1),
+    inpaint_full_res: bool = Form(True),
+    inpaint_full_res_padding: int = Form(32),
+    model: str = Form(""),
+    loras: str = Form("")
+):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image type.")
+
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=400, detail="Image too large (max 10MB).")
+
+    init_image = base64.b64encode(contents).decode("utf-8")
+
+    try:
+        images = sd_client.inpaint(
+            init_image=init_image,
+            mask=mask,
+            positive=positive,
+            negative=negative,
+            denoising_strength=denoising_strength,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg_scale=cfg_scale,
+            sampler=sampler,
+            seed=seed,
+            batch_size=min(batch_size, 4),
+            mask_blur=mask_blur,
+            inpainting_fill=inpainting_fill,
+            inpaint_full_res=inpaint_full_res,
+            inpaint_full_res_padding=inpaint_full_res_padding,
+            model=model,
+            loras=loras
+        )
+
+        saved_files = sd_client.save_images(
+            images=images,
+            positive=positive,
+            negative=negative,
+            width=width,
+            height=height,
+            steps=steps,
+            cfg_scale=cfg_scale,
+            sampler=sampler,
+            seed=seed,
+            model=model,
+            loras=loras,
             mode="img2img",
             denoising_strength=denoising_strength
         )
@@ -491,7 +573,7 @@ async def sd_models():
 
 _DATA_DIR = Path(__file__).parent / "data"
 _LAST_PARAMS_FILE = _DATA_DIR / "last_params.json"
-_VALID_FEATURES = {"generate", "sd", "img2img"}
+_VALID_FEATURES = {"generate", "sd", "img2img", "inpaint"}
 
 
 def _read_last_params() -> dict:
@@ -573,7 +655,12 @@ async def list_outputs(date: Optional[str] = None, mode: Optional[str] = None):
             fname = img_file.name
             # ファイル名からタイムスタンプとモードを解析: {prefix}_{timestamp}_{idx}.png
             parts = fname.replace(".png", "").split("_")
-            file_mode = "img2img" if parts[0] == "i2i" else "txt2img"
+            if parts[0] == "i2i":
+                file_mode = "img2img"
+            elif parts[0] == "inp":
+                file_mode = "inpaint"
+            else:
+                file_mode = "txt2img"
             if mode and file_mode != mode:
                 continue
 

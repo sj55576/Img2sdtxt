@@ -5,6 +5,7 @@ let selectedImage = null;
 let batchFiles = [];
 let currentTab = 'tab-img'; // 'tab-img' | 'tab-txt'
 let presetsCache = [];
+let inpaintSelectedImage = null;
 
 /* =====================================================================
    Init
@@ -17,12 +18,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setupPresetsPage();
     setupSDPage();
     setupImg2ImgPage();
+    setupInpaintPage();
     setupGalleryPage();
     checkStatus();
 
     // Initialize SD and Img2Img selectors early for parameter restoration
     checkSDStatus();
     checkImg2ImgStatus();
+    checkInpaintStatus();
 
     // Prevent default drag and drop behavior on document
     document.addEventListener('dragover', e => {
@@ -56,6 +59,7 @@ function setupNavigation() {
             if (page === 'presets') loadPresets();
             if (page === 'sd') checkSDStatus();
             if (page === 'img2img') checkImg2ImgStatus();
+            if (page === 'inpaint') checkInpaintStatus();
             if (page === 'gallery') loadGallery();
         });
     });
@@ -970,6 +974,324 @@ async function runImg2Img() {
 }
 
 /* =====================================================================
+   Inpaint Page
+   ===================================================================== */
+// Canvas state
+const _inpaint = {
+    drawing: false,
+    mode: 'draw',   // 'draw' | 'erase'
+    brushSize: 30,
+    maskOpacity: 0.5,
+    canvasW: 0,
+    canvasH: 0
+};
+
+function setupInpaintPage() {
+    const uploadArea = document.getElementById('inpaint-upload-area');
+    const imageInput = document.getElementById('inpaint-image-input');
+    const clearImageBtn = document.getElementById('inpaint-clear-image-btn');
+    const clearMaskBtn = document.getElementById('inpaint-clear-mask-btn');
+    const fillMaskBtn = document.getElementById('inpaint-fill-mask-btn');
+    const generateBtn = document.getElementById('inpaint-generate-btn');
+    const drawBtn = document.getElementById('inpaint-tool-draw');
+    const eraseBtn = document.getElementById('inpaint-tool-erase');
+    const brushSlider = document.getElementById('inpaint-brush-size');
+    const brushVal = document.getElementById('inpaint-brush-size-val');
+    const opacitySlider = document.getElementById('inpaint-mask-opacity');
+    const opacityVal = document.getElementById('inpaint-mask-opacity-val');
+    const maskCanvas = document.getElementById('inpaint-mask-canvas');
+
+    uploadArea.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', e => handleInpaintImageSelect(e.target.files[0]));
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        if (e.dataTransfer.files[0]) handleInpaintImageSelect(e.dataTransfer.files[0]);
+    });
+
+    clearImageBtn.addEventListener('click', clearInpaintImage);
+    clearMaskBtn.addEventListener('click', clearInpaintMask);
+    fillMaskBtn.addEventListener('click', fillInpaintMask);
+    generateBtn.addEventListener('click', runInpaint);
+
+    drawBtn.addEventListener('click', () => {
+        _inpaint.mode = 'draw';
+        drawBtn.classList.add('active-tool');
+        eraseBtn.classList.remove('active-tool');
+    });
+    eraseBtn.addEventListener('click', () => {
+        _inpaint.mode = 'erase';
+        eraseBtn.classList.add('active-tool');
+        drawBtn.classList.remove('active-tool');
+    });
+
+    brushSlider.addEventListener('input', () => {
+        _inpaint.brushSize = parseInt(brushSlider.value);
+        brushVal.textContent = brushSlider.value;
+    });
+    opacitySlider.addEventListener('input', () => {
+        _inpaint.maskOpacity = parseInt(opacitySlider.value) / 100;
+        opacityVal.textContent = opacitySlider.value;
+        updateMaskCanvasOpacity();
+    });
+
+    // Canvas mouse/touch drawing
+    maskCanvas.addEventListener('mousedown', e => { _inpaint.drawing = true; paintMask(e); });
+    maskCanvas.addEventListener('mousemove', e => { if (_inpaint.drawing) paintMask(e); });
+    maskCanvas.addEventListener('mouseup', () => { _inpaint.drawing = false; });
+    maskCanvas.addEventListener('mouseleave', () => { _inpaint.drawing = false; });
+    maskCanvas.addEventListener('touchstart', e => { e.preventDefault(); _inpaint.drawing = true; paintMask(e.touches[0]); }, { passive: false });
+    maskCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (_inpaint.drawing) paintMask(e.touches[0]); }, { passive: false });
+    maskCanvas.addEventListener('touchend', () => { _inpaint.drawing = false; });
+
+    setTimeout(() => loadLastParams('inpaint'), 150);
+}
+
+function handleInpaintImageSelect(file) {
+    if (!file || !file.type.startsWith('image/')) { toast('画像ファイルを選択してください', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast('ファイルサイズが10MBを超えています', 'error'); return; }
+    inpaintSelectedImage = file;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            const baseCanvas = document.getElementById('inpaint-base-canvas');
+            const maskCanvas = document.getElementById('inpaint-mask-canvas');
+            const container = document.querySelector('.inpaint-canvas-container');
+
+            // Limit display size to 600px wide
+            const maxW = 600;
+            const scale = img.width > maxW ? maxW / img.width : 1;
+            const displayW = Math.round(img.width * scale);
+            const displayH = Math.round(img.height * scale);
+
+            _inpaint.canvasW = img.width;
+            _inpaint.canvasH = img.height;
+
+            baseCanvas.width = img.width;
+            baseCanvas.height = img.height;
+            maskCanvas.width = img.width;
+            maskCanvas.height = img.height;
+
+            container.style.maxWidth = displayW + 'px';
+
+            const bCtx = baseCanvas.getContext('2d');
+            bCtx.drawImage(img, 0, 0);
+
+            clearInpaintMask();
+
+            document.getElementById('inpaint-upload-area').classList.add('hidden');
+            document.getElementById('inpaint-canvas-wrap').classList.remove('hidden');
+            document.getElementById('inpaint-generate-btn').disabled = false;
+            toast('画像を読み込みました', 'success');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function paintMask(e) {
+    const maskCanvas = document.getElementById('inpaint-mask-canvas');
+    const rect = maskCanvas.getBoundingClientRect();
+    const scaleX = maskCanvas.width / rect.width;
+    const scaleY = maskCanvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    const ctx = maskCanvas.getContext('2d');
+    const radius = _inpaint.brushSize * scaleX;
+
+    ctx.save();
+    if (_inpaint.mode === 'erase') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = 'rgba(0,0,0,1)';
+    } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = `rgba(255,100,0,${_inpaint.maskOpacity})`;
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+function clearInpaintMask() {
+    const maskCanvas = document.getElementById('inpaint-mask-canvas');
+    const ctx = maskCanvas.getContext('2d');
+    ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+}
+
+function fillInpaintMask() {
+    const maskCanvas = document.getElementById('inpaint-mask-canvas');
+    const ctx = maskCanvas.getContext('2d');
+    ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    ctx.fillStyle = `rgba(255,100,0,${_inpaint.maskOpacity})`;
+    ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+}
+
+function updateMaskCanvasOpacity() {
+    // The mask opacity is encoded at draw-time via _inpaint.maskOpacity.
+    // Existing strokes cannot be retroactively changed; the slider only affects new strokes.
+    // This function is intentionally a no-op — updating _inpaint.maskOpacity (already done by the
+    // slider event listener) is sufficient.
+}
+
+function clearInpaintImage() {
+    inpaintSelectedImage = null;
+    document.getElementById('inpaint-image-input').value = '';
+    document.getElementById('inpaint-canvas-wrap').classList.add('hidden');
+    document.getElementById('inpaint-upload-area').classList.remove('hidden');
+    document.getElementById('inpaint-generate-btn').disabled = true;
+    clearInpaintMask();
+}
+
+async function checkInpaintStatus() {
+    const badge = document.getElementById('inpaint-api-badge');
+    if (!badge) return;
+    badge.className = 'badge badge-gray';
+    badge.textContent = 'Checking...';
+    try {
+        const r = await fetch('/api/sd/status');
+        const d = await r.json();
+        if (d.available) {
+            badge.className = 'badge badge-green';
+            badge.textContent = 'Connected';
+
+            if (d.samplers?.length) {
+                const sel = document.getElementById('inpaint-sampler');
+                sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+            }
+            if (d.models?.length) {
+                const modelSel = document.getElementById('inpaint-model');
+                modelSel.innerHTML = '<option value="">-- デフォルト --</option>' +
+                    d.models.map(m => {
+                        const name = m.model_name || m.title || '';
+                        return `<option value="${name}">${name}</option>`;
+                    }).join('');
+                if (modelSel.dataset.pendingValue) { modelSel.value = modelSel.dataset.pendingValue; delete modelSel.dataset.pendingValue; }
+            }
+            await loadLoras('inpaint');
+        } else {
+            badge.className = 'badge badge-red';
+            badge.textContent = 'Disconnected';
+        }
+    } catch {
+        badge.className = 'badge badge-red';
+        badge.textContent = 'Error';
+    }
+}
+
+function getMaskBase64() {
+    const maskCanvas = document.getElementById('inpaint-mask-canvas');
+    const W = maskCanvas.width;
+    const H = maskCanvas.height;
+    const ctx = maskCanvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, W, H);
+
+    // Minimum alpha to consider a pixel as part of the mask (painted area)
+    const MASK_ALPHA_THRESHOLD = 10;
+
+    // Build a greyscale mask canvas: painted pixels → white, rest → black
+    const bwCanvas = document.createElement('canvas');
+    bwCanvas.width = W;
+    bwCanvas.height = H;
+    const bwCtx = bwCanvas.getContext('2d');
+    const bwData = bwCtx.createImageData(W, H);
+
+    for (let i = 0; i < imageData.data.length; i += 4) {
+        const alpha = imageData.data[i + 3];
+        const val = alpha > MASK_ALPHA_THRESHOLD ? 255 : 0;
+        bwData.data[i] = val;
+        bwData.data[i + 1] = val;
+        bwData.data[i + 2] = val;
+        bwData.data[i + 3] = 255;
+    }
+    bwCtx.putImageData(bwData, 0, 0);
+
+    // Return base64 without data URL prefix
+    return bwCanvas.toDataURL('image/png').split(',')[1];
+}
+
+async function runInpaint() {
+    if (!inpaintSelectedImage) { toast('入力画像を選択してください', 'error'); return; }
+    const positive = document.getElementById('inpaint-positive').value.trim();
+    if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
+
+    const maskBase64 = getMaskBase64();
+
+    const loading = document.getElementById('inpaint-loading');
+    const results = document.getElementById('inpaint-results');
+    const imagesEl = document.getElementById('inpaint-images');
+
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+
+    const params = {
+        positive,
+        negative: document.getElementById('inpaint-negative').value.trim(),
+        denoising_strength: parseFloat(document.getElementById('inpaint-denoising').value),
+        width: parseInt(document.getElementById('inpaint-width').value),
+        height: parseInt(document.getElementById('inpaint-height').value),
+        steps: parseInt(document.getElementById('inpaint-steps').value),
+        cfg_scale: parseFloat(document.getElementById('inpaint-cfg').value),
+        sampler: document.getElementById('inpaint-sampler').value,
+        batch_size: parseInt(document.getElementById('inpaint-batch').value),
+        seed: parseInt(document.getElementById('inpaint-seed').value),
+        model: document.getElementById('inpaint-model').value.trim(),
+        loras: document.getElementById('inpaint-loras').value.trim(),
+        mask_blur: parseInt(document.getElementById('inpaint-mask-blur').value),
+        inpainting_fill: parseInt(document.getElementById('inpaint-fill-mode').value),
+        inpaint_full_res: document.getElementById('inpaint-full-res').checked,
+        inpaint_full_res_padding: parseInt(document.getElementById('inpaint-full-res-padding').value)
+    };
+
+    saveLastParams('inpaint', params);
+
+    const fd = new FormData();
+    fd.append('file', inpaintSelectedImage);
+    fd.append('mask', maskBase64);
+    fd.append('positive', params.positive);
+    fd.append('negative', params.negative);
+    fd.append('denoising_strength', params.denoising_strength);
+    fd.append('width', params.width);
+    fd.append('height', params.height);
+    fd.append('steps', params.steps);
+    fd.append('cfg_scale', params.cfg_scale);
+    fd.append('sampler', params.sampler);
+    fd.append('batch_size', params.batch_size);
+    fd.append('seed', params.seed);
+    fd.append('model', params.model);
+    fd.append('loras', params.loras);
+    fd.append('mask_blur', params.mask_blur);
+    fd.append('inpainting_fill', params.inpainting_fill);
+    fd.append('inpaint_full_res', params.inpaint_full_res ? 'true' : 'false');
+    fd.append('inpaint_full_res_padding', params.inpaint_full_res_padding);
+
+    try {
+        const r = await fetch('/api/sd/inpaint', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error((await r.json()).detail);
+        const d = await r.json();
+
+        imagesEl.innerHTML = d.images.map((img, i) => `
+            <div class="sd-image-wrap">
+                <img src="data:image/png;base64,${img}" alt="Inpainted ${i + 1}">
+                <button class="sd-image-download" onclick="downloadImage('${img}', ${i + 1})">⬇ 保存</button>
+            </div>
+        `).join('');
+
+        results.classList.remove('hidden');
+        toast(`${d.count}枚の画像を生成しました`, 'success');
+    } catch (e) {
+        toast(e.message || '生成に失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
+
+/* =====================================================================
    Last Parameter History
    ===================================================================== */
 async function saveLastParams(feature, params) {
@@ -1096,6 +1418,27 @@ function applyLastParams(feature, params) {
                 console.log(`[PARAMS] Set i2i-enable-hr = ${params.enable_hr}`);
             }
         }
+
+    } else if (feature === 'inpaint') {
+        setVal('inpaint-positive', params.positive);
+        setVal('inpaint-negative', params.negative);
+        setVal('inpaint-denoising', params.denoising_strength);
+        setVal('inpaint-width', params.width);
+        setVal('inpaint-height', params.height);
+        setVal('inpaint-steps', params.steps);
+        setVal('inpaint-cfg', params.cfg_scale);
+        setVal('inpaint-batch', params.batch_size);
+        setVal('inpaint-seed', params.seed);
+        setVal('inpaint-model', params.model);
+        setVal('inpaint-loras', params.loras);
+        setVal('inpaint-mask-blur', params.mask_blur);
+        setVal('inpaint-fill-mode', params.inpainting_fill);
+        setVal('inpaint-full-res-padding', params.inpaint_full_res_padding);
+        setVal('inpaint-sampler', params.sampler);
+        if (params.inpaint_full_res !== undefined) {
+            const chk = document.getElementById('inpaint-full-res');
+            if (chk) { chk.checked = params.inpaint_full_res; }
+        }
     }
 }
 
@@ -1192,8 +1535,8 @@ async function loadGallery() {
         }
 
         grid.innerHTML = d.images.map(img => {
-            const modeLabel = img.mode === 'img2img' ? 'Img2Img' : 'SD';
-            const modeClass = img.mode === 'img2img' ? 'badge-img2img' : 'badge-sd';
+            const modeLabel = img.mode === 'img2img' ? 'Img2Img' : img.mode === 'inpaint' ? 'Inpaint' : 'SD';
+            const modeClass = img.mode === 'img2img' ? 'badge-img2img' : img.mode === 'inpaint' ? 'badge-inpaint' : 'badge-sd';
             const prompt = img.parameters.positive_prompt || '';
             const shortPrompt = prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt;
             return `
@@ -1231,7 +1574,7 @@ function openGalleryModal(imgJson) {
 
     const p = img.parameters || {};
     const rows = [
-        ['モード', img.mode === 'img2img' ? 'Img2Img' : 'SD Generate'],
+        ['モード', img.mode === 'img2img' ? 'Img2Img' : img.mode === 'inpaint' ? 'Inpaint' : 'SD Generate'],
         ['日付', img.date],
         ['Positive', p.positive_prompt || ''],
         ['Negative', p.negative_prompt || ''],
@@ -1245,6 +1588,9 @@ function openGalleryModal(imgJson) {
     ].filter(([, v]) => v !== '' && v !== undefined && v !== null);
 
     if (img.mode === 'img2img' && p.denoising_strength !== undefined) {
+        rows.push(['Denoising', p.denoising_strength]);
+    }
+    if (img.mode === 'inpaint' && p.denoising_strength !== undefined) {
         rows.push(['Denoising', p.denoising_strength]);
     }
 

@@ -21,6 +21,7 @@
                 <button class="nav-btn" data-page="presets">🎨 Presets</button>
                 <button class="nav-btn" data-page="sd">🖼️ SD Generate</button>
                 <button class="nav-btn" data-page="img2img">🔄 Img2Img</button>
+                <button class="nav-btn" data-page="inpaint">🖌️ Inpaint</button>
                 <button class="nav-btn" data-page="gallery">🗃️ Gallery</button>
             </nav>
             <div class="sidebar-status">
@@ -637,6 +638,185 @@
                     </div>
                 </div>
             </section>
+            <!-- ======================== INPAINT PAGE ======================== -->
+            <section id="page-inpaint" class="page">
+                <div class="page-header">
+                    <h2>Inpainting</h2>
+                    <p>画像の特定領域をマスクで選択してStable Diffusionで修正・変更</p>
+                    <div id="inpaint-api-badge" class="badge badge-gray">Checking...</div>
+                </div>
+                <div class="page-body two-col">
+                    <!-- Left: Input -->
+                    <div class="col">
+                        <!-- Input Image + Canvas -->
+                        <div class="form-group" style="margin-bottom:12px;">
+                            <label>入力画像とマスク描画</label>
+                            <div class="upload-area" id="inpaint-upload-area">
+                                <div class="upload-icon">🖼️</div>
+                                <p>クリックまたはドラッグ&ドロップ</p>
+                                <small>JPG, PNG, WebP, GIF (最大 10MB)</small>
+                            </div>
+                            <input type="file" id="inpaint-image-input" accept="image/*" hidden>
+                            <!-- Canvas editor (shown after image loaded) -->
+                            <div id="inpaint-canvas-wrap" class="inpaint-canvas-wrap hidden">
+                                <div class="inpaint-canvas-container">
+                                    <canvas id="inpaint-base-canvas"></canvas>
+                                    <canvas id="inpaint-mask-canvas"></canvas>
+                                </div>
+                                <div class="inpaint-tools">
+                                    <div class="inpaint-tool-group">
+                                        <button id="inpaint-tool-draw" class="btn btn-sm btn-primary active-tool" title="ブラシ（白=描き直す）">🖌️ 描画</button>
+                                        <button id="inpaint-tool-erase" class="btn btn-sm btn-secondary" title="消しゴム（黒=保持）">🧹 消去</button>
+                                    </div>
+                                    <div class="inpaint-tool-group">
+                                        <label class="inpaint-brush-label">ブラシサイズ</label>
+                                        <input type="range" id="inpaint-brush-size" min="5" max="100" value="30" class="inpaint-brush-slider">
+                                        <span id="inpaint-brush-size-val">30</span>px
+                                    </div>
+                                    <div class="inpaint-tool-group">
+                                        <button id="inpaint-clear-mask-btn" class="btn btn-sm btn-ghost">🗑️ マスククリア</button>
+                                        <button id="inpaint-fill-mask-btn" class="btn btn-sm btn-ghost">⬜ 全選択</button>
+                                        <button id="inpaint-clear-image-btn" class="btn btn-sm btn-ghost">✕ 画像変更</button>
+                                    </div>
+                                </div>
+                                <div class="inpaint-opacity-row">
+                                    <label class="inpaint-brush-label">マスク透明度</label>
+                                    <input type="range" id="inpaint-mask-opacity" min="10" max="90" value="50" class="inpaint-brush-slider">
+                                    <span id="inpaint-mask-opacity-val">50</span>%
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Prompts -->
+                        <div class="form-group">
+                            <label>Positive Prompt</label>
+                            <textarea id="inpaint-positive" rows="4" placeholder="描き直す領域に生成したい内容..."></textarea>
+                        </div>
+                        <div class="form-group" style="margin-top:10px;">
+                            <label>Negative Prompt</label>
+                            <textarea id="inpaint-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                        </div>
+
+                        <!-- Model & LoRA -->
+                        <div class="customization-panel">
+                            <h3>🎯 モデル・LoRA設定</h3>
+                            <div class="form-group">
+                                <label>モデル</label>
+                                <select id="inpaint-model">
+                                    <option value="">-- デフォルト --</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-top:10px;">
+                                <label>LoRA</label>
+                                <div class="lora-add-row">
+                                    <select id="inpaint-lora-select">
+                                        <option value="">-- LoRA選択 --</option>
+                                    </select>
+                                    <input type="number" id="inpaint-lora-weight" value="1.0" min="0" max="2" step="0.05" title="Weight">
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLora('inpaint')">追加</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="loadLoras('inpaint')" title="LoRA一覧を更新">&#8635;</button>
+                                </div>
+                                <input type="text" id="inpaint-loras" placeholder="&lt;lora:name:1.0&gt; ..." style="margin-top:6px;">
+                            </div>
+                        </div>
+
+                        <!-- Parameters -->
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Denoising Strength</label>
+                                <input type="number" id="inpaint-denoising" value="0.75" min="0" max="1" step="0.05">
+                                <small style="color:var(--text-muted);font-size:0.75rem;">0=変化なし 1=完全変換</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Mask Blur</label>
+                                <input type="number" id="inpaint-mask-blur" value="4" min="0" max="64">
+                                <small style="color:var(--text-muted);font-size:0.75rem;">マスクのぼかし半径</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Inpaint Fill</label>
+                                <select id="inpaint-fill-mode">
+                                    <option value="1">元画像</option>
+                                    <option value="0">塗りつぶし</option>
+                                    <option value="2">潜在ノイズ</option>
+                                    <option value="3">潜在ゼロ</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Width</label>
+                                <select id="inpaint-width">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Height</label>
+                                <select id="inpaint-height">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Steps</label>
+                                <input type="number" id="inpaint-steps" value="20" min="5" max="150">
+                            </div>
+                            <div class="form-group">
+                                <label>CFG Scale</label>
+                                <input type="number" id="inpaint-cfg" value="7" min="1" max="30" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Sampler</label>
+                                <select id="inpaint-sampler">
+                                    <option>Euler a</option>
+                                    <option>Euler</option>
+                                    <option>DPM++ 2M Karras</option>
+                                    <option>DDIM</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Batch Size</label>
+                                <input type="number" id="inpaint-batch" value="1" min="1" max="4">
+                            </div>
+                            <div class="form-group">
+                                <label>Seed (-1=random)</label>
+                                <input type="number" id="inpaint-seed" value="-1">
+                            </div>
+                        </div>
+
+                        <!-- Full-res inpainting -->
+                        <div class="customization-panel">
+                            <h3>🔍 フル解像度インペイント</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="inpaint-full-res" checked>
+                                    <span>マスク領域のみをフル解像度でインペイント</span>
+                                </label>
+                            </div>
+                            <div class="form-group" style="margin-top:8px;">
+                                <label>パディング (px)</label>
+                                <input type="number" id="inpaint-full-res-padding" value="32" min="0" max="256">
+                            </div>
+                        </div>
+
+                        <button id="inpaint-generate-btn" class="btn btn-accent btn-block" disabled>
+                            🖌️ Inpaint 生成
+                        </button>
+                    </div>
+
+                    <!-- Right: Output -->
+                    <div class="col">
+                        <div id="inpaint-loading" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p>インペイント生成中... (しばらくお待ちください)</p>
+                        </div>
+                        <div id="inpaint-results" class="sd-results hidden">
+                            <h3>生成された画像</h3>
+                            <div id="inpaint-images" class="sd-images"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
             <!-- ======================== GALLERY PAGE ======================== -->
             <section id="page-gallery" class="page">
                 <div class="page-header">
@@ -647,6 +827,7 @@
                             <option value="">すべて</option>
                             <option value="txt2img">SD Generate</option>
                             <option value="img2img">Img2Img</option>
+                            <option value="inpaint">Inpaint</option>
                         </select>
                         <select id="gallery-filter-date" class="gallery-filter-select">
                             <option value="">全日付</option>
