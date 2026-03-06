@@ -540,7 +540,7 @@ async def sd_inpaint(
             seed=seed,
             model=model,
             loras=loras,
-            mode="img2img",
+            mode="inpaint",
             denoising_strength=denoising_strength
         )
 
