@@ -1540,7 +1540,7 @@ async function loadGallery() {
             const prompt = img.parameters.positive_prompt || '';
             const shortPrompt = prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt;
             return `
-                <div class="gallery-item" onclick="openGalleryModal(${JSON.stringify(JSON.stringify(img))})">
+                <div class="gallery-item" onclick="openGalleryModal(${escHtml(JSON.stringify(JSON.stringify(img)))})">
                     <div class="gallery-thumb-wrap">
                         <img class="gallery-thumb" src="${escHtml(img.url)}" alt="${escHtml(img.filename)}" loading="lazy">
                         <span class="gallery-mode-badge ${escHtml(modeClass)}">${escHtml(modeLabel)}</span>
