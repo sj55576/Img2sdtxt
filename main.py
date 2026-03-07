@@ -458,7 +458,7 @@ async def sd_img2img(
             seed=seed,
             model=model,
             loras=loras,
-            mode="inpaint",
+            mode="img2img",
             denoising_strength=denoising_strength
         )
 
@@ -622,8 +622,10 @@ async def save_last_params(feature: str, request_data: dict):
 # ------------------------------------------------------------------ #
 
 @app.get("/api/outputs")
-async def list_outputs(date: Optional[str] = None, mode: Optional[str] = None):
+async def list_outputs(date: Optional[str] = None, mode: Optional[str] = None, limit: int = 200):
     """outputsフォルダの生成済み画像一覧を返す"""
+    if limit <= 0:
+        raise HTTPException(status_code=400, detail="limit must be a positive integer.")
     _OUTPUTS_DIR = Path(__file__).parent / "outputs"
     if not _OUTPUTS_DIR.exists():
         return {"success": True, "images": [], "dates": []}
@@ -637,6 +639,8 @@ async def list_outputs(date: Optional[str] = None, mode: Optional[str] = None):
     target_dates = [date] if date else dates
 
     for date_str in target_dates:
+        if len(images) >= limit:
+            break
         date_dir = _OUTPUTS_DIR / date_str
         if not date_dir.is_dir():
             continue
@@ -652,6 +656,8 @@ async def list_outputs(date: Optional[str] = None, mode: Optional[str] = None):
                 pass
 
         for img_file in sorted(date_dir.glob("*.png"), reverse=True):
+            if len(images) >= limit:
+                break
             fname = img_file.name
             # ファイル名からタイムスタンプとモードを解析: {prefix}_{timestamp}_{idx}.png
             parts = fname.replace(".png", "").split("_")
