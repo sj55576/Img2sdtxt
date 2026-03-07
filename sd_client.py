@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List
+from PIL import Image
 from config import SD_API_URL, SD_OUTPUT_DIR
 
 
@@ -388,6 +389,17 @@ class SDClient:
                 image_bytes = base64.b64decode(image_base64)
                 with open(filepath, "wb") as f:
                     f.write(image_bytes)
+
+                # サムネイル生成 (200px JPEG)
+                try:
+                    thumbs_dir = date_dir / "thumbs"
+                    thumbs_dir.mkdir(exist_ok=True)
+                    thumb_path = thumbs_dir / filename
+                    pil_img = Image.open(filepath)
+                    pil_img.thumbnail((200, 200), Image.LANCZOS)
+                    pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
+                except Exception as e:
+                    print(f"Warning: thumbnail generation failed for {filename}: {e}")
 
                 saved_files.append({
                     "filename": filename,
