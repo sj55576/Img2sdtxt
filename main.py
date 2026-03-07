@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 import base64
 import json
+import time
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -621,68 +622,99 @@ async def save_last_params(feature: str, request_data: dict):
 # Outputs Gallery
 # ------------------------------------------------------------------ #
 
+# date_str → (dir_mtime, cache_time, images_list) のインメモリキャッシュ
+_gallery_cache: dict = {}
+_GALLERY_CACHE_TTL = 30  # 秒
+
+
+def _scan_date_dir(date_dir: Path, date_str: str) -> list:
+    """date_dir 内の画像を全件スキャンして返す（キャッシュ対象）"""
+    metadata_map = {}
+    for meta_file in sorted(date_dir.glob("*_metadata.json")):
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            ts = meta.get("timestamp", "")
+            metadata_map[ts] = meta
+        except Exception:
+            pass
+
+    date_images = []
+    for img_file in sorted(date_dir.glob("*.png"), reverse=True):
+        fname = img_file.name
+        parts = fname.replace(".png", "").split("_")
+        if parts[0] == "i2i":
+            file_mode = "img2img"
+        elif parts[0] == "inp":
+            file_mode = "inpaint"
+        else:
+            file_mode = "txt2img"
+
+        timestamp = "_".join(parts[1:3]) if len(parts) >= 3 else ""
+        meta = metadata_map.get(timestamp, {})
+
+        thumb_path = date_dir / "thumbs" / fname
+        thumb_url = f"/outputs/{date_str}/thumbs/{fname}" if thumb_path.exists() else None
+
+        date_images.append({
+            "date": date_str,
+            "filename": fname,
+            "url": f"/outputs/{date_str}/{fname}",
+            "thumb_url": thumb_url,
+            "mode": file_mode,
+            "timestamp": timestamp,
+            "parameters": meta.get("parameters", {}),
+        })
+    return date_images
+
+
 @app.get("/api/outputs")
-async def list_outputs(date: Optional[str] = None, mode: Optional[str] = None, limit: int = 200):
-    """outputsフォルダの生成済み画像一覧を返す"""
+async def list_outputs(
+    date: Optional[str] = None,
+    mode: Optional[str] = None,
+    limit: int = 24,
+    offset: int = 0,
+):
+    """outputsフォルダの生成済み画像一覧を返す（ページネーション対応）"""
     if limit <= 0:
         raise HTTPException(status_code=400, detail="limit must be a positive integer.")
+    if offset < 0:
+        raise HTTPException(status_code=400, detail="offset must be non-negative.")
+
     _OUTPUTS_DIR = Path(__file__).parent / "outputs"
     if not _OUTPUTS_DIR.exists():
-        return {"success": True, "images": [], "dates": []}
+        return {"success": True, "images": [], "dates": [], "total": 0}
 
-    images = []
     dates = sorted(
-        [d.name for d in _OUTPUTS_DIR.iterdir() if d.is_dir()],
+        [d.name for d in _OUTPUTS_DIR.iterdir() if d.is_dir() and d.name != "thumbs"],
         reverse=True
     )
 
     target_dates = [date] if date else dates
 
+    # 全件収集（キャッシュ活用）してからフィルタ・スライス
+    all_images = []
     for date_str in target_dates:
-        if len(images) >= limit:
-            break
         date_dir = _OUTPUTS_DIR / date_str
         if not date_dir.is_dir():
             continue
 
-        # メタデータJSONを読み込む
-        metadata_map = {}
-        for meta_file in sorted(date_dir.glob("*_metadata.json")):
-            try:
-                meta = json.loads(meta_file.read_text(encoding="utf-8"))
-                ts = meta.get("timestamp", "")
-                metadata_map[ts] = meta
-            except Exception:
-                pass
+        dir_mtime = date_dir.stat().st_mtime
+        cached = _gallery_cache.get(date_str)
+        if cached and cached[0] == dir_mtime and (time.time() - cached[1]) < _GALLERY_CACHE_TTL:
+            date_images = cached[2]
+        else:
+            date_images = _scan_date_dir(date_dir, date_str)
+            _gallery_cache[date_str] = (dir_mtime, time.time(), date_images)
 
-        for img_file in sorted(date_dir.glob("*.png"), reverse=True):
-            if len(images) >= limit:
-                break
-            fname = img_file.name
-            # ファイル名からタイムスタンプとモードを解析: {prefix}_{timestamp}_{idx}.png
-            parts = fname.replace(".png", "").split("_")
-            if parts[0] == "i2i":
-                file_mode = "img2img"
-            elif parts[0] == "inp":
-                file_mode = "inpaint"
-            else:
-                file_mode = "txt2img"
-            if mode and file_mode != mode:
-                continue
+        if mode:
+            all_images.extend(img for img in date_images if img["mode"] == mode)
+        else:
+            all_images.extend(date_images)
 
-            timestamp = "_".join(parts[1:3]) if len(parts) >= 3 else ""
-            meta = metadata_map.get(timestamp, {})
+    total = len(all_images)
+    page_images = all_images[offset: offset + limit]
 
-            images.append({
-                "date": date_str,
-                "filename": fname,
-                "url": f"/outputs/{date_str}/{fname}",
-                "mode": file_mode,
-                "timestamp": timestamp,
-                "parameters": meta.get("parameters", {}),
-            })
-
-    return {"success": True, "images": images, "dates": dates}
+    return {"success": True, "images": page_images, "dates": dates, "total": total}
 
 
 if __name__ == "__main__":

@@ -6,6 +6,8 @@ let batchFiles = [];
 let currentTab = 'tab-img'; // 'tab-img' | 'tab-txt'
 let presetsCache = [];
 let inpaintSelectedImage = null;
+let _galleryCache = {};   // key: "mode|date|offset" → API response
+let _galleryOffset = 0;   // 現在の Load More オフセット
 
 /* =====================================================================
    Init
@@ -1487,17 +1489,30 @@ function escHtml(str) {
 /* =====================================================================
    Gallery Page
    ===================================================================== */
+function debounce(fn, ms) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
 function setupGalleryPage() {
-    document.getElementById('refresh-gallery-btn').addEventListener('click', loadGallery);
-    document.getElementById('gallery-filter-mode').addEventListener('change', loadGallery);
-    document.getElementById('gallery-filter-date').addEventListener('change', loadGallery);
+    const debouncedLoad = debounce(() => { _galleryOffset = 0; loadGallery(0); }, 300);
+    document.getElementById('refresh-gallery-btn').addEventListener('click', () => {
+        _galleryCache = {};
+        _galleryOffset = 0;
+        loadGallery(0, true);
+    });
+    document.getElementById('gallery-filter-mode').addEventListener('change', debouncedLoad);
+    document.getElementById('gallery-filter-date').addEventListener('change', debouncedLoad);
+    document.getElementById('gallery-load-more-btn').addEventListener('click', () => {
+        loadGallery(_galleryOffset);
+    });
     document.getElementById('gallery-modal-close').addEventListener('click', closeGalleryModal);
     document.getElementById('gallery-modal').addEventListener('click', e => {
         if (e.target === document.getElementById('gallery-modal')) closeGalleryModal();
     });
 }
 
-async function loadGallery() {
+async function loadGallery(offset = 0, forceRefresh = false) {
     const loading = document.getElementById('gallery-loading');
     const empty = document.getElementById('gallery-empty');
     const grid = document.getElementById('gallery-grid');
@@ -1506,52 +1521,79 @@ async function loadGallery() {
 
     loading.classList.remove('hidden');
     empty.classList.add('hidden');
-    grid.innerHTML = '';
+    if (offset === 0) grid.innerHTML = '';
 
     try {
-        const params = new URLSearchParams();
-        if (modeFilter) params.set('mode', modeFilter);
-        if (dateFilter) params.set('date', dateFilter);
+        const cacheKey = `${modeFilter}|${dateFilter}|${offset}`;
+        let d;
+        if (!forceRefresh && _galleryCache[cacheKey]) {
+            d = _galleryCache[cacheKey];
+        } else {
+            const params = new URLSearchParams();
+            if (modeFilter) params.set('mode', modeFilter);
+            if (dateFilter) params.set('date', dateFilter);
+            params.set('offset', offset);
+            params.set('limit', 24);
 
-        const r = await fetch('/api/outputs?' + params.toString());
-        if (!r.ok) throw new Error('Failed to load gallery');
-        const d = await r.json();
+            const r = await fetch('/api/outputs?' + params.toString());
+            if (!r.ok) throw new Error('Failed to load gallery');
+            d = await r.json();
+            _galleryCache[cacheKey] = d;
+        }
 
-        // Update date filter options
-        const dateSelect = document.getElementById('gallery-filter-date');
-        const currentDate = dateSelect.value;
-        dateSelect.innerHTML = '<option value="">全日付</option>';
-        d.dates.forEach(date => {
-            const opt = document.createElement('option');
-            opt.value = date;
-            opt.textContent = date;
-            if (date === currentDate) opt.selected = true;
-            dateSelect.appendChild(opt);
-        });
+        // 最初のロード時のみ日付フィルターを更新
+        if (offset === 0 && d.dates) {
+            const dateSelect = document.getElementById('gallery-filter-date');
+            const currentDate = dateSelect.value;
+            dateSelect.innerHTML = '<option value="">全日付</option>';
+            d.dates.forEach(date => {
+                const opt = document.createElement('option');
+                opt.value = date;
+                opt.textContent = date;
+                if (date === currentDate) opt.selected = true;
+                dateSelect.appendChild(opt);
+            });
+        }
 
-        if (!d.images || d.images.length === 0) {
+        if (offset === 0 && (!d.images || d.images.length === 0)) {
             empty.classList.remove('hidden');
+            document.getElementById('gallery-load-more-wrap').classList.add('hidden');
             return;
         }
 
-        grid.innerHTML = d.images.map(img => {
+        // DocumentFragment で効率的にアイテムを追加
+        const fragment = document.createDocumentFragment();
+        (d.images || []).forEach(img => {
             const modeLabel = img.mode === 'img2img' ? 'Img2Img' : img.mode === 'inpaint' ? 'Inpaint' : 'SD';
             const modeClass = img.mode === 'img2img' ? 'badge-img2img' : img.mode === 'inpaint' ? 'badge-inpaint' : 'badge-sd';
             const prompt = img.parameters.positive_prompt || '';
             const shortPrompt = prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt;
-            return `
-                <div class="gallery-item" onclick="openGalleryModal(${escHtml(JSON.stringify(JSON.stringify(img)))})">
-                    <div class="gallery-thumb-wrap">
-                        <img class="gallery-thumb" src="${escHtml(img.url)}" alt="${escHtml(img.filename)}" loading="lazy">
-                        <span class="gallery-mode-badge ${escHtml(modeClass)}">${escHtml(modeLabel)}</span>
-                    </div>
-                    <div class="gallery-item-info">
-                        <div class="gallery-item-date">${escHtml(img.date)}</div>
-                        ${shortPrompt ? `<div class="gallery-item-prompt">${escHtml(shortPrompt)}</div>` : ''}
-                    </div>
+            const div = document.createElement('div');
+            div.className = 'gallery-item';
+            div.addEventListener('click', () => openGalleryModal(JSON.stringify(img)));
+            div.innerHTML = `
+                <div class="gallery-thumb-wrap">
+                    <img class="gallery-thumb" src="${escHtml(img.thumb_url || img.url)}" alt="${escHtml(img.filename)}" loading="lazy">
+                    <span class="gallery-mode-badge ${escHtml(modeClass)}">${escHtml(modeLabel)}</span>
                 </div>
-            `;
-        }).join('');
+                <div class="gallery-item-info">
+                    <div class="gallery-item-date">${escHtml(img.date)}</div>
+                    ${shortPrompt ? `<div class="gallery-item-prompt">${escHtml(shortPrompt)}</div>` : ''}
+                </div>`;
+            fragment.appendChild(div);
+        });
+        grid.appendChild(fragment);
+
+        // Load More ボタンの表示制御
+        const loaded = offset + (d.images ? d.images.length : 0);
+        const loadMoreWrap = document.getElementById('gallery-load-more-wrap');
+        if (d.total && loaded < d.total) {
+            loadMoreWrap.classList.remove('hidden');
+            _galleryOffset = loaded;
+        } else {
+            loadMoreWrap.classList.add('hidden');
+            _galleryOffset = 0;
+        }
     } catch (e) {
         toast('ギャラリーの読み込みに失敗しました', 'error');
     } finally {
@@ -1559,8 +1601,8 @@ async function loadGallery() {
     }
 }
 
-function openGalleryModal(imgJson) {
-    const img = JSON.parse(imgJson);
+function openGalleryModal(imgJsonStr) {
+    const img = JSON.parse(imgJsonStr);
     const modal = document.getElementById('gallery-modal');
     const modalImg = document.getElementById('gallery-modal-image');
     const modalTitle = document.getElementById('gallery-modal-title');
