@@ -1,261 +1,350 @@
-# 🎨 Image to Stable Diffusion Prompt Generator
+# 🎨 Img2sdtxt — Image to Stable Diffusion Prompt Generator
 
-画像をアップロードしてStable Diffusion用のポジティブ・ネガティブプロンプトを自動生成するWebアプリです。ローカル実行のLLM（LM StudioまたはLemonade Server）を使用しています。
+画像（またはテキスト説明）をローカルLLMで解析し、Stable Diffusion用のプロンプトを自動生成するWebアプリです。  
+**AUTOMATIC1111 Stable Diffusion WebUI API** との直接連携により、アプリ内で画像生成も行えます。
 
-## 機能
+> 📖 **English documentation**: [README.md](README.md)
 
-- 📤 **画像アップロード**: JPG, PNG, WebP, GIF形式に対応（最大10MB）
-- 🤖 **AI分析**: ローカルLLMで画像の特徴を分析
-- ✍️ **プロンプト生成**:
-  - ✅ ポジティブプロンプト（被写体、スタイル、品質など）
-  - ❌ ネガティブプロンプト（避けたい要素）
-- 📋 **テキスト説明モード**: 画像がない場合はテキスト説明からプロンプト生成
-- 📋 **コピー機能**: 生成されたプロンプトをワンクリックでコピー
+---
+
+## 機能一覧
+
+| 機能 | 説明 |
+|------|------|
+| 📸 **画像 → プロンプト** | 画像1枚をアップロードしてポジティブ・ネガティブプロンプトを生成 |
+| 🗂️ **バッチ処理** | 最大10枚の画像を一括処理 |
+| ✍️ **テキスト → プロンプト** | テキスト説明からSDプロンプトを生成 |
+| ⚙️ **スタイル / トーン / クオリティ** | 8スタイル・8トーン・3クオリティレベルでカスタマイズ |
+| 🎨 **プリセット** | 12種類の組み込みスタイルプリセット＋カスタムプリセット |
+| 🖼️ **SD txt2img** | A1111 APIで直接テキストから画像生成 |
+| 🔄 **SD img2img** | 既存画像をもとに新しい画像を生成 |
+| 🖌️ **SD インペイント** | 画像の特定領域をインペイント |
+| 📋 **履歴** | SQLiteベースのプロンプト生成履歴 |
+| 🗃️ **ギャラリー** | 生成済み画像のブラウズ・フィルタ・ページネーション |
+| 💾 **パラメータ保持** | 最後に使用したパラメータを自動復元 |
+| 📁 **フォルダランダム読み込み** | ローカルフォルダからランダムに画像を選択 |
+
+---
 
 ## 必要な環境
 
 ### 1. LLMサーバー（どちらか一つ）
 
-#### LM Studio
-- ダウンロード: https://lmstudio.ai
-- インストール後、任意のモデルをダウンロード（例：neural-chat, llama 2など）
+#### LM Studio（推奨）
+- ダウンロード: <https://lmstudio.ai>
+- ビジョン対応モデルをロード（例：LLaVA、BakLLaVAなど）
 - 「Server」タブを開いてローカルサーバーを起動
-- デフォルトポート: `http://localhost:1234`
+- デフォルトURL: `http://localhost:1234/v1`
 
 #### Lemonade Server
-- インストール: `pip install lemonade-server`
-- 起動: `lemonade-server --port 8000`
-- 設定: `.env`ファイルで`LLM_SERVER_URL`を変更
-
-### 2. Python 3.8+
-
 ```bash
-python --version
-```
-
-## インストール
-
-### 1. 依存関係をインストール
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. 環境設定
-
-`.env.example`をコピーして`.env`を作成：
-
-```bash
-cp .env.example .env
-```
-
-`.env`ファイルを編集して、LLMサーバーの設定を調整：
-
-```
-LLM_SERVER_URL=http://localhost:1234/v1
-LLM_MODEL=gpt-3.5-turbo
-API_PORT=8000
-DEBUG=false
-```
-
-## 使用方法
-
-### 1. LLMサーバーの起動
-
-**LM Studioの場合:**
-- LM Studioアプリを起動
-- 「Server」タブを開く
-- モデルが読み込まれていることを確認
-- サーバーが起動していることを確認
-
-**Lemonade Serverの場合:**
-```bash
+pip install lemonade-server
 lemonade-server --port 8000
 ```
+`.env` に `LLM_SERVER_URL=http://localhost:8000/api/v1` を設定してください。
 
-### 2. アプリケーションの起動
+### 2. Stable Diffusion WebUI（画像生成を使う場合）
+- [AUTOMATIC1111 WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui) をインストール
+- `--api` フラグ付きで起動:
+  ```bash
+  python launch.py --api
+  ```
+- デフォルトURL: `http://localhost:7860`
+
+### 3. Python 3.8+
+
+---
+
+## クイックスタート
+
+### Windows
+```cmd
+run.bat
+```
+
+### Linux / macOS
+```bash
+bash run.sh
+```
+
+どちらのスクリプトも、仮想環境の作成・依存パッケージのインストール・`.env` の生成・サーバーの起動を自動で行います。
+
+---
+
+## 手動インストール
 
 ```bash
+# 1. リポジトリをクローン
+git clone https://github.com/sj55576/Img2sdtxt.git
+cd Img2sdtxt
+
+# 2. 依存パッケージをインストール
+pip install -r requirements.txt
+
+# 3. .env を作成
+cp .env.example .env
+# .env を編集して設定を調整
+
+# 4. アプリケーションを起動
 python main.py
 ```
 
-ターミナルに以下のように表示されます：
-```
-INFO:     Uvicorn running on http://0.0.0.0:8000
-INFO:     Application startup complete
-```
+ブラウザで <http://localhost:8000> を開きます。
 
-### 3. ブラウザでアクセス
+---
 
-http://localhost:8000 を開きます
+## 環境変数
 
-## 使い方
+| 変数 | デフォルト | 説明 |
+|------|-----------|------|
+| `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLMサーバーのURL |
+| `LLM_MODEL` | `gpt-3.5-turbo` | 使用するモデル名 |
+| `SD_API_URL` | `http://localhost:7860` | AUTOMATIC1111 APIのURL |
+| `API_HOST` | `0.0.0.0` | APIサーバーのバインドアドレス |
+| `API_PORT` | `8000` | APIサーバーのポート番号 |
+| `DEBUG` | `false` | デバッグモード / ホットリロード |
 
-### 画像からプロンプト生成
+---
 
-1. 「📤 Image Upload」タブを開く
-2. 画像をドラッグ&ドロップ（または クリックして選択）
-3. 「Generate Prompts」ボタンをクリック
-4. ポジティブ・ネガティブプロンプトが生成されます
-5. 「Copy」ボタンでプロンプトをコピー
+## カスタマイズオプション
 
-### テキスト説明からプロンプト生成
+### スタイル
+`photorealistic`（写実的）、`anime`（アニメ）、`painting`（絵画）、`watercolor`（水彩）、`concept_art`（コンセプトアート）、`sketch`（スケッチ）、`pixel_art`（ピクセルアート）、`3d_render`（3Dレンダリング）
 
-1. 「✍️ Text Description」タブを開く
-2. 画像の説明を入力
-3. 「Generate from Text」ボタンをクリック
-4. プロンプトが生成されます
+### トーン
+`natural`（自然）、`vibrant`（鮮やか）、`warm`（暖色）、`cool`（寒色）、`dark`（暗い）、`soft`（柔らかい）、`dramatic`（ドラマティック）、`cinematic`（映画的）
+
+### クオリティレベル
+| レベル | 追加キーワード |
+|--------|----------------|
+| `standard` | `best quality` |
+| `high` | `best quality, masterpiece, highly detailed` |
+| `ultra` | `best quality, masterpiece, highly detailed, 8k uhd, sharp focus, professional` |
+
+---
+
+## 組み込みプリセット
+
+| プリセット名 | 説明 |
+|-------------|------|
+| Anime Style | アニメ・マンガスタイル |
+| Photorealistic | 8K写実的スタイル |
+| Oil Painting | 古典的な油絵スタイル |
+| Watercolor | 柔らかい水彩画スタイル |
+| Fantasy Art | 壮大なファンタジーコンセプトアート |
+| Portrait Photo | ボケ背景のポートレート写真 |
+| Realistic Portrait | 超写実的な人物描写 |
+| Fashion Photo | 編集/ヴォーグスタイルの写真 |
+| Cinematic Portrait | 映画的なシネマティック照明 |
+| Street Snap | 自然な街撮りスナップ写真 |
+| Studio Portrait | プロのスタジオポートレート |
+| Natural Light Portrait | 黄金時間の屋外自然光ポートレート |
+
+**プリセット**ページから独自のカスタムプリセットを作成・保存することもできます。
+
+---
 
 ## プロジェクト構成
 
 ```
 Img2sdtxt/
-├── main.py                 # FastAPI メインアプリケーション
-├── config.py              # 設定ファイル
-├── llm_client.py          # LLMサーバーとの通信
-├── prompt_generator.py    # プロンプト生成ロジック
-├── requirements.txt       # Python依存関係
-├── .env.example          # 環境設定のテンプレート
-├── .env                  # 環境設定（.env.exampleをコピー）
-├── static/
-│   ├── index.html        # Webアプリケーション UI
-│   ├── style.css         # スタイル
-│   └── script.js         # JavaScript ロジック
-└── README-ja.md          # このファイル
+├── main.py                  # FastAPIアプリケーション・全APIルート
+├── config.py                # アプリ設定・オプションリスト
+├── llm_client.py            # LLMサーバーとの通信
+├── prompt_generator.py      # プロンプト生成ロジック
+├── sd_client.py             # Stable Diffusion APIクライアント
+├── history.py               # SQLite履歴管理
+├── presets.py               # プリセットテンプレート管理
+├── requirements.txt         # Python依存パッケージ
+├── .env.example             # 環境変数テンプレート
+├── run.bat / run.sh         # ワンクリック起動スクリプト
+├── setup.bat / setup.sh     # セットアップのみのスクリプト
+├── data/                    # 実行時データ（DB・プリセット・パラメータ）
+│   ├── history.db
+│   ├── presets.json
+│   └── last_params.json
+├── outputs/                 # 生成済み画像（自動作成）
+│   └── YYYY-MM-DD/
+│       ├── *.png
+│       ├── *_metadata.json
+│       └── thumbs/
+└── static/
+    ├── index.html           # WebアプリケーションUI
+    ├── style.css            # スタイルシート
+    └── script.js            # JavaScriptロジック
 ```
-
-## API エンドポイント
-
-### POST /api/generate-prompts
-画像ファイルからプロンプトを生成
-
-**リクエスト:**
-```
-Content-Type: multipart/form-data
-file: <image file>
-```
-
-**レスポンス:**
-```json
-{
-  "success": true,
-  "data": {
-    "positive": "ポジティブプロンプト...",
-    "negative": "ネガティブプロンプト..."
-  }
-}
-```
-
-### POST /api/generate-prompts-text
-テキスト説明からプロンプトを生成
-
-**リクエスト:**
-```json
-{
-  "description": "画像の説明..."
-}
-```
-
-**レスポンス:**
-```json
-{
-  "success": true,
-  "data": {
-    "positive": "ポジティブプロンプト...",
-    "negative": "ネガティブプロンプト..."
-  }
-}
-```
-
-### GET /api/config
-設定情報を取得
-
-**レスポンス:**
-```json
-{
-  "llm_server": "http://localhost:1234/v1",
-  "model": "gpt-3.5-turbo"
-}
-```
-
-### GET /health
-ヘルスチェック
-
-**レスポンス:**
-```json
-{
-  "status": "healthy",
-  "llm_server": "connected",
-  "message": "Service is running properly"
-}
-```
-
-## トラブルシューティング
-
-### 「LLM server is not available」エラーが出る
-1. LM Studioが起動しているか確認
-2. ポート番号が正しいか確認（デフォルト: 1234）
-3. 環境変数`LLM_SERVER_URL`が正しいか確認
-
-```bash
-# LM Studioへの接続テスト
-curl http://localhost:1234/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "any",
-    "messages": [{"role": "user", "content": "test"}],
-    "max_tokens": 10
-  }'
-```
-
-### プロンプトが生成されない
-1. LLMサーバーのモデルが読み込まれているか確認
-2. ネットワーク接続を確認
-3. ブラウザの開発者コンソール（F12）でエラーメッセージを確認
-
-### 画像がアップロードできない
-- ファイルサイズが10MBを超えていないか確認
-- サポートされている形式（JPG, PNG, WebP, GIF）か確認
-
-## 環境変数
-
-| 変数 | デフォルト | 説明 |
-|------|----------|------|
-| `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLMサーバーのURL |
-| `LLM_MODEL` | `gpt-3.5-turbo` | 使用するモデル名 |
-| `API_HOST` | `0.0.0.0` | APIサーバーのホスト |
-| `API_PORT` | `8000` | APIサーバーのポート |
-| `DEBUG` | `false` | デバッグモード |
-
-## 開発
-
-### 依存関係の更新
-
-```bash
-pip freeze > requirements.txt
-```
-
-### フォーマット・Linting
-
-```bash
-# formatと一緒
-pip install black flake8
-
-# コード整形
-black *.py
-
-# Lint確認
-flake8 *.py
-```
-
-## ライセンス
-
-このプロジェクトはLICENSEファイルに従います。
-
-## サポート
-
-問題が発生した場合は、GitHubのIssueセクションで報告してください。
 
 ---
 
-**楽しいプロンプト生成を！🚀**
+## APIエンドポイント
+
+### プロンプト生成
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `POST` | `/api/generate-prompts` | 画像1枚からプロンプト生成 |
+| `POST` | `/api/generate-prompts-batch` | 最大10枚の画像を一括処理 |
+| `POST` | `/api/generate-prompts-text` | テキスト説明からプロンプト生成 |
+
+**`/api/generate-prompts` リクエスト（multipart/form-data）:**
+```
+file:          <画像ファイル>
+style:         photorealistic | anime | ... （任意）
+tone:          natural | vibrant | ...     （任意）
+quality:       standard | high | ultra    （デフォルト: high）
+preset_id:     <プリセットID>             （任意）
+save_history:  true | false               （デフォルト: true）
+```
+
+**レスポンス:**
+```json
+{
+  "success": true,
+  "data": {
+    "positive": "ポジティブプロンプト...",
+    "negative": "ネガティブプロンプト..."
+  }
+}
+```
+
+### 履歴
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `GET` | `/api/history` | 履歴一覧（`limit`・`offset`対応） |
+| `DELETE` | `/api/history/{id}` | 特定エントリを削除 |
+| `DELETE` | `/api/history` | 全履歴を削除 |
+
+### プリセット
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `GET` | `/api/presets` | 全プリセット一覧 |
+| `POST` | `/api/presets` | カスタムプリセット作成 |
+| `DELETE` | `/api/presets/{id}` | カスタムプリセット削除 |
+
+### Stable Diffusion
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `GET` | `/api/sd/status` | A1111接続確認 |
+| `GET` | `/api/sd/models` | 利用可能なモデル一覧 |
+| `GET` | `/api/sd/loras` | 利用可能なLoRA一覧 |
+| `GET` | `/api/sd/upscalers` | 利用可能なアップスケーラー一覧 |
+| `POST` | `/api/sd/generate` | txt2img（テキストから画像生成） |
+| `POST` | `/api/sd/img2img` | img2img（画像から画像生成） |
+| `POST` | `/api/sd/inpaint` | インペイント |
+
+**`/api/sd/generate` リクエスト（JSON）:**
+```json
+{
+  "positive": "プロンプト...",
+  "negative": "ネガティブプロンプト...",
+  "width": 512,
+  "height": 512,
+  "steps": 20,
+  "cfg_scale": 7.0,
+  "sampler": "Euler a",
+  "seed": -1,
+  "batch_size": 1,
+  "model": "",
+  "loras": "",
+  "enable_hr": false,
+  "hr_scale": 2.0,
+  "hr_upscaler": "R-ESRGAN 4x+",
+  "hr_second_pass_steps": 0,
+  "hr_denoising_strength": 0.7
+}
+```
+
+### その他
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `GET` | `/api/config` | アプリ設定情報 |
+| `GET` | `/health` | ヘルスチェック |
+| `GET` | `/api/outputs` | ギャラリー画像一覧（`date`・`mode`・`limit`・`offset`対応） |
+| `GET` | `/api/last-params/{feature}` | 最後のパラメータを取得 |
+| `POST` | `/api/last-params/{feature}` | 最後のパラメータを保存 |
+
+`{feature}` に指定できる値: `generate`, `sd`, `img2img`, `inpaint`
+
+---
+
+## 使い方
+
+### 画像からプロンプト生成
+
+1. サイドバーの「📤 Generate」をクリック
+2. 「📸 Image」タブを選択し、画像をドラッグ&ドロップ（またはクリックして選択）
+3. スタイル・トーン・クオリティ・プリセットをカスタマイズ（任意）
+4. 「Generate Prompts」ボタンをクリック
+5. 生成されたプロンプトを「Copy」ボタンでコピー
+
+### テキストからプロンプト生成
+
+1. サイドバーの「📤 Generate」をクリック
+2. 「✍️ Text」タブを選択し、画像の説明を入力
+3. 「Generate from Text」ボタンをクリック
+
+### バッチ処理
+
+1. サイドバーの「🗂️ Batch」をクリック
+2. 最大10枚の画像をまとめてアップロード
+3. スタイル・プリセットを設定して「Generate All」をクリック
+
+### SD画像生成（txt2img）
+
+1. サイドバーの「🖼️ SD Generate」をクリック
+2. プロンプトや各種パラメータを設定
+3. 「Generate」ボタンをクリック
+4. 生成された画像は `outputs/YYYY-MM-DD/` に自動保存
+
+### img2img
+
+1. サイドバーの「🔄 Img2Img」をクリック
+2. 元画像をアップロードし、プロンプトとデノイジング強度を設定
+3. 「Generate」ボタンをクリック
+
+### インペイント
+
+1. サイドバーの「🖌️ Inpaint」をクリック
+2. 画像をアップロードし、塗り替えたい領域をマスク
+3. プロンプトを設定して「Generate」をクリック
+
+---
+
+## トラブルシューティング
+
+### 「LLM server is not available」エラー
+1. LLMサーバーが起動しているか確認
+2. `.env` の `LLM_SERVER_URL` が正しいか確認
+3. 接続テスト:
+   ```bash
+   curl http://localhost:1234/v1/chat/completions \
+     -H "Content-Type: application/json" \
+     -d '{"model":"any","messages":[{"role":"user","content":"test"}],"max_tokens":10}'
+   ```
+
+### 「Stable Diffusion API is not available」エラー
+1. A1111 WebUIを `--api` フラグ付きで起動しているか確認
+2. `.env` の `SD_API_URL` が正しいか確認
+3. 接続テスト: `curl http://localhost:7860/config`
+
+### 画像がアップロードできない
+- ファイルサイズが **10MB** 以下か確認
+- 対応形式: **JPG・PNG・WebP・GIF**
+
+### APIドキュメント（インタラクティブ）
+- Swagger UI: <http://localhost:8000/docs>
+- ReDoc: <http://localhost:8000/redoc>
+
+---
+
+## ライセンス
+
+[LICENSE](LICENSE) ファイルを参照してください。
+
+---
+
+**楽しいプロンプト生成・画像生成を！🚀**

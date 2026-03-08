@@ -1,1 +1,260 @@
-# Img2sdtxt
+# 🎨 Img2sdtxt — Image to Stable Diffusion Prompt Generator
+
+A web application that analyzes images (or text descriptions) with a local LLM and generates ready-to-use Stable Diffusion prompts.  
+It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API** so you can generate images without leaving the app.
+
+> 📖 **Japanese documentation**: [README-ja.md](README-ja.md)
+
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| 📸 **Single Image → Prompt** | Upload one image to generate positive & negative prompts |
+| 🗂️ **Batch Processing** | Upload up to 10 images and generate prompts for all at once |
+| ✍️ **Text → Prompt** | Describe an image in plain text and get SD prompts |
+| ⚙️ **Style / Tone / Quality** | Customize output with 8 styles, 8 tones, and 3 quality levels |
+| 🎨 **Presets** | 12 built-in style presets (Anime, Photorealistic, Portrait, etc.) + custom presets |
+| 🖼️ **SD txt2img** | Generate images directly via the A1111 API |
+| 🔄 **SD img2img** | Transform an existing image using SD |
+| 🖌️ **SD Inpaint** | Inpaint selected areas of an image |
+| 📋 **History** | SQLite-based history of generated prompts |
+| 🗃️ **Gallery** | Browse, filter, and paginate generated images |
+| 💾 **Parameter Persistence** | Last-used parameters are restored automatically |
+| 📁 **Random Folder Load** | Pick a random image from a local folder |
+
+---
+
+## Requirements
+
+### 1. LLM Server (choose one)
+
+#### LM Studio
+- Download: <https://lmstudio.ai>
+- Load any vision-capable model (e.g. LLaVA, BakLLaVA)
+- Open the **Server** tab and start the local server
+- Default URL: `http://localhost:1234/v1`
+
+#### Lemonade Server
+```bash
+pip install lemonade-server
+lemonade-server --port 8000
+```
+Set `LLM_SERVER_URL=http://localhost:8000/api/v1` in `.env`.
+
+### 2. Stable Diffusion WebUI (optional, for image generation)
+- Install [AUTOMATIC1111 WebUI](https://github.com/AUTOMATIC1111/stable-diffusion-webui)
+- Launch with the `--api` flag:
+  ```bash
+  python launch.py --api
+  ```
+- Default URL: `http://localhost:7860`
+
+### 3. Python 3.8+
+
+---
+
+## Quick Start
+
+### Windows
+```cmd
+run.bat
+```
+
+### Linux / macOS
+```bash
+bash run.sh
+```
+
+Both scripts automatically create a virtual environment, install dependencies, generate a default `.env`, and start the server.
+
+---
+
+## Manual Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/sj55576/Img2sdtxt.git
+cd Img2sdtxt
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Create .env from template
+cp .env.example .env
+# Edit .env as needed
+
+# 4. Start the application
+python main.py
+```
+
+Open <http://localhost:8000> in your browser.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLM server endpoint |
+| `LLM_MODEL` | `gpt-3.5-turbo` | Model name to use |
+| `SD_API_URL` | `http://localhost:7860` | AUTOMATIC1111 API URL |
+| `API_HOST` | `0.0.0.0` | API server bind address |
+| `API_PORT` | `8000` | API server port |
+| `DEBUG` | `false` | Enable debug / hot-reload |
+
+---
+
+## Prompt Customization Options
+
+### Styles
+`photorealistic`, `anime`, `painting`, `watercolor`, `concept_art`, `sketch`, `pixel_art`, `3d_render`
+
+### Tones
+`natural`, `vibrant`, `warm`, `cool`, `dark`, `soft`, `dramatic`, `cinematic`
+
+### Quality Levels
+| Level | Added keywords |
+|-------|----------------|
+| `standard` | `best quality` |
+| `high` | `best quality, masterpiece, highly detailed` |
+| `ultra` | `best quality, masterpiece, highly detailed, 8k uhd, sharp focus, professional` |
+
+---
+
+## Built-in Presets
+
+| Preset | Description |
+|--------|-------------|
+| Anime Style | Anime / manga style |
+| Photorealistic | 8K photorealistic |
+| Oil Painting | Classical oil painting |
+| Watercolor | Soft watercolor |
+| Fantasy Art | Epic fantasy concept art |
+| Portrait Photo | Bokeh portrait photography |
+| Realistic Portrait | Hyper-realistic face rendering |
+| Fashion Photo | Editorial / Vogue-style photo |
+| Cinematic Portrait | Movie-still cinematic lighting |
+| Street Snap | Candid street photography |
+| Studio Portrait | Professional studio headshot |
+| Natural Light Portrait | Golden-hour outdoor portrait |
+
+Custom presets can be created and saved from the **Presets** page.
+
+---
+
+## Project Structure
+
+```
+Img2sdtxt/
+├── main.py                  # FastAPI application & all API routes
+├── config.py                # App configuration & option lists
+├── llm_client.py            # LLM server communication
+├── prompt_generator.py      # Prompt generation logic
+├── sd_client.py             # Stable Diffusion API client
+├── history.py               # SQLite history management
+├── presets.py               # Preset template management
+├── requirements.txt         # Python dependencies
+├── .env.example             # Environment variable template
+├── run.bat / run.sh         # One-click launch scripts
+├── setup.bat / setup.sh     # Setup-only scripts
+├── data/                    # Runtime data (DB, presets, last params)
+│   ├── history.db
+│   ├── presets.json
+│   └── last_params.json
+├── outputs/                 # Generated images (auto-created)
+│   └── YYYY-MM-DD/
+│       ├── *.png
+│       ├── *_metadata.json
+│       └── thumbs/
+└── static/
+    ├── index.html           # Web UI
+    ├── style.css
+    └── script.js
+```
+
+---
+
+## API Endpoints
+
+### Prompt Generation
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/generate-prompts` | Single image → prompts |
+| `POST` | `/api/generate-prompts-batch` | Up to 10 images → prompts |
+| `POST` | `/api/generate-prompts-text` | Text description → prompts |
+
+### History
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/history` | List history (`limit`, `offset`) |
+| `DELETE` | `/api/history/{id}` | Delete one entry |
+| `DELETE` | `/api/history` | Clear all history |
+
+### Presets
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/presets` | List all presets |
+| `POST` | `/api/presets` | Create custom preset |
+| `DELETE` | `/api/presets/{id}` | Delete custom preset |
+
+### Stable Diffusion
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/sd/status` | Check A1111 connection |
+| `GET` | `/api/sd/models` | List available models |
+| `GET` | `/api/sd/loras` | List available LoRAs |
+| `GET` | `/api/sd/upscalers` | List available upscalers |
+| `POST` | `/api/sd/generate` | txt2img generation |
+| `POST` | `/api/sd/img2img` | img2img generation |
+| `POST` | `/api/sd/inpaint` | Inpainting |
+
+### Other
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/config` | App configuration |
+| `GET` | `/health` | Health check |
+| `GET` | `/api/outputs` | Gallery images (`date`, `mode`, `limit`, `offset`) |
+| `GET` | `/api/last-params/{feature}` | Restore last parameters |
+| `POST` | `/api/last-params/{feature}` | Save last parameters |
+
+Valid `feature` values: `generate`, `sd`, `img2img`, `inpaint`
+
+---
+
+## Troubleshooting
+
+### "LLM server is not available"
+1. Make sure your LLM server is running
+2. Check `LLM_SERVER_URL` in `.env`
+3. Test connectivity:
+   ```bash
+   curl http://localhost:1234/v1/chat/completions \
+     -H "Content-Type: application/json" \
+     -d '{"model":"any","messages":[{"role":"user","content":"test"}],"max_tokens":10}'
+   ```
+
+### "Stable Diffusion API is not available"
+1. Launch A1111 WebUI with the `--api` flag
+2. Check `SD_API_URL` in `.env`
+3. Test: `curl http://localhost:7860/config`
+
+### Image won't upload
+- File size must not exceed **10 MB**
+- Supported formats: **JPG, PNG, WebP, GIF**
+
+### API documentation (interactive)
+- Swagger UI: <http://localhost:8000/docs>
+- ReDoc: <http://localhost:8000/redoc>
+
+---
+
+## License
+
+See [LICENSE](LICENSE).
