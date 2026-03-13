@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from typing import List, Optional
+from PIL import Image
 
 from config import (
     API_HOST, API_PORT, DEBUG,
@@ -653,6 +654,15 @@ def _scan_date_dir(date_dir: Path, date_str: str) -> list:
         meta = metadata_map.get(timestamp, {})
 
         thumb_path = date_dir / "thumbs" / fname
+        if not thumb_path.exists():
+            try:
+                thumbs_dir = date_dir / "thumbs"
+                thumbs_dir.mkdir(exist_ok=True)
+                with Image.open(img_file) as pil_img:
+                    pil_img.thumbnail((200, 200), Image.LANCZOS)
+                    pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
+            except Exception as e:
+                print(f"Warning: on-demand thumbnail generation failed for {fname}: {e}")
         thumb_url = f"/outputs/{date_str}/thumbs/{fname}" if thumb_path.exists() else None
 
         date_images.append({
