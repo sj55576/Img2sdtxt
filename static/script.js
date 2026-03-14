@@ -9,6 +9,11 @@ let inpaintSelectedImage = null;
 let _galleryCache = {};   // key: "mode|date|offset" → API response
 let _galleryOffset = 0;   // 現在の Load More オフセット
 
+// モデル選択の永続化（タブ切り替えでリセットされないよう変数で保持）
+const _selectedModel = { sd: '', img2img: '', inpaint: '' };
+// モデルリストの初回ロード済みフラグ（タブ切り替え時の再構築を防ぐ）
+const _modelsLoaded = { sd: false, img2img: false, inpaint: false };
+
 /* =====================================================================
    Init
    ===================================================================== */
@@ -102,35 +107,40 @@ async function checkSDStatus() {
             badge.className = 'badge badge-green';
             badge.textContent = 'Connected';
 
-            // Sampler更新
-            if (d.samplers?.length) {
-                const sel = document.getElementById('sd-sampler');
-                sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
-                if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
-            }
-
-            // モデル一覧を更新
-            if (d.models?.length) {
-                const modelSel = document.getElementById('sd-model');
-                modelSel.innerHTML = '<option value="">-- デフォルト --</option>' +
-                    d.models.map(m => {
+            if (!_modelsLoaded.sd) {
+                // 初回のみリストを構築
+                if (d.samplers?.length) {
+                    const sel = document.getElementById('sd-sampler');
+                    sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                    if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                }
+                if (d.models?.length) {
+                    const modelSel = document.getElementById('sd-model');
+                    const toRestore = _selectedModel.sd || modelSel.dataset.pendingValue || d.model || '';
+                    modelSel.innerHTML = d.models.map(m => {
                         const name = m.model_name || m.title || '';
                         return `<option value="${name}">${name}</option>`;
                     }).join('');
-                if (modelSel.dataset.pendingValue) { modelSel.value = modelSel.dataset.pendingValue; delete modelSel.dataset.pendingValue; }
+                    if (toRestore) modelSel.value = toRestore;
+                    if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
+                    if (modelSel.value) _selectedModel.sd = modelSel.value;
+                }
+                if (d.upscalers?.length) {
+                    const upscalerSel = document.getElementById('sd-hr-upscaler');
+                    upscalerSel.innerHTML = d.upscalers.map(u =>
+                        `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
+                    ).join('');
+                    if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
+                }
+                await loadLoras('sd');
+                _modelsLoaded.sd = true;
+            } else {
+                // タブ切り替え時は選択を復元するのみ
+                const modelSel = document.getElementById('sd-model');
+                if (_selectedModel.sd && modelSel.value !== _selectedModel.sd) {
+                    modelSel.value = _selectedModel.sd;
+                }
             }
-
-            // アップスケーラー一覧を更新
-            if (d.upscalers?.length) {
-                const upscalerSel = document.getElementById('sd-hr-upscaler');
-                upscalerSel.innerHTML = d.upscalers.map(u =>
-                    `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
-                ).join('');
-                if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
-            }
-
-            // LoRA一覧を更新
-            await loadLoras('sd');
         } else {
             sdEl.classList.add('error');
             sdEl.querySelector('.label').textContent = 'SD ✗';
@@ -623,6 +633,9 @@ function setupSDPage() {
     document.getElementById('sd-enable-hr').addEventListener('change', e => {
         document.getElementById('sd-hr-settings').classList.toggle('hidden', !e.target.checked);
     });
+    document.getElementById('sd-model').addEventListener('change', e => {
+        _selectedModel.sd = e.target.value;
+    });
 
     // Restore last used parameters (with delay for async operations)
     console.log('[INIT] Calling loadLastParams(sd)');
@@ -632,6 +645,9 @@ function setupSDPage() {
 async function runSDGenerate() {
     const positive = document.getElementById('sd-positive').value.trim();
     if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
+    const _sdModel = document.getElementById('sd-model').value.trim();
+    if (!_sdModel) { toast('モデルを選択してください', 'error'); return; }
+    if (!await confirmModel(_sdModel)) return;
 
     const loading = document.getElementById('sd-loading');
     const results = document.getElementById('sd-results');
@@ -760,6 +776,10 @@ function setupImg2ImgPage() {
     if (clearBtn) clearBtn.addEventListener('click', clearI2IImage);
     if (generateBtn) generateBtn.addEventListener('click', runImg2Img);
 
+    document.getElementById('i2i-model').addEventListener('change', e => {
+        _selectedModel.img2img = e.target.value;
+    });
+
     // Random folder load
     const i2iRandomFolderInput = document.getElementById('i2i-random-folder-input');
     const i2iRandomFolderBtn = document.getElementById('i2i-random-folder-btn');
@@ -859,32 +879,38 @@ async function checkImg2ImgStatus() {
             badge.className = 'badge badge-green';
             badge.textContent = 'Connected';
 
-            if (d.samplers?.length) {
-                const sel = document.getElementById('i2i-sampler');
-                sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
-                if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
-            }
-            if (d.models?.length) {
-                const modelSel = document.getElementById('i2i-model');
-                modelSel.innerHTML = '<option value="">-- デフォルト --</option>' +
-                    d.models.map(m => {
+            if (!_modelsLoaded.img2img) {
+                if (d.samplers?.length) {
+                    const sel = document.getElementById('i2i-sampler');
+                    sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                    if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                }
+                if (d.models?.length) {
+                    const modelSel = document.getElementById('i2i-model');
+                    const toRestore = _selectedModel.img2img || modelSel.dataset.pendingValue || d.model || '';
+                    modelSel.innerHTML = d.models.map(m => {
                         const name = m.model_name || m.title || '';
                         return `<option value="${name}">${name}</option>`;
                     }).join('');
-                if (modelSel.dataset.pendingValue) { modelSel.value = modelSel.dataset.pendingValue; delete modelSel.dataset.pendingValue; }
+                    if (toRestore) modelSel.value = toRestore;
+                    if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
+                    if (modelSel.value) _selectedModel.img2img = modelSel.value;
+                }
+                if (d.upscalers?.length) {
+                    const upscalerSel = document.getElementById('i2i-hr-upscaler');
+                    upscalerSel.innerHTML = d.upscalers.map(u =>
+                        `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
+                    ).join('');
+                    if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
+                }
+                await loadLoras('i2i');
+                _modelsLoaded.img2img = true;
+            } else {
+                const modelSel = document.getElementById('i2i-model');
+                if (_selectedModel.img2img && modelSel.value !== _selectedModel.img2img) {
+                    modelSel.value = _selectedModel.img2img;
+                }
             }
-
-            // アップスケーラー一覧を更新
-            if (d.upscalers?.length) {
-                const upscalerSel = document.getElementById('i2i-hr-upscaler');
-                upscalerSel.innerHTML = d.upscalers.map(u =>
-                    `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
-                ).join('');
-                if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
-            }
-
-            // LoRA一覧を更新
-            await loadLoras('i2i');
         } else {
             badge.className = 'badge badge-red';
             badge.textContent = 'Disconnected';
@@ -900,6 +926,9 @@ async function runImg2Img() {
 
     const positive = document.getElementById('i2i-positive').value.trim();
     if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
+    const _i2iModel = document.getElementById('i2i-model').value.trim();
+    if (!_i2iModel) { toast('モデルを選択してください', 'error'); return; }
+    if (!await confirmModel(_i2iModel)) return;
 
     const loading = document.getElementById('i2i-loading');
     const results = document.getElementById('i2i-results');
@@ -1017,6 +1046,10 @@ function setupInpaintPage() {
     clearMaskBtn.addEventListener('click', clearInpaintMask);
     fillMaskBtn.addEventListener('click', fillInpaintMask);
     generateBtn.addEventListener('click', runInpaint);
+
+    document.getElementById('inpaint-model').addEventListener('change', e => {
+        _selectedModel.inpaint = e.target.value;
+    });
 
     drawBtn.addEventListener('click', () => {
         _inpaint.mode = 'draw';
@@ -1161,21 +1194,31 @@ async function checkInpaintStatus() {
             badge.className = 'badge badge-green';
             badge.textContent = 'Connected';
 
-            if (d.samplers?.length) {
-                const sel = document.getElementById('inpaint-sampler');
-                sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
-                if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
-            }
-            if (d.models?.length) {
-                const modelSel = document.getElementById('inpaint-model');
-                modelSel.innerHTML = '<option value="">-- デフォルト --</option>' +
-                    d.models.map(m => {
+            if (!_modelsLoaded.inpaint) {
+                if (d.samplers?.length) {
+                    const sel = document.getElementById('inpaint-sampler');
+                    sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                    if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                }
+                if (d.models?.length) {
+                    const modelSel = document.getElementById('inpaint-model');
+                    const toRestore = _selectedModel.inpaint || modelSel.dataset.pendingValue || d.model || '';
+                    modelSel.innerHTML = d.models.map(m => {
                         const name = m.model_name || m.title || '';
                         return `<option value="${name}">${name}</option>`;
                     }).join('');
-                if (modelSel.dataset.pendingValue) { modelSel.value = modelSel.dataset.pendingValue; delete modelSel.dataset.pendingValue; }
+                    if (toRestore) modelSel.value = toRestore;
+                    if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
+                    if (modelSel.value) _selectedModel.inpaint = modelSel.value;
+                }
+                await loadLoras('inpaint');
+                _modelsLoaded.inpaint = true;
+            } else {
+                const modelSel = document.getElementById('inpaint-model');
+                if (_selectedModel.inpaint && modelSel.value !== _selectedModel.inpaint) {
+                    modelSel.value = _selectedModel.inpaint;
+                }
             }
-            await loadLoras('inpaint');
         } else {
             badge.className = 'badge badge-red';
             badge.textContent = 'Disconnected';
@@ -1221,6 +1264,9 @@ async function runInpaint() {
     if (!inpaintSelectedImage) { toast('入力画像を選択してください', 'error'); return; }
     const positive = document.getElementById('inpaint-positive').value.trim();
     if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
+    const _inpaintModel = document.getElementById('inpaint-model').value.trim();
+    if (!_inpaintModel) { toast('モデルを選択してください', 'error'); return; }
+    if (!await confirmModel(_inpaintModel)) return;
 
     const maskBase64 = getMaskBase64();
 
@@ -1379,6 +1425,7 @@ function applyLastParams(feature, params) {
         setVal('sd-batch', params.batch_size);
         setVal('sd-seed', params.seed);
         setVal('sd-model', params.model);
+        if (params.model) _selectedModel.sd = params.model;
         setVal('sd-loras', params.loras);
         setVal('sd-hr-scale', params.hr_scale);
         setVal('sd-hr-steps', params.hr_second_pass_steps);
@@ -1406,6 +1453,7 @@ function applyLastParams(feature, params) {
         setVal('i2i-batch', params.batch_size);
         setVal('i2i-seed', params.seed);
         setVal('i2i-model', params.model);
+        if (params.model) _selectedModel.img2img = params.model;
         setVal('i2i-loras', params.loras);
         setVal('i2i-hr-scale', params.hr_scale);
         setVal('i2i-hr-steps', params.hr_second_pass_steps);
@@ -1432,6 +1480,7 @@ function applyLastParams(feature, params) {
         setVal('inpaint-batch', params.batch_size);
         setVal('inpaint-seed', params.seed);
         setVal('inpaint-model', params.model);
+        if (params.model) _selectedModel.inpaint = params.model;
         setVal('inpaint-loras', params.loras);
         setVal('inpaint-mask-blur', params.mask_blur);
         setVal('inpaint-fill-mode', params.inpainting_fill);
@@ -1470,6 +1519,27 @@ function copyText(elementId, btn) {
         btn.textContent = '✓ OK';
         btn.classList.add('copied');
         setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+    });
+}
+
+// モデル確認ダイアログ（Promise を返す）
+function confirmModel(modelName) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('model-confirm-modal');
+        document.getElementById('model-confirm-name').textContent = modelName;
+        modal.classList.remove('hidden');
+        const okBtn = document.getElementById('model-confirm-ok');
+        const cancelBtn = document.getElementById('model-confirm-cancel');
+        const cleanup = (result) => {
+            modal.classList.add('hidden');
+            okBtn.removeEventListener('click', onOk);
+            cancelBtn.removeEventListener('click', onCancel);
+            resolve(result);
+        };
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
     });
 }
 
