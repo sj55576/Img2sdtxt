@@ -1,5 +1,4 @@
 import sqlite3
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -19,9 +18,15 @@ def init_db():
                 style TEXT,
                 tone TEXT,
                 quality TEXT,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                is_favorite INTEGER NOT NULL DEFAULT 0
             )
         """)
+        # 既存DBへの is_favorite カラム追加（マイグレーション）
+        try:
+            conn.execute("ALTER TABLE prompt_history ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # カラムが既に存在する場合はスキップ
         conn.commit()
 
 
@@ -46,16 +51,72 @@ def save_history(
         return cursor.lastrowid
 
 
-def get_history(limit: int = 50, offset: int = 0) -> List[Dict]:
+def get_history(
+    limit: int = 50,
+    offset: int = 0,
+    search: str = "",
+    style: str = "",
+    quality: str = "",
+    favorites_only: bool = False
+) -> List[Dict]:
     init_db()
+    conditions = []
+    params: List = []
+
+    if search:
+        conditions.append("(positive LIKE ? OR negative LIKE ? OR image_name LIKE ?)")
+        term = f"%{search}%"
+        params.extend([term, term, term])
+    if style:
+        conditions.append("style = ?")
+        params.append(style)
+    if quality:
+        conditions.append("quality = ?")
+        params.append(quality)
+    if favorites_only:
+        conditions.append("is_favorite = 1")
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.extend([limit, offset])
+
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            """SELECT * FROM prompt_history
-               ORDER BY created_at DESC LIMIT ? OFFSET ?""",
-            (limit, offset)
+            f"SELECT * FROM prompt_history {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            params
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def get_history_count(
+    search: str = "",
+    style: str = "",
+    quality: str = "",
+    favorites_only: bool = False
+) -> int:
+    init_db()
+    conditions = []
+    params: List = []
+
+    if search:
+        conditions.append("(positive LIKE ? OR negative LIKE ? OR image_name LIKE ?)")
+        term = f"%{search}%"
+        params.extend([term, term, term])
+    if style:
+        conditions.append("style = ?")
+        params.append(style)
+    if quality:
+        conditions.append("quality = ?")
+        params.append(quality)
+    if favorites_only:
+        conditions.append("is_favorite = 1")
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+    with sqlite3.connect(DB_PATH) as conn:
+        return conn.execute(
+            f"SELECT COUNT(*) FROM prompt_history {where}", params
+        ).fetchone()[0]
 
 
 def get_history_item(item_id: int) -> Optional[Dict]:
@@ -86,7 +147,22 @@ def clear_all_history() -> int:
         return result.rowcount
 
 
-def get_history_count() -> int:
+def toggle_favorite(item_id: int) -> Optional[Dict]:
+    """お気に入り状態をトグルし、更新後のアイテムを返す"""
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
-        return conn.execute("SELECT COUNT(*) FROM prompt_history").fetchone()[0]
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT id, is_favorite FROM prompt_history WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not row:
+            return None
+        new_state = 0 if row["is_favorite"] else 1
+        conn.execute(
+            "UPDATE prompt_history SET is_favorite = ? WHERE id = ?", (new_state, item_id)
+        )
+        conn.commit()
+        updated = conn.execute(
+            "SELECT * FROM prompt_history WHERE id = ?", (item_id,)
+        ).fetchone()
+        return dict(updated) if updated else None

@@ -231,14 +231,86 @@ async def generate_prompts_text(request_data: dict):
 
 
 # ------------------------------------------------------------------ #
+# Prompt Refinement
+# ------------------------------------------------------------------ #
+
+@app.post("/api/refine-prompt")
+async def refine_prompt(request_data: dict):
+    positive = request_data.get("positive", "").strip()
+    if not positive:
+        raise HTTPException(status_code=400, detail="Positive prompt is required.")
+
+    negative = request_data.get("negative", "").strip()
+    instruction = request_data.get("instruction", "").strip()
+    style = request_data.get("style", "")
+    tone = request_data.get("tone", "")
+    quality = request_data.get("quality", "high")
+
+    result = prompt_generator.refine_prompt(
+        positive=positive,
+        negative=negative,
+        instruction=instruction,
+        style=style,
+        tone=tone,
+        quality=quality
+    )
+
+    if result.get("status") == "error":
+        raise HTTPException(status_code=500, detail=result.get("error"))
+
+    return {
+        "success": True,
+        "data": {
+            "positive": result["positive"],
+            "negative": result["negative"],
+            "changes": result.get("changes", "")
+        }
+    }
+
+
+# ------------------------------------------------------------------ #
 # History
 # ------------------------------------------------------------------ #
 
 @app.get("/api/history")
-async def get_history(limit: int = 50, offset: int = 0):
-    items = hist.get_history(limit=limit, offset=offset)
-    total = hist.get_history_count()
+async def get_history(
+    limit: int = 50,
+    offset: int = 0,
+    search: str = "",
+    style: str = "",
+    quality: str = "",
+    favorites_only: bool = False
+):
+    items = hist.get_history(
+        limit=limit, offset=offset,
+        search=search, style=style, quality=quality,
+        favorites_only=favorites_only
+    )
+    total = hist.get_history_count(
+        search=search, style=style, quality=quality,
+        favorites_only=favorites_only
+    )
     return {"success": True, "items": items, "total": total}
+
+
+@app.get("/api/history/export")
+async def export_history():
+    """全履歴をJSONとしてダウンロード"""
+    from datetime import datetime as _dt
+    from fastapi.responses import JSONResponse
+    items = hist.get_history(limit=10000)
+    return JSONResponse(
+        content={"exported_at": _dt.now().isoformat(), "items": items},
+        headers={"Content-Disposition": "attachment; filename=prompt_history.json"}
+    )
+
+
+@app.put("/api/history/{item_id}/favorite")
+async def toggle_history_favorite(item_id: int):
+    updated = hist.toggle_favorite(item_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="History item not found.")
+    return {"success": True, "item": updated}
 
 
 @app.delete("/api/history/{item_id}")
