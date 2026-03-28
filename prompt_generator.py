@@ -102,6 +102,55 @@ JSON形式のみで返してください：
         except Exception as e:
             return {"positive": "", "negative": "", "error": str(e), "status": "error"}
 
+    def refine_prompt(
+        self,
+        positive: str,
+        negative: str = "",
+        instruction: str = "",
+        style: str = "",
+        tone: str = "",
+        quality: str = "high"
+    ) -> Dict[str, str]:
+        """既存のプロンプトをLLMで改善・強化する"""
+        try:
+            style_instruction = self._build_style_instruction(style, tone, quality)
+            customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
+            user_instruction = f"\n\n特別な指示: {instruction}" if instruction else ""
+
+            prompt = f"""以下のStable Diffusion用プロンプトを改善・強化してください。{customization}{user_instruction}
+
+現在のポジティブプロンプト:
+{positive}
+
+現在のネガティブプロンプト:
+{negative if negative else "(なし)"}
+
+改善のポイント:
+- より詳細で具体的なタグを追加する
+- 品質・スタイルタグを最適化する
+- 重複するタグを整理する
+- ネガティブプロンプトを充実させる
+- タグの順序を重要度順に整える
+
+JSON形式のみで返してください：
+{{
+  "positive": "改善されたポジティブプロンプト (英語のカンマ区切りタグ形式)",
+  "negative": "改善されたネガティブプロンプト (英語のカンマ区切りタグ形式)",
+  "changes": "改善した主な点の説明 (日本語)"
+}}
+
+注意: JSONのみ返してください。"""
+
+            result = self._call_llm(prompt)
+            return {
+                "positive": result.get("positive", positive),
+                "negative": result.get("negative", negative),
+                "changes": result.get("changes", ""),
+                "status": "success"
+            }
+        except Exception as e:
+            return {"positive": positive, "negative": negative, "changes": "", "error": str(e), "status": "error"}
+
     def generate_prompts_text_only(
         self,
         description: str,

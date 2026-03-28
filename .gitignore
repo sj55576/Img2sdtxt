@@ -6,3 +6,4 @@ outputs/
 tmpclaude-*
 venv/
 .vscode/
+.claude/

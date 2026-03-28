@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image to SD Prompt Generator</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=2">
 </head>
 <body>
     <div class="app-layout">
@@ -17,6 +17,7 @@
             <nav class="sidebar-nav">
                 <button class="nav-btn active" data-page="generate">📤 Generate</button>
                 <button class="nav-btn" data-page="batch">🗂️ Batch</button>
+                <button class="nav-btn" data-page="refine">🔧 Refine</button>
                 <button class="nav-btn" data-page="history">📋 History</button>
                 <button class="nav-btn" data-page="presets">🎨 Presets</button>
                 <button class="nav-btn" data-page="sd">🖼️ SD Generate</button>
@@ -157,8 +158,111 @@
                             </div>
                             <div class="result-actions">
                                 <button id="copy-all-btn" class="btn btn-secondary">📋 全コピー</button>
+                                <button id="refine-prompt-btn" class="btn btn-secondary">🔧 Refine</button>
                                 <button id="send-to-sd-btn" class="btn btn-accent">🖼️ SDで生成</button>
                                 <button id="send-to-img2img-btn" class="btn btn-accent">🔄 Img2Imgへ</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ======================== REFINE PAGE ======================== -->
+            <section id="page-refine" class="page">
+                <div class="page-header">
+                    <h2>Refine Prompt</h2>
+                    <p>既存のプロンプトをLLMで改善・強化</p>
+                </div>
+                <div class="page-body two-col">
+                    <!-- Left: Input -->
+                    <div class="col">
+                        <div class="form-group">
+                            <label class="field-label">Positive Prompt <span class="required">*</span></label>
+                            <textarea id="refine-positive-input" class="prompt-ta" rows="6" placeholder="改善したいポジティブプロンプトを入力..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="field-label">Negative Prompt</label>
+                            <textarea id="refine-negative-input" class="prompt-ta" rows="4" placeholder="ネガティブプロンプト（省略可）"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="field-label">改善の指示（オプション）</label>
+                            <input type="text" id="refine-instruction-input" class="form-input" placeholder="例: アニメスタイルに変更して, より詳細なライティングを追加して">
+                        </div>
+                        <div class="customization-panel">
+                            <h3>⚙️ カスタマイズ</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>スタイル</label>
+                                    <select id="refine-style">
+                                        <option value="">-- なし --</option>
+                                        <option value="photorealistic">Photorealistic</option>
+                                        <option value="anime">Anime</option>
+                                        <option value="painting">Painting</option>
+                                        <option value="watercolor">Watercolor</option>
+                                        <option value="concept_art">Concept Art</option>
+                                        <option value="sketch">Sketch</option>
+                                        <option value="pixel_art">Pixel Art</option>
+                                        <option value="3d_render">3D Render</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>トーン</label>
+                                    <select id="refine-tone">
+                                        <option value="">-- なし --</option>
+                                        <option value="natural">Natural</option>
+                                        <option value="vibrant">Vibrant</option>
+                                        <option value="warm">Warm</option>
+                                        <option value="cool">Cool</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="soft">Soft</option>
+                                        <option value="dramatic">Dramatic</option>
+                                        <option value="cinematic">Cinematic</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>品質</label>
+                                    <select id="refine-quality">
+                                        <option value="standard">Standard</option>
+                                        <option value="high" selected>High</option>
+                                        <option value="ultra">Ultra</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="refine-btn" class="btn btn-primary btn-block">
+                            🔧 プロンプトを改善
+                        </button>
+                    </div>
+
+                    <!-- Right: Results -->
+                    <div class="col">
+                        <div id="loading-refine" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p>LLMで改善中...</p>
+                        </div>
+                        <div id="refine-result-box" class="result-box hidden">
+                            <div id="refine-changes-box" class="refine-changes-box hidden">
+                                <div class="refine-changes-header">💡 改善ポイント</div>
+                                <div id="refine-changes-text"></div>
+                            </div>
+                            <div class="prompt-card positive">
+                                <div class="prompt-card-header">
+                                    <span>✅ Positive Prompt</span>
+                                    <button class="copy-btn" data-target="refine-pos-output">Copy</button>
+                                </div>
+                                <textarea id="refine-pos-output" class="prompt-ta"></textarea>
+                            </div>
+                            <div class="prompt-card negative">
+                                <div class="prompt-card-header">
+                                    <span>❌ Negative Prompt</span>
+                                    <button class="copy-btn" data-target="refine-neg-output">Copy</button>
+                                </div>
+                                <textarea id="refine-neg-output" class="prompt-ta"></textarea>
+                            </div>
+                            <div class="result-actions">
+                                <button id="refine-copy-all-btn" class="btn btn-secondary">📋 全コピー</button>
+                                <button id="refine-send-to-sd-btn" class="btn btn-accent">🖼️ SDで生成</button>
+                                <button id="refine-apply-btn" class="btn btn-secondary">↩️ 入力に反映</button>
                             </div>
                         </div>
                     </div>
@@ -228,9 +332,31 @@
                     <h2>History</h2>
                     <p>生成履歴の管理</p>
                     <div class="header-actions">
+                        <button id="export-history-btn" class="btn btn-sm btn-secondary">📥 エクスポート</button>
                         <button id="refresh-history-btn" class="btn btn-sm btn-secondary">🔄 更新</button>
                         <button id="clear-history-btn" class="btn btn-sm btn-danger">🗑️ 全削除</button>
                     </div>
+                </div>
+                <div class="history-filters">
+                    <input type="text" id="history-search" class="history-search-input" placeholder="🔍 プロンプト・ファイル名で検索...">
+                    <select id="history-filter-style" class="history-filter-select">
+                        <option value="">全スタイル</option>
+                        <option value="photorealistic">Photorealistic</option>
+                        <option value="anime">Anime</option>
+                        <option value="painting">Painting</option>
+                        <option value="watercolor">Watercolor</option>
+                        <option value="concept_art">Concept Art</option>
+                        <option value="sketch">Sketch</option>
+                        <option value="pixel_art">Pixel Art</option>
+                        <option value="3d_render">3D Render</option>
+                    </select>
+                    <select id="history-filter-quality" class="history-filter-select">
+                        <option value="">全クオリティ</option>
+                        <option value="standard">Standard</option>
+                        <option value="high">High</option>
+                        <option value="ultra">Ultra</option>
+                    </select>
+                    <button id="history-favorites-toggle" class="btn btn-sm btn-secondary" data-active="false">⭐ お気に入り</button>
                 </div>
                 <div class="page-body">
                     <div id="history-loading" class="loading-box hidden">
@@ -887,6 +1013,6 @@
         </div>
     </div>
 
-    <script src="/static/script.js"></script>
+    <script src="/static/script.js?v=2"></script>
 </body>
 </html>

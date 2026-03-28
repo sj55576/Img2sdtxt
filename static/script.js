@@ -18,15 +18,17 @@ const _modelsLoaded = { sd: false, img2img: false, inpaint: false };
    Init
    ===================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
-    setupNavigation();
-    setupGeneratePage();
-    setupBatchPage();
-    setupHistoryPage();
-    setupPresetsPage();
-    setupSDPage();
-    setupImg2ImgPage();
-    setupInpaintPage();
-    setupGalleryPage();
+    const _setup = (name, fn) => { try { fn(); } catch(e) { console.error(`[SETUP] ${name} failed:`, e); } };
+    _setup('navigation', setupNavigation);
+    _setup('generate', setupGeneratePage);
+    _setup('batch', setupBatchPage);
+    _setup('refine', setupRefinePage);
+    _setup('history', setupHistoryPage);
+    _setup('presets', setupPresetsPage);
+    _setup('sd', setupSDPage);
+    _setup('img2img', setupImg2ImgPage);
+    _setup('inpaint', setupInpaintPage);
+    _setup('gallery', setupGalleryPage);
     checkStatus();
 
     // Initialize SD and Img2Img selectors early for parameter restoration
@@ -68,6 +70,7 @@ function setupNavigation() {
             if (page === 'img2img') checkImg2ImgStatus();
             if (page === 'inpaint') checkInpaintStatus();
             if (page === 'gallery') loadGallery();
+            if (page === 'refine') { /* nothing to lazy load */ }
         });
     });
 }
@@ -238,6 +241,10 @@ function setupGeneratePage() {
         btn.addEventListener('click', () => copyText(btn.dataset.target, btn));
     });
     document.getElementById('copy-all-btn').addEventListener('click', copyAllPrompts);
+    document.getElementById('refine-prompt-btn').addEventListener('click', () => sendToRefine(
+        document.getElementById('pos-prompt').value,
+        document.getElementById('neg-prompt').value
+    ));
     document.getElementById('send-to-sd-btn').addEventListener('click', sendToSDPage);
     document.getElementById('send-to-img2img-btn').addEventListener('click', sendToImg2ImgPage);
 
@@ -433,6 +440,95 @@ async function runBatch() {
 /* =====================================================================
    History Page
    ===================================================================== */
+function sendToRefine(positive, negative) {
+    document.getElementById('refine-positive-input').value = positive || '';
+    document.getElementById('refine-negative-input').value = negative || '';
+    document.querySelector('[data-page="refine"]').click();
+    toast('Refineページに送りました', 'info');
+}
+
+/* =====================================================================
+   Refine Page
+   ===================================================================== */
+function setupRefinePage() {
+    document.getElementById('refine-btn').addEventListener('click', doRefinePrompt);
+
+    document.querySelectorAll('#page-refine .copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => copyText(btn.dataset.target, btn));
+    });
+
+    document.getElementById('refine-copy-all-btn').addEventListener('click', () => {
+        const pos = document.getElementById('refine-pos-output').value;
+        const neg = document.getElementById('refine-neg-output').value;
+        const text = `Positive:\n${pos}\n\nNegative:\n${neg}`;
+        navigator.clipboard.writeText(text).then(() => toast('全プロンプトをコピーしました', 'success'));
+    });
+
+    document.getElementById('refine-send-to-sd-btn').addEventListener('click', () => {
+        document.getElementById('sd-positive').value = document.getElementById('refine-pos-output').value;
+        document.getElementById('sd-negative').value = document.getElementById('refine-neg-output').value;
+        document.querySelector('[data-page="sd"]').click();
+        checkSDStatus();
+    });
+
+    document.getElementById('refine-apply-btn').addEventListener('click', () => {
+        document.getElementById('refine-positive-input').value = document.getElementById('refine-pos-output').value;
+        document.getElementById('refine-negative-input').value = document.getElementById('refine-neg-output').value;
+        document.getElementById('refine-result-box').classList.add('hidden');
+        toast('入力フィールドに反映しました', 'success');
+    });
+}
+
+async function doRefinePrompt() {
+    const positive = document.getElementById('refine-positive-input').value.trim();
+    if (!positive) { toast('Positiveプロンプトを入力してください', 'error'); return; }
+
+    const loading = document.getElementById('loading-refine');
+    const resultBox = document.getElementById('refine-result-box');
+    loading.classList.remove('hidden');
+    resultBox.classList.add('hidden');
+
+    try {
+        const r = await fetch('/api/refine-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                positive,
+                negative: document.getElementById('refine-negative-input').value.trim(),
+                instruction: document.getElementById('refine-instruction-input').value.trim(),
+                style: document.getElementById('refine-style').value,
+                tone: document.getElementById('refine-tone').value,
+                quality: document.getElementById('refine-quality').value,
+            })
+        });
+        if (!r.ok) throw new Error((await r.json()).detail);
+        const d = (await r.json()).data;
+
+        document.getElementById('refine-pos-output').value = d.positive;
+        document.getElementById('refine-neg-output').value = d.negative;
+
+        const changesBox = document.getElementById('refine-changes-box');
+        if (d.changes) {
+            document.getElementById('refine-changes-text').textContent = d.changes;
+            changesBox.classList.remove('hidden');
+        } else {
+            changesBox.classList.add('hidden');
+        }
+
+        resultBox.classList.remove('hidden');
+        toast('プロンプトを改善しました！', 'success');
+    } catch (e) {
+        toast(e.message || '改善に失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
+
+/* =====================================================================
+   History Page
+   ===================================================================== */
+let _historyDebounceTimer = null;
+
 function setupHistoryPage() {
     document.getElementById('refresh-history-btn').addEventListener('click', loadHistory);
     document.getElementById('clear-history-btn').addEventListener('click', async () => {
@@ -440,6 +536,25 @@ function setupHistoryPage() {
         await fetch('/api/history', { method: 'DELETE' });
         loadHistory();
         toast('履歴を削除しました', 'success');
+    });
+    document.getElementById('export-history-btn').addEventListener('click', () => {
+        window.location.href = '/api/history/export';
+    });
+
+    const debouncedLoad = () => {
+        clearTimeout(_historyDebounceTimer);
+        _historyDebounceTimer = setTimeout(loadHistory, 300);
+    };
+    document.getElementById('history-search').addEventListener('input', debouncedLoad);
+    document.getElementById('history-filter-style').addEventListener('change', loadHistory);
+    document.getElementById('history-filter-quality').addEventListener('change', loadHistory);
+
+    document.getElementById('history-favorites-toggle').addEventListener('click', function () {
+        const active = this.dataset.active === 'true';
+        this.dataset.active = String(!active);
+        this.classList.toggle('btn-accent', !active);
+        this.classList.toggle('btn-secondary', active);
+        loadHistory();
     });
 }
 
@@ -451,8 +566,19 @@ async function loadHistory() {
     empty.classList.add('hidden');
     list.innerHTML = '';
 
+    const search = document.getElementById('history-search')?.value.trim() || '';
+    const style = document.getElementById('history-filter-style')?.value || '';
+    const quality = document.getElementById('history-filter-quality')?.value || '';
+    const favoritesOnly = document.getElementById('history-favorites-toggle')?.dataset.active === 'true';
+
+    const params = new URLSearchParams({ limit: 100 });
+    if (search) params.set('search', search);
+    if (style) params.set('style', style);
+    if (quality) params.set('quality', quality);
+    if (favoritesOnly) params.set('favorites_only', 'true');
+
     try {
-        const r = await fetch('/api/history?limit=100');
+        const r = await fetch('/api/history?' + params.toString());
         const d = await r.json();
         loading.classList.add('hidden');
 
@@ -468,7 +594,10 @@ async function loadHistory() {
                         ${item.created_at ? `<span>${new Date(item.created_at).toLocaleString('ja-JP')}</span>` : ''}
                     </div>
                     <div class="history-item-actions">
+                        <button class="btn btn-sm ${item.is_favorite ? 'btn-favorite-active' : 'btn-ghost'}"
+                            onclick="toggleFavorite(${item.id})" title="${item.is_favorite ? 'お気に入り解除' : 'お気に入り登録'}">⭐</button>
                         <button class="btn btn-sm btn-secondary" onclick="loadHistoryItem(${item.id})">使用</button>
+                        <button class="btn btn-sm btn-secondary" onclick="sendToRefineFromHistory(${item.id})">🔧</button>
                         <button class="btn btn-sm btn-ghost" onclick="deleteHistoryItem(${item.id})">🗑️</button>
                     </div>
                 </div>
@@ -486,6 +615,30 @@ async function loadHistory() {
         loading.classList.add('hidden');
         toast('履歴の読み込みに失敗しました', 'error');
     }
+}
+
+async function toggleFavorite(id) {
+    try {
+        const r = await fetch(`/api/history/${id}/favorite`, { method: 'PUT' });
+        if (!r.ok) throw new Error();
+        const item = (await r.json()).item;
+        const btn = document.querySelector(`#hist-${id} .history-item-actions button:first-child`);
+        if (btn) {
+            btn.className = `btn btn-sm ${item.is_favorite ? 'btn-favorite-active' : 'btn-ghost'}`;
+            btn.title = item.is_favorite ? 'お気に入り解除' : 'お気に入り登録';
+        }
+        toast(item.is_favorite ? '⭐ お気に入りに追加' : 'お気に入りを解除', 'success');
+    } catch {
+        toast('更新に失敗しました', 'error');
+    }
+}
+
+function sendToRefineFromHistory(id) {
+    const el = document.getElementById(`hist-${id}`);
+    if (!el) return;
+    const positive = el.querySelectorAll('.history-prompt')[0]?.textContent.replace(/^Positive\s*/i, '').trim() || '';
+    const negative = el.querySelectorAll('.history-prompt')[1]?.textContent.replace(/^Negative\s*/i, '').trim() || '';
+    sendToRefine(positive, negative);
 }
 
 function loadHistoryItem(id) {
