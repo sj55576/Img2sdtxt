@@ -672,9 +672,6 @@ async def get_last_params(feature: str):
         raise HTTPException(status_code=400, detail="Invalid feature name.")
     data = _read_last_params()
     params = data.get(feature, {})
-    print(f"[API] GET /api/last-params/{feature} -> {len(params)} keys")
-    print(f"[API] File exists: {_LAST_PARAMS_FILE.exists()}")
-    print(f"[API] Return params: {params}")
     return {"success": True, "params": params}
 
 
@@ -685,9 +682,6 @@ async def save_last_params(feature: str, request_data: dict):
     data = _read_last_params()
     data[feature] = request_data
     _write_last_params(data)
-    print(f"[API] POST /api/last-params/{feature} -> Saved {len(request_data)} keys")
-    print(f"[API] File path: {_LAST_PARAMS_FILE}")
-    print(f"[API] File exists: {_LAST_PARAMS_FILE.exists()}")
     return {"success": True}
 
 

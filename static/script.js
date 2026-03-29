@@ -193,7 +193,6 @@ function addLora(prefix) {
    Generate Page
    ===================================================================== */
 function setupGeneratePage() {
-    console.log('[INIT] setupGeneratePage');
     // Inner tabs
     document.querySelectorAll('.inner-tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -252,7 +251,6 @@ function setupGeneratePage() {
     loadPresetsIntoSelects();
 
     // Restore last used parameters
-    console.log('[INIT] Calling loadLastParams(generate)');
     loadLastParams('generate');
 }
 
@@ -781,7 +779,6 @@ function closePresetModal() {
    SD Generate Page
    ===================================================================== */
 function setupSDPage() {
-    console.log('[INIT] setupSDPage');
     document.getElementById('sd-generate-btn').addEventListener('click', runSDGenerate);
     document.getElementById('sd-enable-hr').addEventListener('change', e => {
         document.getElementById('sd-hr-settings').classList.toggle('hidden', !e.target.checked);
@@ -791,7 +788,6 @@ function setupSDPage() {
     });
 
     // Restore last used parameters (with delay for async operations)
-    console.log('[INIT] Calling loadLastParams(sd)');
     setTimeout(() => loadLastParams('sd'), 100);
 }
 
@@ -877,11 +873,6 @@ function setupImg2ImgPage() {
     const enableHrCheckbox = document.getElementById('i2i-enable-hr');
     const hrSettings = document.getElementById('i2i-hr-settings');
 
-    console.log('[IMG2IMG] setupImg2ImgPage called');
-    console.log('[INIT] setupImg2ImgPage');
-    console.log('[IMG2IMG] uploadArea:', uploadArea);
-    console.log('[IMG2IMG] imageInput:', imageInput);
-
     if (!uploadArea || !imageInput) {
         console.error('[IMG2IMG] Upload elements not found!');
         return;
@@ -889,19 +880,16 @@ function setupImg2ImgPage() {
 
     // Click to upload
     uploadArea.addEventListener('click', () => {
-        console.log('[IMG2IMG] Click on upload area');
         imageInput.click();
     });
 
     // File input change
     imageInput.addEventListener('change', e => {
-        console.log('[IMG2IMG] File input changed:', e.target.files);
         handleI2IImageSelect(e.target.files[0]);
     });
 
     // Drag over
     uploadArea.addEventListener('dragover', e => {
-        console.log('[IMG2IMG] Dragover');
         e.preventDefault();
         e.stopPropagation();
         uploadArea.classList.add('drag-over');
@@ -909,7 +897,6 @@ function setupImg2ImgPage() {
 
     // Drag leave
     uploadArea.addEventListener('dragleave', e => {
-        console.log('[IMG2IMG] Dragleave');
         e.preventDefault();
         e.stopPropagation();
         uploadArea.classList.remove('drag-over');
@@ -917,7 +904,6 @@ function setupImg2ImgPage() {
 
     // Drop
     uploadArea.addEventListener('drop', e => {
-        console.log('[IMG2IMG] Drop event:', e.dataTransfer.files);
         e.preventDefault();
         e.stopPropagation();
         uploadArea.classList.remove('drag-over');
@@ -950,16 +936,11 @@ function setupImg2ImgPage() {
         });
     }
 
-    console.log('[IMG2IMG] setupImg2ImgPage completed');
-
     // Restore last used parameters (with delay for selector population)
-    console.log('[INIT] Calling loadLastParams(img2img)');
     setTimeout(() => loadLastParams('img2img'), 150);
 }
 
 function handleI2IImageSelect(file) {
-    console.log('[IMG2IMG] handleI2IImageSelect called with file:', file);
-
     if (!file) {
         console.error('[IMG2IMG] No file provided');
         toast('画像ファイルを選択してください', 'error');
@@ -979,11 +960,9 @@ function handleI2IImageSelect(file) {
     }
 
     i2iSelectedImage = file;
-    console.log('[IMG2IMG] File stored, reading as DataURL');
 
     const reader = new FileReader();
     reader.onload = e => {
-        console.log('[IMG2IMG] FileReader onload completed');
         const previewImg = document.getElementById('i2i-preview-image');
         const previewWrap = document.getElementById('i2i-preview-wrap');
         const uploadArea = document.getElementById('i2i-upload-area');
@@ -994,7 +973,6 @@ function handleI2IImageSelect(file) {
         if (uploadArea) uploadArea.classList.add('hidden');
         if (genBtn) genBtn.disabled = false;
 
-        console.log('[IMG2IMG] Preview updated');
         toast('画像を読み込みました', 'success');
     };
     reader.onerror = () => {
@@ -1005,7 +983,6 @@ function handleI2IImageSelect(file) {
 }
 
 function clearI2IImage() {
-    console.log('[IMG2IMG] clearI2IImage called');
     i2iSelectedImage = null;
 
     const imageInput = document.getElementById('i2i-image-input');
@@ -1017,8 +994,6 @@ function clearI2IImage() {
     if (previewWrap) previewWrap.classList.add('hidden');
     if (uploadArea) uploadArea.classList.remove('hidden');
     if (genBtn) genBtn.disabled = true;
-
-    console.log('[IMG2IMG] Image cleared');
 }
 
 async function checkImg2ImgStatus() {
@@ -1502,7 +1477,9 @@ async function saveLastParams(feature, params) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)
         });
-        console.log(`[PARAMS] Saved ${feature}:`, params);
+        if (!r.ok) {
+            console.error(`[PARAMS] Save failed for ${feature}:`, r.status);
+        }
     } catch (e) {
         console.error(`[PARAMS] Save failed for ${feature}:`, e);
     }
@@ -1510,19 +1487,14 @@ async function saveLastParams(feature, params) {
 
 async function loadLastParams(feature) {
     try {
-        console.log(`[PARAMS] Loading ${feature}...`);
         const r = await fetch(`/api/last-params/${feature}`);
         if (!r.ok) {
             console.warn(`[PARAMS] API response not OK for ${feature}:`, r.status);
             return;
         }
         const d = await r.json();
-        console.log(`[PARAMS] Loaded ${feature}:`, d);
         if (d.params && Object.keys(d.params).length > 0) {
-            console.log(`[PARAMS] Applying ${feature} with`, Object.keys(d.params).length, 'keys');
             applyLastParams(feature, d.params);
-        } else {
-            console.warn(`[PARAMS] No params found for ${feature}`);
         }
     } catch (e) {
         console.error(`[PARAMS] Load failed for ${feature}:`, e);
@@ -1538,29 +1510,23 @@ function applyLastParams(feature, params) {
                 // If option exists, set it directly
                 if (el.querySelector(`option[value="${val}"]`)) {
                     el.value = val;
-                    console.log(`[PARAMS] Set ${id} = ${val}`);
                     return;
                 } else if (val && !el.dataset.pendingValue) {
                     // Otherwise, use pendingValue for later
                     el.dataset.pendingValue = val;
-                    console.log(`[PARAMS] Set pending ${id} = ${val}`);
                     return;
                 }
             }
             // For text inputs and other elements
             el.value = val;
-            console.log(`[PARAMS] Set ${id} = ${val}`);
         }
     };
     const setPending = (id, val) => {
         const el = document.getElementById(id);
         if (el && val !== undefined && val !== null) {
             el.dataset.pendingValue = val;
-            console.log(`[PARAMS] Set pending ${id} = ${val}`);
         }
     };
-
-    console.log(`[PARAMS] applyLastParams(${feature})`);
 
     if (feature === 'generate') {
         setVal('select-style', params.style);
@@ -1590,7 +1556,6 @@ function applyLastParams(feature, params) {
             if (hrChk) {
                 hrChk.checked = params.enable_hr;
                 document.getElementById('sd-hr-settings').classList.toggle('hidden', !params.enable_hr);
-                console.log(`[PARAMS] Set sd-enable-hr = ${params.enable_hr}`);
             }
         }
 
@@ -1618,7 +1583,6 @@ function applyLastParams(feature, params) {
             if (hrChk) {
                 hrChk.checked = params.enable_hr;
                 document.getElementById('i2i-hr-settings').classList.toggle('hidden', !params.enable_hr);
-                console.log(`[PARAMS] Set i2i-enable-hr = ${params.enable_hr}`);
             }
         }
 
