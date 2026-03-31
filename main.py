@@ -793,6 +793,99 @@ async def list_outputs(
     return {"success": True, "images": page_images, "dates": dates, "total": total}
 
 
+
+def _run_batch_cli() -> None:
+    """Parse CLI arguments and run batch or watch mode when --input-dir is given."""
+    import argparse
+    from batch_processor import BatchProcessor
+
+    parser = argparse.ArgumentParser(
+        prog="main.py",
+        description=(
+            "Img2sdtxt — Image to Stable Diffusion Prompt Generator.\n"
+            "Run without --input-dir to start the web server."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--input-dir",
+        dest="input_dirs",
+        metavar="PATH",
+        action="append",
+        default=None,
+        help="Directory containing images to process (can be specified multiple times).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        dest="output_dir",
+        metavar="PATH",
+        default="./outputs",
+        help="Directory where results are saved (default: ./outputs).",
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Watch mode: monitor input directories and process new files automatically.",
+    )
+    parser.add_argument(
+        "--format",
+        dest="fmt",
+        choices=["json", "txt", "both"],
+        default="json",
+        help="Output format (default: json).",
+    )
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Recursively scan sub-directories.",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Number of parallel workers (default: 1). Increase with care due to LLM rate limits.",
+    )
+    parser.add_argument(
+        "--skip-existing",
+        dest="skip_existing",
+        action="store_true",
+        help="Skip images that already have an output file.",
+    )
+
+    args, _unknown = parser.parse_known_args()
+
+    if args.input_dirs is None:
+        # No --input-dir → start the web server
+        import uvicorn
+        uvicorn.run(app, host=API_HOST, port=API_PORT, reload=DEBUG)
+        return
+
+    input_paths = [Path(d) for d in args.input_dirs]
+    for p in input_paths:
+        if not p.is_dir():
+            parser.error(f"--input-dir '{p}' is not a valid directory.")
+
+    output_path = Path(args.output_dir)
+
+    processor = BatchProcessor(llm_client, concurrency=args.concurrency)
+
+    if args.watch:
+        processor.watch(
+            input_dirs=input_paths,
+            output_dir=output_path,
+            fmt=args.fmt,
+            recursive=args.recursive,
+            skip_existing=args.skip_existing,
+        )
+    else:
+        processor.run(
+            input_dirs=input_paths,
+            output_dir=output_path,
+            fmt=args.fmt,
+            recursive=args.recursive,
+            skip_existing=args.skip_existing,
+        )
+
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host=API_HOST, port=API_PORT, reload=DEBUG)
+    _run_batch_cli()

@@ -23,6 +23,8 @@ It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API*
 | 🗃️ **Gallery** | Browse, filter, and paginate generated images |
 | 💾 **Parameter Persistence** | Last-used parameters are restored automatically |
 | 📁 **Random Folder Load** | Pick a random image from a local folder |
+| 🖥️ **CLI Batch Mode** | Process a whole directory of images from the command line |
+| 👁️ **CLI Watch Mode** | Monitor a folder and auto-process new images as they arrive |
 
 ---
 
@@ -141,6 +143,69 @@ Open <http://localhost:8000> in your browser.
 | Natural Light Portrait | Golden-hour outdoor portrait |
 
 Custom presets can be created and saved from the **Presets** page.
+
+---
+
+
+## CLI Batch & Watch Mode
+
+In addition to the web UI, `main.py` can be used as a command-line tool to
+process entire directories of images.
+
+### Basic batch processing
+
+```bash
+python main.py --input-dir ./my_images --output-dir ./outputs
+```
+
+### Multiple input directories
+
+```bash
+python main.py --input-dir ./photos --input-dir ./screenshots --output-dir ./out
+```
+
+### Recursive scan + TXT output
+
+```bash
+python main.py --input-dir ./images --recursive --format txt
+```
+
+### Skip already-processed images
+
+```bash
+python main.py --input-dir ./images --skip-existing
+```
+
+### Parallel processing (increase with care due to LLM rate limits)
+
+```bash
+python main.py --input-dir ./images --concurrency 3
+```
+
+### Watch mode — auto-process new files
+
+```bash
+python main.py --input-dir ./inbox --output-dir ./processed --watch
+```
+
+Drop any `jpg`, `jpeg`, `png`, or `webp` image into `./inbox` while the
+watcher is running and it will be processed automatically. The watcher waits
+until the file size has been stable for ~1.5 s before starting, to avoid
+reading partially-written files.
+
+### All CLI options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--input-dir PATH` | *(required)* | Input directory (repeat for multiple) |
+| `--output-dir PATH` | `./outputs` | Where to save results |
+| `--format {json,txt,both}` | `json` | Output format |
+| `--recursive` | off | Scan sub-directories |
+| `--concurrency N` | `1` | Parallel worker threads |
+| `--skip-existing` | off | Skip images with existing output |
+| `--watch` | off | Watch for new files instead of exiting |
+
+> **Note:** Omit `--input-dir` entirely to start the normal web server.
 
 ---
 
