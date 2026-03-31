@@ -793,6 +793,115 @@ async def list_outputs(
     return {"success": True, "images": page_images, "dates": dates, "total": total}
 
 
+# --------------------------------------------------------------------------- #
+# CLI entry point (batch / watch mode)
+# --------------------------------------------------------------------------- #
+
+def _build_cli_parser():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="python main.py",
+        description=(
+            "Img2sdtxt — バッチ処理・監視モードで画像からSD プロンプトを生成します。\n"
+            "引数なしで起動すると Web API サーバーが立ち上がります。"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    # バッチ / ウォッチ共通オプション
+    parser.add_argument(
+        "--input-dir",
+        dest="input_dirs",
+        metavar="PATH",
+        nargs="+",
+        help="処理対象の画像ディレクトリ（複数指定可）",
+    )
+    parser.add_argument(
+        "--output-dir",
+        dest="output_dir",
+        metavar="PATH",
+        default="./outputs",
+        help="生成結果を保存するディレクトリ（デフォルト: ./outputs）",
+    )
+    parser.add_argument(
+        "--format",
+        dest="fmt",
+        choices=["json", "txt", "both"],
+        default="json",
+        help="出力フォーマット（デフォルト: json）",
+    )
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        help="サブディレクトリを再帰的に処理する",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        metavar="N",
+        help="同時実行数（デフォルト: 1、LLM レート制限に注意）",
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="既に出力ファイルがある画像をスキップする",
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="監視モード: 新規画像を検知して自動処理する（Ctrl+C で停止）",
+    )
+
+    # Web サーバーオプション（引数なし起動との互換性）
+    parser.add_argument(
+        "--host",
+        default=API_HOST,
+        help=f"Web API のホスト（デフォルト: {API_HOST}）",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=API_PORT,
+        help=f"Web API のポート（デフォルト: {API_PORT}）",
+    )
+
+    return parser
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=API_HOST, port=API_PORT, reload=DEBUG)
+    from pathlib import Path as _Path
+
+    parser = _build_cli_parser()
+    args = parser.parse_args()
+
+    if args.input_dirs:
+        # バッチ / ウォッチモード
+        from batch_processor import run_batch, run_watch
+
+        input_dirs = [_Path(d) for d in args.input_dirs]
+        output_dir = _Path(args.output_dir)
+
+        if args.watch:
+            run_watch(
+                input_dirs=input_dirs,
+                output_dir=output_dir,
+                fmt=args.fmt,
+                recursive=args.recursive,
+                concurrency=args.concurrency,
+                skip_existing=args.skip_existing,
+            )
+        else:
+            run_batch(
+                input_dirs=input_dirs,
+                output_dir=output_dir,
+                fmt=args.fmt,
+                recursive=args.recursive,
+                concurrency=args.concurrency,
+                skip_existing=args.skip_existing,
+            )
+    else:
+        # Web API サーバーモード（デフォルト）
+        uvicorn.run(app, host=args.host, port=args.port, reload=DEBUG)

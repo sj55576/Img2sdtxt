@@ -5,3 +5,5 @@ pillow==10.1.0
 requests==2.31.0
 python-dotenv==1.0.0
 aiofiles==23.2.1
+watchdog==4.0.2
+tqdm==4.66.4

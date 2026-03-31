@@ -229,3 +229,64 @@ deactivate
 | **Linux/macOS** | `bash run.sh` または `./run.sh` |
 
 スクリプトが問題を自動的に処理するため、初回使用時は推奨方法を使用することをお勧めします。
+
+---
+
+## CLI バッチモード / 監視モード
+
+Web UI を使わずに、コマンドラインでディレクトリ内の画像を一括処理できます。
+
+### バッチモード（一括処理）
+
+```bash
+# ./my_images 内の全画像を処理し、JSON プロンプトを ./outputs に保存
+python main.py --input-dir ./my_images
+
+# JSON と TXT の両方を出力し、サブディレクトリも再帰的に処理する
+python main.py --input-dir ./my_images --output-dir ./results \
+               --format both --recursive --skip-existing
+
+# 複数ディレクトリを同時実行数 4 で処理
+python main.py --input-dir ./dir_a ./dir_b --concurrency 4
+```
+
+### 監視モード（Watch モード）
+
+```bash
+# ./incoming を監視し、新しい画像を自動処理（Ctrl+C で停止）
+python main.py --input-dir ./incoming --watch
+
+# 出力先と形式を指定して監視
+python main.py --input-dir ./incoming --output-dir ./prompts --format txt --watch
+```
+
+### CLI オプション一覧
+
+| オプション | デフォルト | 説明 |
+|-----------|-----------|------|
+| `--input-dir PATH [PATH …]` | — | 処理対象ディレクトリ（複数指定可） |
+| `--output-dir PATH` | `./outputs` | 生成ファイルの保存先 |
+| `--format {json,txt,both}` | `json` | 出力フォーマット |
+| `--recursive` | オフ | サブディレクトリを再帰的に処理する |
+| `--concurrency N` | `1` | 並列実行数 |
+| `--skip-existing` | オフ | 既に出力があれば処理をスキップ |
+| `--watch` | オフ | 監視モード（新規ファイルを自動処理） |
+
+### 出力 JSON フォーマット
+
+```json
+{
+  "image_filename": "photo.jpg",
+  "prompt_text": "masterpiece, best quality, …",
+  "negative_prompt": "lowres, bad anatomy, …",
+  "model_used": "gpt-3.5-turbo",
+  "timestamp": "2025-01-01T12:00:00.000000",
+  "processing_time_ms": 1234,
+  "metadata": {
+    "image_path": "/絶対パス/photo.jpg",
+    "image_size_bytes": 204800
+  }
+}
+```
+
+バッチ実行のログ（成功・失敗）は `data/batch_log.jsonl` に追記されます。

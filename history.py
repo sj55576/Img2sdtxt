@@ -1,7 +1,12 @@
+import json
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
+
+_batch_log_lock = threading.Lock()
+BATCH_LOG_PATH = Path(__file__).parent / "data" / "batch_log.jsonl"
 
 DB_PATH = Path(__file__).parent / "data" / "history.db"
 
@@ -166,3 +171,17 @@ def toggle_favorite(item_id: int) -> Optional[Dict]:
             "SELECT * FROM prompt_history WHERE id = ?", (item_id,)
         ).fetchone()
         return dict(updated) if updated else None
+
+
+def save_batch_log(record: Dict) -> None:
+    """バッチ処理の実行結果（成功・失敗）をJSONL形式でログに追記する。
+
+    record には以下のキーを含めることを想定:
+        image_filename, status, prompt_text, model_used, timestamp,
+        processing_time_ms, error (失敗時のみ), metadata
+    """
+    BATCH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    entry = {"logged_at": datetime.now().isoformat(), **record}
+    with _batch_log_lock:
+        with open(BATCH_LOG_PATH, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")

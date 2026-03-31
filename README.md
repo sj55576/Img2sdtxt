@@ -23,6 +23,8 @@ It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API*
 | 🗃️ **Gallery** | Browse, filter, and paginate generated images |
 | 💾 **Parameter Persistence** | Last-used parameters are restored automatically |
 | 📁 **Random Folder Load** | Pick a random image from a local folder |
+| 📂 **CLI Batch Mode** | Process a whole directory of images from the command line |
+| 👁️ **CLI Watch Mode** | Auto-process new images as they appear in a monitored folder |
 
 ---
 
@@ -252,6 +254,79 @@ Valid `feature` values: `generate`, `sd`, `img2img`, `inpaint`
 ### API documentation (interactive)
 - Swagger UI: <http://localhost:8000/docs>
 - ReDoc: <http://localhost:8000/redoc>
+
+---
+
+## CLI Batch & Watch Mode
+
+In addition to the web UI, you can process image directories directly from the command line.
+
+### Batch mode — process all images in a directory
+
+```bash
+# Process all images in ./my_images, save JSON prompts to ./outputs
+python main.py --input-dir ./my_images
+
+# Save both JSON and TXT, recurse into subdirectories, skip already-processed images
+python main.py --input-dir ./my_images --output-dir ./results \
+               --format both --recursive --skip-existing
+
+# Process multiple directories with 4 parallel workers
+python main.py --input-dir ./dir_a ./dir_b --concurrency 4
+```
+
+### Watch mode — auto-process new images
+
+```bash
+# Watch ./incoming and process every new image automatically (Ctrl+C to stop)
+python main.py --input-dir ./incoming --watch
+
+# Watch with custom output directory and TXT format
+python main.py --input-dir ./incoming --output-dir ./prompts --format txt --watch
+```
+
+### All CLI options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--input-dir PATH [PATH …]` | — | Image directories to process (required for batch/watch) |
+| `--output-dir PATH` | `./outputs` | Where to save generated files |
+| `--format {json,txt,both}` | `json` | Output format |
+| `--recursive` | off | Recurse into subdirectories |
+| `--concurrency N` | `1` | Number of parallel workers |
+| `--skip-existing` | off | Skip images that already have output files |
+| `--watch` | off | Watch mode: auto-process new images |
+
+### Output JSON format
+
+```json
+{
+  "image_filename": "photo.jpg",
+  "prompt_text": "masterpiece, best quality, …",
+  "negative_prompt": "lowres, bad anatomy, …",
+  "model_used": "gpt-3.5-turbo",
+  "timestamp": "2025-01-01T12:00:00.000000",
+  "processing_time_ms": 1234,
+  "metadata": {
+    "image_path": "/absolute/path/to/photo.jpg",
+    "image_size_bytes": 204800
+  }
+}
+```
+
+Batch run logs (success and failure) are appended to `data/batch_log.jsonl`.
+
+### Watch mode — manual integration test
+
+1. Start watch mode in one terminal:
+   ```bash
+   python main.py --input-dir ./incoming --output-dir ./prompts --watch
+   ```
+2. Copy a new image into `./incoming/` in another terminal:
+   ```bash
+   cp sample.jpg ./incoming/
+   ```
+3. The watcher detects the file, waits for it to finish writing, then generates and saves the prompt automatically.
 
 ---
 
