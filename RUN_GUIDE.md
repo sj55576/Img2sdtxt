@@ -221,6 +221,69 @@ deactivate
 deactivate
 ```
 
+
+## CLIバッチ処理・監視モード
+
+Web UI を起動せずにコマンドラインからディレクトリ内の画像を一括処理できます。
+
+### 基本的なバッチ処理
+
+```bash
+python main.py --input-dir ./images --output-dir ./outputs
+```
+
+### 複数の入力ディレクトリを指定
+
+```bash
+python main.py --input-dir ./photos --input-dir ./screenshots --output-dir ./out
+```
+
+### サブディレクトリも再帰的に処理 + TXT 形式で出力
+
+```bash
+python main.py --input-dir ./images --recursive --format txt
+```
+
+### 処理済み画像をスキップ
+
+```bash
+python main.py --input-dir ./images --skip-existing
+```
+
+### 並列処理数を増やす（LLM のレート制限に注意）
+
+```bash
+python main.py --input-dir ./images --concurrency 3
+```
+
+### 監視モード — 新しいファイルを自動処理
+
+```bash
+python main.py --input-dir ./inbox --output-dir ./processed --watch
+```
+
+監視中に `./inbox` へ画像 (`jpg`, `jpeg`, `png`, `webp` など) を追加すると
+自動的に処理されます。ファイルサイズが 1.5 秒間安定してから処理を開始するため、
+書き込み途中のファイルが誤って処理されることはありません。
+
+Ctrl+C で停止できます。
+
+### CLIオプション一覧
+
+| オプション | デフォルト | 説明 |
+|-----------|-----------|------|
+| `--input-dir PATH` | *(必須)* | 入力ディレクトリ（複数指定可） |
+| `--output-dir PATH` | `./outputs` | 出力ディレクトリ |
+| `--format {json,txt,both}` | `json` | 出力フォーマット |
+| `--recursive` | off | サブディレクトリを再帰的にスキャン |
+| `--concurrency N` | `1` | 並列ワーカー数 |
+| `--skip-existing` | off | 既に出力ファイルが存在する画像をスキップ |
+| `--watch` | off | 終了せずに新規ファイルを監視し続ける |
+
+> **注意:** `--input-dir` を指定しない場合は通常の Web サーバーが起動します。
+
+---
+
 ## まとめ
 
 | OS | 推奨実行方法 |

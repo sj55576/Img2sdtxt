@@ -147,6 +147,42 @@ def clear_all_history() -> int:
         return result.rowcount
 
 
+def save_batch_result(
+    image_filename: str,
+    status: str,
+    positive: str = "",
+    negative: str = "",
+    error: str = "",
+) -> None:
+    """バッチ処理の結果（成功 / 失敗）を履歴DBに記録する。
+
+    Args:
+        image_filename: 処理対象の画像ファイル名。
+        status: ``"success"`` または ``"error"``。
+        positive: 生成されたポジティブプロンプト（成功時）。
+        negative: 生成されたネガティブプロンプト（成功時）。
+        error: エラーメッセージ（失敗時）。
+    """
+    init_db()
+    note = error if status == "error" else ""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO prompt_history
+               (image_name, positive, negative, style, tone, quality, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                image_filename,
+                positive if status == "success" else f"[batch:{status}]",
+                negative if status == "success" else note,
+                "batch",
+                "",
+                "",
+                datetime.now().isoformat(),
+            ),
+        )
+        conn.commit()
+
+
 def toggle_favorite(item_id: int) -> Optional[Dict]:
     """お気に入り状態をトグルし、更新後のアイテムを返す"""
     init_db()
