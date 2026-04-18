@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD Generate - Stylish Redesign</title>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 50%, #0d1117 100%);
+            color: #e0e6ed;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 160px;
+            background: linear-gradient(180deg, #131820 0%, #0f1419 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            padding: 24px 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 0 16px 32px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #ff006e, #8338ec);
+            clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+        }
+
+        .logo-subtitle {
+            font-size: 11px;
+            color: #8892a0;
+            font-weight: 500;
+        }
+
+        .nav-items {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 8px;
+        }
+
+        .nav-item {
+            padding: 10px 12px;
+            font-size: 13px;
+            color: #8892a0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 2px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-item:hover {
+            color: #b8c5d6;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .nav-item.active {
+            color: #a78bfa;
+            background: rgba(167, 139, 250, 0.1);
+            border-left-color: #a78bfa;
+            font-weight: 500;
+        }
+
+        .nav-icon {
+            width: 16px;
+            height: 16px;
+            opacity: 0.7;
+        }
+
+        .nav-item.active .nav-icon {
+            opacity: 1;
+        }
+
+        /* MAIN CONTENT */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 50%, #0d1117 100%);
+        }
+
+        .header {
+            padding: 16px 32px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 20, 25, 0.4);
+            backdrop-filter: blur(10px);
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-tag {
+            font-size: 12px;
+            color: #8892a0;
+            font-weight: 500;
+        }
+
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #10b981;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+        }
+
+        .content {
+            flex: 1;
+            padding: 32px;
+            overflow-y: auto;
+        }
+
+        /* FORM SECTIONS */
+        .form-section {
+            margin-bottom: 28px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            color: #fff;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section-icon {
+            width: 16px;
+            height: 16px;
+            opacity: 0.7;
+        }
+
+        .form-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(30, 41, 59, 0.4));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 20px;
+            margin-bottom: 16px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .form-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.3), transparent);
+        }
+
+        .form-card:hover {
+            background: linear-gradient(135deg, rgba(40, 51, 69, 0.9), rgba(40, 51, 69, 0.5));
+            border-color: rgba(167, 139, 250, 0.2);
+        }
+
+        .card-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+
+        .card-badge {
+            width: 6px;
+            height: 6px;
+            background: #ff006e;
+            clip-path: circle(50%);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            font-size: 12px;
+            color: #8892a0;
+            margin-bottom: 8px;
+            display: block;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            background: rgba(15, 20, 25, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e0e6ed;
+            padding: 10px 12px;
+            font-size: 13px;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            background: rgba(15, 20, 25, 0.8);
+            border-color: rgba(167, 139, 250, 0.4);
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .input-row.two-cols {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        /* BUTTONS */
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(167, 139, 250, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e0e6ed;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-small {
+            padding: 6px 10px;
+            font-size: 12px;
+            flex: 0 1 auto;
+        }
+
+        /* CHECKBOXES */
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 8px 0;
+        }
+
+        .checkbox {
+            width: 16px;
+            height: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .checkbox:hover {
+            border-color: rgba(167, 139, 250, 0.4);
+        }
+
+        .checkbox.checked {
+            background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+            border-color: #a78bfa;
+        }
+
+        .checkbox-label {
+            font-size: 13px;
+            color: #b8c5d6;
+        }
+
+        /* SCROLLBAR */
+        .content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .content::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+        }
+
+        /* UTILITY */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .text-muted {
+            color: #6b7280;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const {useState, useCallback} = React;
+
+        const App = () => {
+            const [activeNav, setActiveNav] = useState('generate');
+            const [model, setModel] = useState('yayoiMix_v25');
+            const [loraVersion, setLoraVersion] = useState('1.0');
+            const [positivePrompt, setPositivePrompt] = useState('');
+            const [negativePrompt, setNegativePrompt] = useState('');
+            const [width, setWidth] = useState('512');
+            const [height, setHeight] = useState('768');
+            const [steps, setSteps] = useState('30');
+            const [cfgScale, setCfgScale] = useState('7.5');
+            const [sampler, setSampler] = useState('DPM++ 2M');
+            const [batchSize, setBatchSize] = useState('1');
+            const [seed, setSeed] = useState('-1');
+            const [upscale, setUpscale] = useState(false);
+            const [hiresFix, setHiresFix] = useState(false);
+            const [isGenerating, setIsGenerating] = useState(false);
+
+            const navItems = [
+                {id: 'generate', icon: '⚡', label: 'Generate'},
+                {id: 'batch', icon: '📦', label: 'Batch'},
+                {id: 'refine', icon: '✨', label: 'Refine'},
+                {id: 'history', icon: '📜', label: 'History'},
+                {id: 'presets', icon: '⭐', label: 'Presets'},
+                {id: 'sd-gen', icon: '🎨', label: 'SD Generate'},
+                {id: 'img2img', icon: '🖼️', label: 'Img2Img'},
+                {id: 'inpaint', icon: '🖌️', label: 'Inpaint'},
+                {id: 'gallery', icon: '🗂️', label: 'Gallery'},
+            ];
+
+            const handleGenerate = () => {
+                setIsGenerating(true);
+                setTimeout(() => setIsGenerating(false), 2000);
+            };
+
+            const randomSeed = () => {
+                setSeed(Math.floor(Math.random() * 1000000000).toString());
+            };
+
+            return (
+                <div className="container">
+                    {/* SIDEBAR */}
+                    <div className="sidebar">
+                        <div className="sidebar-header">
+                            <div className="logo">
+                                <div className="logo-icon"></div>
+                                <div>
+                                    <div>Img2SD</div>
+                                </div>
+                            </div>
+                            <div className="logo-subtitle">Prompt Generator</div>
+                        </div>
+
+                        <div className="nav-items">
+                            {navItems.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className={`nav-item ${activeNav === item.id ? 'active' : ''}`}
+                                    onClick={() => setActiveNav(item.id)}
+                                    title={item.label}
+                                >
+                                    <span className="nav-icon">{item.icon}</span>
+                                    <span>{item.label}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={{padding: '16px 8px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '11px', color: '#6b7280', display: 'flex', gap: '6px', justifyContent: 'center'}}>
+                            <span>●</span>
+                            <span>LIM ✓</span>
+                            <span>●</span>
+                            <span>SD ✓</span>
+                        </div>
+                    </div>
+
+                    {/* MAIN */}
+                    <div className="main">
+                        <div className="header">
+                            <div>
+                                <div className="header-title">
+                                    SD Generate
+                                    <span className="header-tag">Stable Diffusion API で直接生成</span>
+                                </div>
+                            </div>
+                            <div className="header-status">
+                                <div className="status-dot"></div>
+                                Connected
+                            </div>
+                        </div>
+
+                        <div className="content">
+                            {/* MODEL & LORA */}
+                            <div className="form-section">
+                                <div className="section-header">
+                                    <span className="section-icon">🤖</span>
+                                    Model & LoRA Configuration
+                                </div>
+
+                                <div className="form-card">
+                                    <div className="card-title">
+                                        <span className="card-badge"></span>
+                                        Model Selection
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Model</label>
+                                        <select className="form-select" value={model} onChange={(e) => setModel(e.target.value)}>
+                                            <option>yayoiMix_v25</option>
+                                            <option>realistic_v60</option>
+                                            <option>dreamshaper_v8</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">利用可能なチェックポイントを選択</label>
+                                        <div style={{fontSize: '12px', color: '#6b7280', marginBottom: '10px'}}>LORA</div>
+                                        <div style={{display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px'}}>
+                                            <select className="form-select" value={loraVersion} onChange={(e) => setLoraVersion(e.target.value)}>
+                                                <option>-- LoRA選択 --</option>
+                                                <option value="1.0">Version 1.0</option>
+                                                <option value="2.0">Version 2.0</option>
+                                            </select>
+                                            <input type="text" className="form-input" value={loraVersion} readOnly style={{width: '60px'}} />
+                                        </div>
+                                    </div>
+
+                                    <div className="text-muted" style={{marginTop: '12px'}}>
+                                        ドロップダウンから選択して追加、または直接値入力
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* PROMPTS */}
+                            <div className="form-section">
+                                <div className="section-header">
+                                    <span className="section-icon">💭</span>
+                                    Prompts
+                                </div>
+
+                                <div className="form-card">
+                                    <div className="form-group">
+                                        <label className="form-label">Positive Prompt</label>
+                                        <textarea
+                                            className="form-textarea"
+                                            value={positivePrompt}
+                                            onChange={(e) => setPositivePrompt(e.target.value)}
+                                            placeholder="ポジティブプロンプト..."
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Negative Prompt</label>
+                                        <textarea
+                                            className="form-textarea"
+                                            value={negativePrompt}
+                                            onChange={(e) => setNegativePrompt(e.target.value)}
+                                            placeholder="ネガティブプロンプト..."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* GENERATION SETTINGS */}
+                            <div className="form-section">
+                                <div className="section-header">
+                                    <span className="section-icon">⚙️</span>
+                                    Generation Settings
+                                </div>
+
+                                <div className="form-card">
+                                    <div className="input-row">
+                                        <div className="form-group">
+                                            <label className="form-label">Width</label>
+                                            <select className="form-select" value={width} onChange={(e) => setWidth(e.target.value)}>
+                                                <option>256</option>
+                                                <option>384</option>
+                                                <option>512</option>
+                                                <option>640</option>
+                                                <option>768</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label className="form-label">Height</label>
+                                            <select className="form-select" value={height} onChange={(e) => setHeight(e.target.value)}>
+                                                <option>512</option>
+                                                <option>640</option>
+                                                <option>768</option>
+                                                <option>896</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label className="form-label">Steps</label>
+                                            <input type="number" className="form-input" value={steps} onChange={(e) => setSteps(e.target.value)} min="1" max="150" />
+                                        </div>
+                                    </div>
+
+                                    <div className="input-row">
+                                        <div className="form-group">
+                                            <label className="form-label">CFG Scale</label>
+                                            <input type="number" className="form-input" value={cfgScale} onChange={(e) => setCfgScale(e.target.value)} step="0.1" min="1" max="30" />
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label className="form-label">Sampler</label>
+                                            <select className="form-select" value={sampler} onChange={(e) => setSampler(e.target.value)}>
+                                                <option>DPM++ 2M</option>
+                                                <option>Euler</option>
+                                                <option>DPM++</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="form-group">
+                                            <label className="form-label">Batch Size</label>
+                                            <input type="number" className="form-input" value={batchSize} onChange={(e) => setBatchSize(e.target.value)} min="1" max="8" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ADVANCED */}
+                            <div className="form-section">
+                                <div className="section-header">
+                                    <span className="section-icon">🔧</span>
+                                    Advanced Options
+                                </div>
+
+                                <div className="form-card">
+                                    <div className="form-group">
+                                        <label className="form-label">Seed (-1 = Random)</label>
+                                        <div style={{display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px'}}>
+                                            <input type="text" className="form-input" value={seed} onChange={(e) => setSeed(e.target.value)} />
+                                            <button className="btn btn-secondary btn-small" onClick={randomSeed}>🔀</button>
+                                        </div>
+                                    </div>
+
+                                    <div className="checkbox-group">
+                                        <div className="checkbox-item" onClick={() => setUpscale(!upscale)}>
+                                            <div className={`checkbox ${upscale ? 'checked' : ''}`}></div>
+                                            <span className="checkbox-label">アップスケール設定 (Hires.fix)</span>
+                                        </div>
+
+                                        <div className="checkbox-item" onClick={() => setHiresFix(!hiresFix)}>
+                                            <div className={`checkbox ${hiresFix ? 'checked' : ''}`}></div>
+                                            <span className="checkbox-label">HIRES.FIX を有効化（高精度アップスケール）</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ACTION BUTTONS */}
+                            <div className="button-group">
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={handleGenerate}
+                                    disabled={isGenerating}
+                                    style={{opacity: isGenerating ? 0.7 : 1}}
+                                >
+                                    {isGenerating ? '🔄 生成中...' : '🎨 画像生成'}
+                                </button>
+                            </div>
+
+                            <div style={{marginTop: '60px'}}></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
