@@ -135,7 +135,7 @@ async function checkSDStatus() {
                     ).join('');
                     if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
                 }
-                await loadLoras('sd');
+                await loadLoras('sd', d.loras || []);
                 _modelsLoaded.sd = true;
             } else {
                 // タブ切り替え時は選択を復元するのみ
@@ -158,16 +158,22 @@ async function checkSDStatus() {
     }
 }
 
-async function loadLoras(prefix) {
+async function loadLoras(prefix, preloadedLoras = null) {
     try {
-        const r = await fetch('/api/sd/loras');
-        if (!r.ok) return;
-        const d = await r.json();
-        if (!d.success) return;
+        let loras;
+        if (preloadedLoras !== null) {
+            loras = preloadedLoras;
+        } else {
+            const r = await fetch('/api/sd/loras');
+            if (!r.ok) return;
+            const d = await r.json();
+            if (!d.success) return;
+            loras = d.loras || [];
+        }
         const loraSel = document.getElementById(`${prefix}-lora-select`);
         if (!loraSel) return;
         loraSel.innerHTML = '<option value="">-- LoRA選択 --</option>' +
-            (d.loras || []).map(l => {
+            loras.map(l => {
                 const name = l.name || '';
                 const alias = l.alias || name;
                 const display = alias !== name ? `${alias} (${name})` : name;
@@ -1031,7 +1037,7 @@ async function checkImg2ImgStatus() {
                     ).join('');
                     if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
                 }
-                await loadLoras('i2i');
+                await loadLoras('i2i', d.loras || []);
                 _modelsLoaded.img2img = true;
             } else {
                 const modelSel = document.getElementById('i2i-model');
@@ -1339,7 +1345,7 @@ async function checkInpaintStatus() {
                     if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
                     if (modelSel.value) _selectedModel.inpaint = modelSel.value;
                 }
-                await loadLoras('inpaint');
+                await loadLoras('inpaint', d.loras || []);
                 _modelsLoaded.inpaint = true;
             } else {
                 const modelSel = document.getElementById('inpaint-model');
