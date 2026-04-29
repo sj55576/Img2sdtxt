@@ -251,6 +251,7 @@ function setupGeneratePage() {
         document.getElementById('neg-prompt').value
     ));
     document.getElementById('send-to-sd-btn').addEventListener('click', sendToSDPage);
+    document.getElementById('send-to-sd-and-generate-btn').addEventListener('click', sendToSDPageAndGenerate);
     document.getElementById('send-to-img2img-btn').addEventListener('click', sendToImg2ImgPage);
 
     // Load presets into select
@@ -354,6 +355,22 @@ function sendToImg2ImgPage() {
     document.getElementById('i2i-negative').value = document.getElementById('neg-prompt').value;
     document.querySelector('[data-page="img2img"]').click();
     checkImg2ImgStatus();
+}
+
+async function sendToSDPageAndGenerate() {
+    document.getElementById('sd-positive').value = document.getElementById('pos-prompt').value;
+    document.getElementById('sd-negative').value = document.getElementById('neg-prompt').value;
+    document.querySelector('[data-page="sd"]').click();
+    await new Promise(r => setTimeout(r, 150));
+    runSDGenerate();
+}
+
+async function refineToSDPageAndGenerate() {
+    document.getElementById('sd-positive').value = document.getElementById('refine-pos-output').value;
+    document.getElementById('sd-negative').value = document.getElementById('refine-neg-output').value;
+    document.querySelector('[data-page="sd"]').click();
+    await new Promise(r => setTimeout(r, 150));
+    runSDGenerate();
 }
 
 function copyAllPrompts() {
@@ -473,6 +490,10 @@ function setupRefinePage() {
         document.getElementById('sd-negative').value = document.getElementById('refine-neg-output').value;
         document.querySelector('[data-page="sd"]').click();
         checkSDStatus();
+    });
+
+    document.getElementById('refine-send-to-sd-and-generate-btn').addEventListener('click', () => {
+        refineToSDPageAndGenerate();
     });
 
     document.getElementById('refine-apply-btn').addEventListener('click', () => {
