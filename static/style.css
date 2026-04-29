@@ -579,11 +579,17 @@ textarea { resize: vertical; }
 }
 .multi-model-result-images {
     padding: 10px;
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 200px));
     gap: 8px;
     background: var(--bg);
 }
+.multi-model-result-images.pending-msg {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+.multi-model-result-header.pending { border-left-color: var(--text-muted); }
 
 /* ---- Scrollbar ---- */
 :root { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.1) transparent; }
