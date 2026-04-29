@@ -241,6 +241,7 @@ function setupGeneratePage() {
 
     // Generate button
     document.getElementById('generate-btn').addEventListener('click', generatePrompt);
+    document.getElementById('generate-and-multi-btn').addEventListener('click', generatePromptAndMultiGenerate);
 
     // Result actions
     document.querySelectorAll('.copy-btn').forEach(btn => {
@@ -287,11 +288,10 @@ function clearSingleImage() {
 
 function updateGenerateBtn() {
     const btn = document.getElementById('generate-btn');
-    if (currentTab === 'tab-img') {
-        btn.disabled = !selectedImage;
-    } else {
-        btn.disabled = !document.getElementById('description-input').value.trim();
-    }
+    const multiBtn = document.getElementById('generate-and-multi-btn');
+    const enabled = currentTab === 'tab-img' ? !!selectedImage : !!document.getElementById('description-input').value.trim();
+    btn.disabled = !enabled;
+    multiBtn.disabled = !enabled;
 }
 
 async function generatePrompt() {
@@ -373,6 +373,14 @@ async function sendToSDAndMultiGenerate() {
     document.querySelector('[data-page="sd"]').click();
     await new Promise(r => setTimeout(r, 150));
     runMultiModelGenerate();
+}
+
+async function generatePromptAndMultiGenerate() {
+    await generatePrompt();
+    const resultBox = document.getElementById('result-box');
+    if (!resultBox.classList.contains('hidden')) {
+        await sendToSDAndMultiGenerate();
+    }
 }
 
 async function refineToSDPageAndGenerate() {
