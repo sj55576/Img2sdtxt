@@ -951,11 +951,7 @@ async function loadMultiModelSelection() {
         document.querySelectorAll('.multi-model-checkbox').forEach(cb => {
             if (savedSet.has(cb.value)) cb.checked = true;
         });
-        const countEl = document.getElementById('sd-multi-model-count');
-        const btn = document.getElementById('sd-multi-generate-btn');
-        const checkedCount = document.querySelectorAll('.multi-model-checkbox:checked').length;
-        if (countEl) countEl.textContent = `${checkedCount} モデル選択中`;
-        if (btn) btn.disabled = checkedCount === 0;
+        updateMultiModelCount();
     } catch (e) {
         console.error('[MULTI-MODEL] Failed to restore selection:', e);
     }
