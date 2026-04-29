@@ -291,7 +291,7 @@ function updateGenerateBtn() {
     const multiBtn = document.getElementById('generate-and-multi-btn');
     const enabled = currentTab === 'tab-img' ? !!selectedImage : !!document.getElementById('description-input').value.trim();
     btn.disabled = !enabled;
-    multiBtn.disabled = !enabled;
+    if (multiBtn) multiBtn.disabled = !enabled;
 }
 
 async function generatePrompt() {
