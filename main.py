@@ -632,6 +632,82 @@ async def sd_inpaint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/sd/generate-multi-model")
+async def sd_generate_multi_model(request_data: dict):
+    models = request_data.get("models", [])
+    if not models:
+        raise HTTPException(status_code=400, detail="At least one model is required.")
+
+    positive = request_data.get("positive", "").strip()
+    if not positive:
+        raise HTTPException(status_code=400, detail="Positive prompt is required.")
+
+    negative = request_data.get("negative", "").strip()
+    width = int(request_data.get("width", 512))
+    height = int(request_data.get("height", 512))
+    steps = int(request_data.get("steps", 20))
+    cfg_scale = float(request_data.get("cfg_scale", 7.0))
+    sampler = request_data.get("sampler", "Euler a")
+    seed = int(request_data.get("seed", -1))
+    batch_size = min(int(request_data.get("batch_size", 1)), 4)
+    loras = request_data.get("loras", "")
+    enable_hr = bool(request_data.get("enable_hr", False))
+    hr_scale = float(request_data.get("hr_scale", 2.0))
+    hr_upscaler = request_data.get("hr_upscaler", "R-ESRGAN 4x+")
+    hr_second_pass_steps = int(request_data.get("hr_second_pass_steps", 0))
+    hr_denoising_strength = float(request_data.get("hr_denoising_strength", 0.7))
+
+    results = []
+    for model in models:
+        try:
+            images = sd_client.txt2img(
+                positive=positive,
+                negative=negative,
+                width=width,
+                height=height,
+                steps=steps,
+                cfg_scale=cfg_scale,
+                sampler=sampler,
+                seed=seed,
+                batch_size=batch_size,
+                model=model,
+                loras=loras,
+                enable_hr=enable_hr,
+                hr_scale=hr_scale,
+                hr_upscaler=hr_upscaler,
+                hr_second_pass_steps=hr_second_pass_steps,
+                hr_denoising_strength=hr_denoising_strength
+            )
+            saved_files = sd_client.save_images(
+                images=images,
+                positive=positive,
+                negative=negative,
+                width=width,
+                height=height,
+                steps=steps,
+                cfg_scale=cfg_scale,
+                sampler=sampler,
+                seed=seed,
+                model=model,
+                loras=loras
+            )
+            results.append({
+                "model": model,
+                "success": True,
+                "images": images,
+                "count": len(images),
+                "saved_files": saved_files
+            })
+        except Exception as e:
+            results.append({
+                "model": model,
+                "success": False,
+                "error": str(e)
+            })
+
+    return {"success": True, "results": results, "total_models": len(models)}
+
+
 @app.get("/api/sd/models")
 async def sd_models():
     try:
