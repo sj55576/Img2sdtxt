@@ -935,14 +935,13 @@ async function runMultiModelGenerate() {
     const results = document.getElementById('sd-multi-results');
     const imagesEl = document.getElementById('sd-multi-images');
 
-    // 単独生成結果を隠す
     document.getElementById('sd-results').classList.add('hidden');
     loading.classList.remove('hidden');
-    results.classList.add('hidden');
+    results.classList.remove('hidden');
     imagesEl.innerHTML = '';
 
     const enableHr = document.getElementById('sd-enable-hr').checked;
-    const payload = {
+    const basePayload = {
         positive,
         negative: document.getElementById('sd-negative').value.trim(),
         width: parseInt(document.getElementById('sd-width').value),
@@ -958,47 +957,55 @@ async function runMultiModelGenerate() {
         hr_upscaler: document.getElementById('sd-hr-upscaler').value,
         hr_second_pass_steps: parseInt(document.getElementById('sd-hr-steps').value),
         hr_denoising_strength: parseFloat(document.getElementById('sd-hr-denoising').value),
-        models: selectedModels
     };
 
-    try {
-        loadingText.textContent = `0 / ${selectedModels.length} モデル処理中...`;
-        const r = await fetch('/api/sd/generate-multi-model', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        if (!r.ok) throw new Error((await r.json()).detail);
-        const d = await r.json();
+    // 全モデル分のプレースホルダーカードを事前に作成
+    selectedModels.forEach(model => {
+        const card = document.createElement('div');
+        card.className = 'multi-model-result-card';
+        card.innerHTML = `
+            <div class="multi-model-result-header pending">⏳ ${escHtml(model)}</div>
+            <div class="multi-model-result-images pending-msg">待機中...</div>`;
+        imagesEl.appendChild(card);
+    });
 
-        const successCount = d.results.filter(res => res.success).length;
+    let successCount = 0;
 
-        imagesEl.innerHTML = d.results.map(res => {
-            if (res.success) {
-                const imgs = res.images.map((img, i) => `
-                    <div class="sd-image-wrap">
-                        <img src="data:image/png;base64,${img}" alt="${escHtml(res.model)} ${i + 1}">
-                        <button class="sd-image-download" onclick="downloadImage('${img}', ${i + 1})">⬇ 保存</button>
-                    </div>`).join('');
-                return `<div class="multi-model-result-card">
-                    <div class="multi-model-result-header success">✅ ${escHtml(res.model)} <span class="multi-model-result-count">${res.count}枚</span></div>
-                    <div class="multi-model-result-images">${imgs}</div>
-                </div>`;
-            } else {
-                return `<div class="multi-model-result-card">
-                    <div class="multi-model-result-header error">❌ ${escHtml(res.model)}</div>
-                    <div style="padding:10px 14px;font-size:0.82rem;color:var(--danger)">${escHtml(res.error || '生成に失敗しました')}</div>
-                </div>`;
-            }
-        }).join('');
+    for (let i = 0; i < selectedModels.length; i++) {
+        const model = selectedModels[i];
+        const card = imagesEl.children[i];
+        loadingText.textContent = `${i + 1} / ${selectedModels.length} モデル処理中... (${model})`;
+        card.querySelector('.multi-model-result-header').textContent = `⏳ ${model}`;
+        card.querySelector('.multi-model-result-images').textContent = '生成中...';
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-        results.classList.remove('hidden');
-        toast(`${successCount} / ${d.total_models} モデルで生成完了`, successCount > 0 ? 'success' : 'error');
-    } catch (e) {
-        toast(e.message || 'マルチモデル生成に失敗しました', 'error');
-    } finally {
-        loading.classList.add('hidden');
+        try {
+            const r = await fetch('/api/sd/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...basePayload, model })
+            });
+            if (!r.ok) throw new Error((await r.json()).detail);
+            const d = await r.json();
+
+            successCount++;
+            const imgs = d.images.map((img, j) => `
+                <div class="sd-image-wrap">
+                    <img src="data:image/png;base64,${img}" alt="${escHtml(model)} ${j + 1}">
+                    <button class="sd-image-download" onclick="downloadImage('${img}', ${j + 1})">⬇ 保存</button>
+                </div>`).join('');
+            card.innerHTML = `
+                <div class="multi-model-result-header success">✅ ${escHtml(model)} <span class="multi-model-result-count">${d.count}枚</span></div>
+                <div class="multi-model-result-images">${imgs}</div>`;
+        } catch (e) {
+            card.innerHTML = `
+                <div class="multi-model-result-header error">❌ ${escHtml(model)}</div>
+                <div style="padding:10px 14px;font-size:0.82rem;color:var(--danger)">${escHtml(e.message || '生成に失敗しました')}</div>`;
+        }
     }
+
+    loading.classList.add('hidden');
+    toast(`${successCount} / ${selectedModels.length} モデルで生成完了`, successCount > 0 ? 'success' : 'error');
 }
 
 /* =====================================================================
