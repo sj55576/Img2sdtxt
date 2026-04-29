@@ -253,6 +253,7 @@ function setupGeneratePage() {
     ));
     document.getElementById('send-to-sd-btn').addEventListener('click', sendToSDPage);
     document.getElementById('send-to-sd-and-generate-btn').addEventListener('click', sendToSDPageAndGenerate);
+    document.getElementById('send-to-sd-and-multi-generate-btn').addEventListener('click', sendToSDAndMultiGenerate);
     document.getElementById('send-to-img2img-btn').addEventListener('click', sendToImg2ImgPage);
 
     // Load presets into select
@@ -364,6 +365,14 @@ async function sendToSDPageAndGenerate() {
     document.querySelector('[data-page="sd"]').click();
     await new Promise(r => setTimeout(r, 150));
     runSDGenerate();
+}
+
+async function sendToSDAndMultiGenerate() {
+    document.getElementById('sd-positive').value = document.getElementById('pos-prompt').value;
+    document.getElementById('sd-negative').value = document.getElementById('neg-prompt').value;
+    document.querySelector('[data-page="sd"]').click();
+    await new Promise(r => setTimeout(r, 150));
+    runMultiModelGenerate();
 }
 
 async function refineToSDPageAndGenerate() {
@@ -908,6 +917,8 @@ function populateMultiModelList(models) {
         </label>`;
     }).join('');
     updateMultiModelCount();
+    // Restore saved model selections after populating
+    loadMultiModelSelection();
 }
 
 function updateMultiModelCount() {
@@ -916,11 +927,38 @@ function updateMultiModelCount() {
     const btn = document.getElementById('sd-multi-generate-btn');
     if (countEl) countEl.textContent = `${checked.length} モデル選択中`;
     if (btn) btn.disabled = checked.length === 0;
+    saveMultiModelSelection();
 }
 
 function selectAllModels(checked) {
     document.querySelectorAll('.multi-model-checkbox').forEach(cb => { cb.checked = checked; });
     updateMultiModelCount();
+}
+
+function saveMultiModelSelection() {
+    const selected = Array.from(document.querySelectorAll('.multi-model-checkbox:checked')).map(cb => cb.value);
+    saveLastParams('multi_model', { models: selected });
+}
+
+async function loadMultiModelSelection() {
+    try {
+        const r = await fetch('/api/last-params/multi_model');
+        if (!r.ok) return;
+        const d = await r.json();
+        const savedModels = d.params?.models;
+        if (!savedModels || !savedModels.length) return;
+        const savedSet = new Set(savedModels);
+        document.querySelectorAll('.multi-model-checkbox').forEach(cb => {
+            if (savedSet.has(cb.value)) cb.checked = true;
+        });
+        const countEl = document.getElementById('sd-multi-model-count');
+        const btn = document.getElementById('sd-multi-generate-btn');
+        const checkedCount = document.querySelectorAll('.multi-model-checkbox:checked').length;
+        if (countEl) countEl.textContent = `${checkedCount} モデル選択中`;
+        if (btn) btn.disabled = checkedCount === 0;
+    } catch (e) {
+        console.error('[MULTI-MODEL] Failed to restore selection:', e);
+    }
 }
 
 async function runMultiModelGenerate() {

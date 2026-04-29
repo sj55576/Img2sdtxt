@@ -723,7 +723,7 @@ async def sd_models():
 
 _DATA_DIR = Path(__file__).parent / "data"
 _LAST_PARAMS_FILE = _DATA_DIR / "last_params.json"
-_VALID_FEATURES = {"generate", "sd", "img2img", "inpaint"}
+_VALID_FEATURES = {"generate", "sd", "img2img", "inpaint", "multi_model"}
 
 
 def _read_last_params() -> dict:
