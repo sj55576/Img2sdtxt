@@ -565,6 +565,25 @@
                         <button id="sd-generate-btn" class="btn btn-accent btn-block">
                             🖼️ 画像生成
                         </button>
+
+                        <!-- Multi-model Generation Panel -->
+                        <div class="customization-panel" style="margin-top:16px;">
+                            <h3>🔁 マルチモデル生成</h3>
+                            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;">同一プロンプト・設定を複数モデルに順番に適用</p>
+                            <div class="form-group">
+                                <div class="multi-model-actions">
+                                    <button class="btn btn-sm btn-secondary" onclick="selectAllModels(true)">全選択</button>
+                                    <button class="btn btn-sm btn-ghost" onclick="selectAllModels(false)">全解除</button>
+                                    <span id="sd-multi-model-count" class="multi-model-count">0 モデル選択中</span>
+                                </div>
+                                <div id="sd-multi-model-list" class="multi-model-list">
+                                    <p class="multi-model-empty">SD APIに接続するとモデルが表示されます</p>
+                                </div>
+                            </div>
+                            <button id="sd-multi-generate-btn" class="btn btn-primary btn-block" disabled>
+                                🔁 選択モデルで順次生成
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Right: Output -->
@@ -576,6 +595,14 @@
                         <div id="sd-results" class="sd-results hidden">
                             <h3>生成された画像</h3>
                             <div id="sd-images" class="sd-images"></div>
+                        </div>
+                        <div id="sd-multi-loading" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p id="sd-multi-loading-text">マルチモデル生成中...</p>
+                        </div>
+                        <div id="sd-multi-results" class="hidden">
+                            <h3>マルチモデル生成結果</h3>
+                            <div id="sd-multi-images"></div>
                         </div>
                     </div>
                 </div>

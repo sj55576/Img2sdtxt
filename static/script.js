@@ -136,6 +136,7 @@ async function checkSDStatus() {
                     if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
                 }
                 await loadLoras('sd', d.loras || []);
+                if (d.models?.length) populateMultiModelList(d.models);
                 _modelsLoaded.sd = true;
             } else {
                 // タブ切り替え時は選択を復元するのみ
@@ -813,6 +814,7 @@ function setupSDPage() {
     document.getElementById('sd-model').addEventListener('change', e => {
         _selectedModel.sd = e.target.value;
     });
+    document.getElementById('sd-multi-generate-btn').addEventListener('click', runMultiModelGenerate);
 
     // Restore last used parameters (with delay for async operations)
     setTimeout(() => loadLastParams('sd'), 100);
@@ -885,6 +887,118 @@ function downloadImage(base64, index) {
     a.href = `data:image/png;base64,${base64}`;
     a.download = `sd_generated_${index}.png`;
     a.click();
+}
+
+/* =====================================================================
+   Multi-model Generation
+   ===================================================================== */
+function populateMultiModelList(models) {
+    const list = document.getElementById('sd-multi-model-list');
+    if (!list) return;
+    if (!models || !models.length) {
+        list.innerHTML = '<p class="multi-model-empty">利用可能なモデルがありません</p>';
+        return;
+    }
+    list.innerHTML = models.map(m => {
+        const name = m.model_name || m.title || '';
+        if (!name) return '';
+        return `<label class="multi-model-item">
+            <input type="checkbox" class="multi-model-checkbox" value="${escHtml(name)}" onchange="updateMultiModelCount()">
+            <span>${escHtml(name)}</span>
+        </label>`;
+    }).join('');
+    updateMultiModelCount();
+}
+
+function updateMultiModelCount() {
+    const checked = document.querySelectorAll('.multi-model-checkbox:checked');
+    const countEl = document.getElementById('sd-multi-model-count');
+    const btn = document.getElementById('sd-multi-generate-btn');
+    if (countEl) countEl.textContent = `${checked.length} モデル選択中`;
+    if (btn) btn.disabled = checked.length === 0;
+}
+
+function selectAllModels(checked) {
+    document.querySelectorAll('.multi-model-checkbox').forEach(cb => { cb.checked = checked; });
+    updateMultiModelCount();
+}
+
+async function runMultiModelGenerate() {
+    const positive = document.getElementById('sd-positive').value.trim();
+    if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
+
+    const selectedModels = Array.from(document.querySelectorAll('.multi-model-checkbox:checked')).map(cb => cb.value);
+    if (!selectedModels.length) { toast('1つ以上のモデルを選択してください', 'error'); return; }
+
+    const loading = document.getElementById('sd-multi-loading');
+    const loadingText = document.getElementById('sd-multi-loading-text');
+    const results = document.getElementById('sd-multi-results');
+    const imagesEl = document.getElementById('sd-multi-images');
+
+    // 単独生成結果を隠す
+    document.getElementById('sd-results').classList.add('hidden');
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+    imagesEl.innerHTML = '';
+
+    const enableHr = document.getElementById('sd-enable-hr').checked;
+    const payload = {
+        positive,
+        negative: document.getElementById('sd-negative').value.trim(),
+        width: parseInt(document.getElementById('sd-width').value),
+        height: parseInt(document.getElementById('sd-height').value),
+        steps: parseInt(document.getElementById('sd-steps').value),
+        cfg_scale: parseFloat(document.getElementById('sd-cfg').value),
+        sampler: document.getElementById('sd-sampler').value,
+        batch_size: parseInt(document.getElementById('sd-batch').value),
+        seed: parseInt(document.getElementById('sd-seed').value),
+        loras: document.getElementById('sd-loras').value.trim(),
+        enable_hr: enableHr,
+        hr_scale: parseFloat(document.getElementById('sd-hr-scale').value),
+        hr_upscaler: document.getElementById('sd-hr-upscaler').value,
+        hr_second_pass_steps: parseInt(document.getElementById('sd-hr-steps').value),
+        hr_denoising_strength: parseFloat(document.getElementById('sd-hr-denoising').value),
+        models: selectedModels
+    };
+
+    try {
+        loadingText.textContent = `0 / ${selectedModels.length} モデル処理中...`;
+        const r = await fetch('/api/sd/generate-multi-model', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!r.ok) throw new Error((await r.json()).detail);
+        const d = await r.json();
+
+        const successCount = d.results.filter(res => res.success).length;
+
+        imagesEl.innerHTML = d.results.map(res => {
+            if (res.success) {
+                const imgs = res.images.map((img, i) => `
+                    <div class="sd-image-wrap">
+                        <img src="data:image/png;base64,${img}" alt="${escHtml(res.model)} ${i + 1}">
+                        <button class="sd-image-download" onclick="downloadImage('${img}', ${i + 1})">⬇ 保存</button>
+                    </div>`).join('');
+                return `<div class="multi-model-result-card">
+                    <div class="multi-model-result-header success">✅ ${escHtml(res.model)} <span class="multi-model-result-count">${res.count}枚</span></div>
+                    <div class="multi-model-result-images">${imgs}</div>
+                </div>`;
+            } else {
+                return `<div class="multi-model-result-card">
+                    <div class="multi-model-result-header error">❌ ${escHtml(res.model)}</div>
+                    <div style="padding:10px 14px;font-size:0.82rem;color:var(--danger)">${escHtml(res.error || '生成に失敗しました')}</div>
+                </div>`;
+            }
+        }).join('');
+
+        results.classList.remove('hidden');
+        toast(`${successCount} / ${d.total_models} モデルで生成完了`, successCount > 0 ? 'success' : 'error');
+    } catch (e) {
+        toast(e.message || 'マルチモデル生成に失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
+    }
 }
 
 /* =====================================================================
