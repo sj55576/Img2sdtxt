@@ -920,7 +920,7 @@ function populateMultiModelList(models) {
         const name = m.model_name || m.title || '';
         if (!name) return '';
         return `<label class="multi-model-item">
-            <input type="checkbox" class="multi-model-checkbox" value="${escHtml(name)}" onchange="updateMultiModelCount()">
+            <input type="checkbox" class="multi-model-checkbox" value="${escHtml(name)}" onchange="updateMultiModelCount(); saveMultiModelSelection();">
             <span>${escHtml(name)}</span>
         </label>`;
     }).join('');
@@ -935,12 +935,12 @@ function updateMultiModelCount() {
     const btn = document.getElementById('sd-multi-generate-btn');
     if (countEl) countEl.textContent = `${checked.length} モデル選択中`;
     if (btn) btn.disabled = checked.length === 0;
-    saveMultiModelSelection();
 }
 
 function selectAllModels(checked) {
     document.querySelectorAll('.multi-model-checkbox').forEach(cb => { cb.checked = checked; });
     updateMultiModelCount();
+    saveMultiModelSelection();
 }
 
 function saveMultiModelSelection() {
