@@ -19,6 +19,7 @@ It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API*
 | 🖼️ **SD txt2img** | Generate images directly via the A1111 API |
 | 🔄 **SD img2img** | Transform an existing image using SD |
 | 🖌️ **SD Inpaint** | Inpaint selected areas of an image |
+| 🌟 **Multi-Model Generation** | Generate images sequentially with multiple models from a single prompt |
 | 📋 **History** | SQLite-based history of generated prompts |
 | 🗃️ **Gallery** | Browse, filter, and paginate generated images |
 | 💾 **Parameter Persistence** | Last-used parameters are restored automatically |
@@ -276,6 +277,7 @@ Img2sdtxt/
 | `GET` | `/api/sd/loras` | List available LoRAs |
 | `GET` | `/api/sd/upscalers` | List available upscalers |
 | `POST` | `/api/sd/generate` | txt2img generation |
+| `POST` | `/api/sd/generate-multi-model` | txt2img generation with multiple models sequentially |
 | `POST` | `/api/sd/img2img` | img2img generation |
 | `POST` | `/api/sd/inpaint` | Inpainting |
 
@@ -289,7 +291,7 @@ Img2sdtxt/
 | `GET` | `/api/last-params/{feature}` | Restore last parameters |
 | `POST` | `/api/last-params/{feature}` | Save last parameters |
 
-Valid `feature` values: `generate`, `sd`, `img2img`, `inpaint`
+Valid `feature` values: `generate`, `sd`, `img2img`, `inpaint`, `multi_model`
 
 ---
 

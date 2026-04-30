@@ -19,6 +19,7 @@
 | 🖼️ **SD txt2img** | A1111 APIで直接テキストから画像生成 |
 | 🔄 **SD img2img** | 既存画像をもとに新しい画像を生成 |
 | 🖌️ **SD インペイント** | 画像の特定領域をインペイント |
+| 🌟 **マルチモデル生成** | 複数のモデルで順序に画像生成（1つのプロンプトから複数モデルで生成） |
 | 📋 **履歴** | SQLiteベースのプロンプト生成履歴 |
 | 🗃️ **ギャラリー** | 生成済み画像のブラウズ・フィルタ・ページネーション |
 | 💾 **パラメータ保持** | 最後に使用したパラメータを自動復元 |
@@ -232,6 +233,7 @@ save_history:  true | false               （デフォルト: true）
 | `GET` | `/api/sd/loras` | 利用可能なLoRA一覧 |
 | `GET` | `/api/sd/upscalers` | 利用可能なアップスケーラー一覧 |
 | `POST` | `/api/sd/generate` | txt2img（テキストから画像生成） |
+| `POST` | `/api/sd/generate-multi-model` | 複数モデルで順序に txt2img 生成 |
 | `POST` | `/api/sd/img2img` | img2img（画像から画像生成） |
 | `POST` | `/api/sd/inpaint` | インペイント |
 
@@ -267,7 +269,7 @@ save_history:  true | false               （デフォルト: true）
 | `GET` | `/api/last-params/{feature}` | 最後のパラメータを取得 |
 | `POST` | `/api/last-params/{feature}` | 最後のパラメータを保存 |
 
-`{feature}` に指定できる値: `generate`, `sd`, `img2img`, `inpaint`
+`{feature}` に指定できる値: `generate`, `sd`, `img2img`, `inpaint`, `multi_model`
 
 ---
 
