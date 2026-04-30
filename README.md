@@ -14,13 +14,16 @@ It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API*
 | 📸 **Single Image → Prompt** | Upload one image to generate positive & negative prompts |
 | 🗂️ **Batch Processing** | Upload up to 10 images and generate prompts for all at once |
 | ✍️ **Text → Prompt** | Describe an image in plain text and get SD prompts |
+| ✨ **Prompt Refinement** | Refine and enhance existing prompts with LLM (optional custom instruction) |
 | ⚙️ **Style / Tone / Quality** | Customize output with 8 styles, 8 tones, and 3 quality levels |
 | 🎨 **Presets** | 12 built-in style presets (Anime, Photorealistic, Portrait, etc.) + custom presets |
 | 🖼️ **SD txt2img** | Generate images directly via the A1111 API |
 | 🔄 **SD img2img** | Transform an existing image using SD |
 | 🖌️ **SD Inpaint** | Inpaint selected areas of an image |
 | 🌟 **Multi-Model Generation** | Generate images sequentially with multiple models from a single prompt |
-| 📋 **History** | SQLite-based history of generated prompts |
+| 📋 **History** | SQLite-based history with full-text search, style/quality filters, and favorites |
+| ⭐ **Favorites** | Mark history entries as favorites for quick access |
+| 📤 **History Export** | Download the full prompt history as a JSON file |
 | 🗃️ **Gallery** | Browse, filter, and paginate generated images |
 | 💾 **Parameter Persistence** | Last-used parameters are restored automatically |
 | 📁 **Random Folder Load** | Pick a random image from a local folder |
@@ -189,9 +192,9 @@ python main.py --input-dir ./images --concurrency 3
 python main.py --input-dir ./inbox --output-dir ./processed --watch
 ```
 
-Drop any `jpg`, `jpeg`, `png`, or `webp` image into `./inbox` while the
-watcher is running and it will be processed automatically. The watcher waits
-until the file size has been stable for ~1.5 s before starting, to avoid
+Drop any `jpg`, `jpeg`, `png`, `webp`, `gif`, or `bmp` image into `./inbox`
+while the watcher is running and it will be processed automatically. The watcher
+waits until the file size has been stable for ~1.5 s before starting, to avoid
 reading partially-written files.
 
 ### All CLI options
@@ -251,12 +254,15 @@ Img2sdtxt/
 | `POST` | `/api/generate-prompts` | Single image → prompts |
 | `POST` | `/api/generate-prompts-batch` | Up to 10 images → prompts |
 | `POST` | `/api/generate-prompts-text` | Text description → prompts |
+| `POST` | `/api/refine-prompt` | Refine & enhance existing prompts |
 
 ### History
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/history` | List history (`limit`, `offset`) |
+| `GET` | `/api/history` | List history (`limit`, `offset`, `search`, `style`, `quality`, `favorites_only`) |
+| `GET` | `/api/history/export` | Download all history as JSON |
+| `PUT` | `/api/history/{id}/favorite` | Toggle favorite on a history entry |
 | `DELETE` | `/api/history/{id}` | Delete one entry |
 | `DELETE` | `/api/history` | Clear all history |
 
