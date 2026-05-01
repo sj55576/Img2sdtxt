@@ -236,6 +236,19 @@ function setupGeneratePage() {
         randomFolderInput.value = '';
     });
 
+    // Random folder load + generate + multi-model (one-click)
+    const randomFolderAutoInput = document.getElementById('random-folder-auto-input');
+    document.getElementById('random-folder-auto-btn').addEventListener('click', () => randomFolderAutoInput.click());
+    randomFolderAutoInput.addEventListener('change', async e => {
+        const file = pickRandomImageFromFolder(e.target.files);
+        randomFolderAutoInput.value = '';
+        if (!file) return;
+        handleSingleImageSelect(file);
+        // Wait for the image preview to be set before generating
+        await new Promise(r => setTimeout(r, 100));
+        await generatePromptAndMultiGenerate();
+    });
+
     // Text input enable button
     document.getElementById('description-input').addEventListener('input', updateGenerateBtn);
 
