@@ -55,23 +55,28 @@ document.addEventListener('DOMContentLoaded', () => {
    Navigation
    ===================================================================== */
 function setupNavigation() {
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const page = btn.dataset.page;
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById(`page-${page}`).classList.add('active');
+    function navigateTo(page) {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
 
-            // Lazy-load page data
-            if (page === 'history') loadHistory();
-            if (page === 'presets') loadPresets();
-            if (page === 'sd') checkSDStatus();
-            if (page === 'img2img') checkImg2ImgStatus();
-            if (page === 'inpaint') checkInpaintStatus();
-            if (page === 'gallery') loadGallery();
-            if (page === 'refine') { /* nothing to lazy load */ }
-        });
+        document.querySelectorAll(`.nav-btn[data-page="${page}"], .mobile-nav-btn[data-page="${page}"]`).forEach(b => b.classList.add('active'));
+        document.getElementById(`page-${page}`).classList.add('active');
+
+        // Lazy-load page data
+        if (page === 'history') loadHistory();
+        if (page === 'presets') loadPresets();
+        if (page === 'sd') checkSDStatus();
+        if (page === 'img2img') checkImg2ImgStatus();
+        if (page === 'inpaint') checkInpaintStatus();
+        if (page === 'gallery') loadGallery();
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => navigateTo(btn.dataset.page));
+    });
+    document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => navigateTo(btn.dataset.page));
     });
 }
 
