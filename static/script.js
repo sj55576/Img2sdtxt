@@ -49,6 +49,22 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         e.stopPropagation();
     });
+
+    // Global paste handler: Ctrl+V でクリップボードの画像を読み込む（全ブラウザ対応）
+    document.addEventListener('paste', e => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) {
+                    handleSingleImageSelect(file);
+                    e.preventDefault();
+                    break;
+                }
+            }
+        }
+    });
 });
 
 /* =====================================================================
@@ -406,6 +422,12 @@ async function generatePromptAndMultiGenerate() {
 }
 
 async function loadImageFromClipboard() {
+    // Clipboard API (navigator.clipboard.read) は HTTPS またはローカルホスト、
+    // かつ Chrome / Edge でのみ動作する。使えない場合は Ctrl+V を案内する。
+    if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+        toast('Ctrl+V でクリップボードから画像を貼り付けてください', 'info');
+        return;
+    }
     try {
         const items = await navigator.clipboard.read();
         let found = false;
@@ -413,7 +435,8 @@ async function loadImageFromClipboard() {
             const imageType = item.types.find(t => t.startsWith('image/'));
             if (imageType) {
                 const blob = await item.getType(imageType);
-                const file = new File([blob], 'clipboard.' + imageType.split('/')[1], { type: imageType });
+                const ext = imageType.split('/')[1]?.trim() || 'png';
+                const file = new File([blob], `clipboard.${ext}`, { type: imageType });
                 handleSingleImageSelect(file);
                 found = true;
                 break;
@@ -422,7 +445,9 @@ async function loadImageFromClipboard() {
         if (!found) toast('クリップボードに画像がありません', 'error');
     } catch (e) {
         if (e.name === 'NotAllowedError') {
-            toast('クリップボードへのアクセスが拒否されました', 'error');
+            toast('クリップボードへのアクセスが拒否されました。ブラウザの権限設定を確認してください', 'error');
+        } else if (e.name === 'TypeError') {
+            toast('クリップボードの読み込みに失敗しました。Ctrl+V で貼り付けてください', 'error');
         } else {
             toast('クリップボードから読み込めませんでした', 'error');
         }
