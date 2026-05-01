@@ -244,8 +244,6 @@ function setupGeneratePage() {
         randomFolderAutoInput.value = '';
         if (!file) return;
         handleSingleImageSelect(file);
-        // Wait for the image preview to be set before generating
-        await new Promise(r => setTimeout(r, 100));
         await generatePromptAndMultiGenerate();
     });
 
