@@ -252,6 +252,12 @@ function setupGeneratePage() {
         await generatePromptAndMultiGenerate();
     });
 
+    // Clipboard load
+    document.getElementById('clipboard-load-btn').addEventListener('click', loadImageFromClipboard);
+
+    // Clipboard load + generate + multi-model (one-click)
+    document.getElementById('clipboard-auto-btn').addEventListener('click', clipboardAutoRun);
+
     // Text input enable button
     document.getElementById('description-input').addEventListener('input', updateGenerateBtn);
 
@@ -397,6 +403,36 @@ async function generatePromptAndMultiGenerate() {
     if (!resultBox.classList.contains('hidden')) {
         await sendToSDAndMultiGenerate();
     }
+}
+
+async function loadImageFromClipboard() {
+    try {
+        const items = await navigator.clipboard.read();
+        let found = false;
+        for (const item of items) {
+            const imageType = item.types.find(t => t.startsWith('image/'));
+            if (imageType) {
+                const blob = await item.getType(imageType);
+                const file = new File([blob], 'clipboard.' + imageType.split('/')[1], { type: imageType });
+                handleSingleImageSelect(file);
+                found = true;
+                break;
+            }
+        }
+        if (!found) toast('クリップボードに画像がありません', 'error');
+    } catch (e) {
+        if (e.name === 'NotAllowedError') {
+            toast('クリップボードへのアクセスが拒否されました', 'error');
+        } else {
+            toast('クリップボードから読み込めませんでした', 'error');
+        }
+    }
+}
+
+async function clipboardAutoRun() {
+    await loadImageFromClipboard();
+    if (!selectedImage) return;
+    await generatePromptAndMultiGenerate();
 }
 
 async function refineToSDPageAndGenerate() {
