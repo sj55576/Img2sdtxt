@@ -87,9 +87,24 @@ if not exist ".env" (
         echo API_HOST=0.0.0.0
         echo API_PORT=8000
         echo DEBUG=false
+        echo.
+        echo # HTTPS Configuration
+        echo HTTPS_ENABLED=false
+        echo #SSL_CERTFILE=/path/to/cert.pem
+        echo #SSL_KEYFILE=/path/to/key.pem
     ) > .env
     echo %SUCCESS% Default .env file created. Please configure it as needed.
     echo.
+)
+
+REM Read HTTPS_ENABLED and API_PORT from .env
+set APP_PROTOCOL=http
+set APP_PORT=8000
+for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+    if /i "%%A"=="HTTPS_ENABLED" (
+        if /i "%%B"=="true" set APP_PROTOCOL=https
+    )
+    if /i "%%A"=="API_PORT" set APP_PORT=%%B
 )
 
 REM Display configuration
@@ -97,7 +112,7 @@ echo.
 echo ========================================
 echo Configuration
 echo ========================================
-echo %INFO% API will start on: http://0.0.0.0:8000
+echo %INFO% API will start on: %APP_PROTOCOL%://localhost:%APP_PORT%
 echo %INFO% LLM Server URL: http://localhost:1234/v1
 echo %INFO% SD API URL: http://localhost:7860
 echo.

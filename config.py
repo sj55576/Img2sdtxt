@@ -17,6 +17,11 @@ API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
+# HTTPS Configuration
+HTTPS_ENABLED = os.getenv("HTTPS_ENABLED", "false").lower() == "true"
+SSL_CERTFILE = os.getenv("SSL_CERTFILE", "")
+SSL_KEYFILE = os.getenv("SSL_KEYFILE", "")
+
 # Image Configuration
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]

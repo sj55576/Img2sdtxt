@@ -112,9 +112,24 @@ SD_API_URL=http://localhost:7860
 API_HOST=0.0.0.0
 API_PORT=8000
 DEBUG=false
+
+# HTTPS Configuration
+HTTPS_ENABLED=false
+#SSL_CERTFILE=/path/to/cert.pem
+#SSL_KEYFILE=/path/to/key.pem
 EOF
     success "Default .env file created. Please configure it as needed."
     echo ""
+fi
+
+# Read settings from .env (if it exists)
+API_PORT_VAL=$(grep -E '^API_PORT=' .env 2>/dev/null | cut -d'=' -f2 | tr -d '[:space:]')
+API_PORT_VAL="${API_PORT_VAL:-8000}"
+HTTPS_VAL=$(grep -E '^HTTPS_ENABLED=' .env 2>/dev/null | cut -d'=' -f2 | tr -d '[:space:]')
+if [ "$(echo "$HTTPS_VAL" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
+    APP_PROTOCOL="https"
+else
+    APP_PROTOCOL="http"
 fi
 
 # Display configuration
@@ -122,7 +137,7 @@ echo ""
 echo "========================================"
 echo "Configuration"
 echo "========================================"
-info "API will start on: http://0.0.0.0:8000"
+info "API will start on: ${APP_PROTOCOL}://localhost:${API_PORT_VAL}"
 info "LLM Server URL: http://localhost:1234/v1"
 info "SD API URL: http://localhost:7860"
 echo ""
