@@ -107,6 +107,47 @@ python main.py
 | `API_HOST` | `0.0.0.0` | APIサーバーのバインドアドレス |
 | `API_PORT` | `8000` | APIサーバーのポート番号 |
 | `DEBUG` | `false` | デバッグモード / ホットリロード |
+| `HTTPS_ENABLED` | `false` | HTTPSで起動する |
+| `SSL_CERTFILE` | *(自動)* | TLS証明書ファイルのパス（PEM形式） |
+| `SSL_KEYFILE` | *(自動)* | TLS秘密鍵ファイルのパス（PEM形式） |
+
+---
+
+## HTTPS対応
+
+`.env` に `HTTPS_ENABLED=true` を設定するとHTTPSが有効になります。
+
+### オプション1 — 自己署名証明書の自動生成（開発用）
+
+`HTTPS_ENABLED=true` を設定するだけです。証明書ファイルが存在しない場合、
+アプリが `ssl/cert.pem` と `ssl/key.pem` を自動生成します（`openssl` のインストールが必要）。
+
+```env
+HTTPS_ENABLED=true
+```
+
+ブラウザで <https://localhost:8000> を開きます。  
+自己署名証明書のためブラウザにセキュリティ警告が表示されます。**詳細設定 → 続行**
+をクリックしてください。
+
+### オプション2 — 独自証明書を使用（本番環境）
+
+CA署名済みまたはLet's Encrypt証明書を指定します。
+
+```env
+HTTPS_ENABLED=true
+SSL_CERTFILE=/etc/letsencrypt/live/example.com/fullchain.pem
+SSL_KEYFILE=/etc/letsencrypt/live/example.com/privkey.pem
+```
+
+### 自己署名証明書を手動で生成する場合
+
+```bash
+mkdir -p ssl
+openssl req -x509 -newkey rsa:4096 \
+  -keyout ssl/key.pem -out ssl/cert.pem \
+  -days 365 -nodes -subj "/CN=localhost"
+```
 
 ---
 

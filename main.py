@@ -11,6 +11,7 @@ from PIL import Image
 
 from config import (
     API_HOST, API_PORT, DEBUG,
+    HTTPS_ENABLED, SSL_CERTFILE, SSL_KEYFILE,
     ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE,
     STYLES, TONES, QUALITY_LEVELS
 )
@@ -934,7 +935,75 @@ def _run_batch_cli() -> None:
     if args.input_dirs is None:
         # No --input-dir → start the web server
         import uvicorn
-        uvicorn.run(app, host=API_HOST, port=API_PORT, reload=DEBUG)
+
+        ssl_certfile = None
+        ssl_keyfile = None
+
+        if HTTPS_ENABLED:
+            certfile = SSL_CERTFILE or str(Path(__file__).parent / "ssl" / "cert.pem")
+            keyfile = SSL_KEYFILE or str(Path(__file__).parent / "ssl" / "key.pem")
+
+            if not (Path(certfile).exists() and Path(keyfile).exists()):
+                # Auto-generate a self-signed certificate with openssl
+                import subprocess
+                import shutil
+
+                if shutil.which("openssl") is None:
+                    print(
+                        "[ERROR] HTTPS_ENABLED=true but 'openssl' was not found in PATH.\n"
+                        "Please either:\n"
+                        "  1. Install openssl (e.g. 'sudo apt install openssl' / 'brew install openssl')\n"
+                        "  2. Generate a certificate manually and set SSL_CERTFILE / SSL_KEYFILE in .env\n"
+                        "     openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj '/CN=localhost'"
+                    )
+                    raise SystemExit(1)
+
+                ssl_dir = Path(__file__).parent / "ssl"
+                ssl_dir.mkdir(parents=True, exist_ok=True)
+
+                print("[INFO] Generating self-signed certificate in ssl/ ...")
+                try:
+                    subprocess.run(
+                        [
+                            "openssl", "req", "-x509",
+                            "-newkey", "rsa:4096",
+                            "-keyout", str(ssl_dir / "key.pem"),
+                            "-out", str(ssl_dir / "cert.pem"),
+                            "-days", "365",
+                            "-nodes",
+                            "-subj", "/CN=localhost",
+                        ],
+                        check=True,
+                    )
+                except subprocess.CalledProcessError as exc:
+                    print(
+                        f"[ERROR] Failed to generate self-signed certificate (exit code {exc.returncode}).\n"
+                        "To generate one manually:\n"
+                        "  mkdir -p ssl\n"
+                        "  openssl req -x509 -newkey rsa:4096 -keyout ssl/key.pem -out ssl/cert.pem"
+                        " -days 365 -nodes -subj '/CN=localhost'\n"
+                        "Then set SSL_CERTFILE and SSL_KEYFILE in .env."
+                    )
+                    raise SystemExit(1) from exc
+                print("[INFO] Self-signed certificate generated.")
+
+            ssl_certfile = certfile
+            ssl_keyfile = keyfile
+            protocol = "https"
+        else:
+            protocol = "http"
+
+        host_display = "localhost" if API_HOST in ("0.0.0.0", "::") else API_HOST
+        print(f"[INFO] Starting server at {protocol}://{host_display}:{API_PORT}")
+
+        uvicorn.run(
+            app,
+            host=API_HOST,
+            port=API_PORT,
+            reload=DEBUG,
+            ssl_certfile=ssl_certfile,
+            ssl_keyfile=ssl_keyfile,
+        )
         return
 
     input_paths = [Path(d) for d in args.input_dirs]

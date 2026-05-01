@@ -109,6 +109,48 @@ Open <http://localhost:8000> in your browser.
 | `API_HOST` | `0.0.0.0` | API server bind address |
 | `API_PORT` | `8000` | API server port |
 | `DEBUG` | `false` | Enable debug / hot-reload |
+| `HTTPS_ENABLED` | `false` | Serve over HTTPS |
+| `SSL_CERTFILE` | *(auto)* | Path to TLS certificate file (PEM) |
+| `SSL_KEYFILE` | *(auto)* | Path to TLS private key file (PEM) |
+
+---
+
+## HTTPS
+
+To enable HTTPS, set `HTTPS_ENABLED=true` in your `.env` file.
+
+### Option 1 — Auto-generated self-signed certificate (development)
+
+Simply set `HTTPS_ENABLED=true`. If no certificate files are found, the app
+generates a self-signed certificate in `ssl/cert.pem` and `ssl/key.pem`
+automatically (requires `openssl` to be installed).
+
+```env
+HTTPS_ENABLED=true
+```
+
+Then open <https://localhost:8000> in your browser.  
+Your browser will show a security warning for self-signed certificates — click
+**Advanced → Proceed** to continue.
+
+### Option 2 — Bring your own certificate (production)
+
+Point the app at your CA-signed or Let's Encrypt certificate:
+
+```env
+HTTPS_ENABLED=true
+SSL_CERTFILE=/etc/letsencrypt/live/example.com/fullchain.pem
+SSL_KEYFILE=/etc/letsencrypt/live/example.com/privkey.pem
+```
+
+### Generate a self-signed certificate manually
+
+```bash
+mkdir -p ssl
+openssl req -x509 -newkey rsa:4096 \
+  -keyout ssl/key.pem -out ssl/cert.pem \
+  -days 365 -nodes -subj "/CN=localhost"
+```
 
 ---
 
