@@ -262,7 +262,7 @@ function setupGeneratePage() {
     document.getElementById('random-folder-auto-btn').addEventListener('click', () => randomFolderAutoInput.click());
     randomFolderAutoInput.addEventListener('change', async e => {
         const count = Math.max(1, parseInt(document.getElementById('random-folder-count').value) || 1);
-        const allFiles = e.target.files;
+        const allFiles = Array.from(e.target.files);
         randomFolderAutoInput.value = '';
         if (count === 1) {
             const file = pickRandomImageFromFolder(allFiles);
@@ -416,7 +416,7 @@ async function sendToSDAndMultiGenerate() {
     document.getElementById('sd-negative').value = document.getElementById('neg-prompt').value;
     document.querySelector('[data-page="sd"]').click();
     await new Promise(r => setTimeout(r, 150));
-    runMultiModelGenerate();
+    await runMultiModelGenerate();
 }
 
 async function generatePromptAndMultiGenerate() {
