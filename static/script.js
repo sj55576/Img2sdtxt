@@ -261,11 +261,17 @@ function setupGeneratePage() {
     const randomFolderAutoInput = document.getElementById('random-folder-auto-input');
     document.getElementById('random-folder-auto-btn').addEventListener('click', () => randomFolderAutoInput.click());
     randomFolderAutoInput.addEventListener('change', async e => {
-        const file = pickRandomImageFromFolder(e.target.files);
+        const count = Math.max(1, parseInt(document.getElementById('random-folder-count').value) || 1);
+        const allFiles = e.target.files;
         randomFolderAutoInput.value = '';
-        if (!file) return;
-        handleSingleImageSelect(file);
-        await generatePromptAndMultiGenerate();
+        if (count === 1) {
+            const file = pickRandomImageFromFolder(allFiles);
+            if (!file) return;
+            handleSingleImageSelect(file);
+            await generatePromptAndMultiGenerate();
+        } else {
+            await runFolderBatchAutoRun(allFiles, count);
+        }
     });
 
     // Clipboard load
@@ -1895,6 +1901,59 @@ function pickRandomImageFromFolder(files) {
     const idx = Math.floor(Math.random() * imageFiles.length);
     return imageFiles[idx];
 }
+
+/**
+ * フォルダ内の画像ファイルからランダムに n 枚を重複なしで選択して返す。
+ * フォルダ内の画像数が n 未満の場合は全件返す。
+ */
+function pickNRandomImagesFromFolder(files, n) {
+    if (!files || files.length === 0) return [];
+    const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!imageFiles.length) {
+        toast('フォルダ内に画像ファイルが見つかりませんでした', 'error');
+        return [];
+    }
+    const count = Math.min(n, imageFiles.length);
+    // Fisher-Yates shuffle then take first `count` elements
+    const arr = [...imageFiles];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr.slice(0, count);
+}
+
+/**
+ * フォルダから n 枚の画像をランダムに選び、各画像に対して
+ * 「プロンプト生成」→「マルチモデル生成」を順番に連続実行する。
+ */
+async function runFolderBatchAutoRun(files, n) {
+    const images = pickNRandomImagesFromFolder(files, n);
+    if (!images.length) return;
+
+    const autoBtn = document.getElementById('random-folder-auto-btn');
+    if (autoBtn) autoBtn.disabled = true;
+
+    // Short delay to allow the image preview to render before processing
+    const IMAGE_PREVIEW_RENDER_DELAY = 100;
+
+    try {
+        for (let i = 0; i < images.length; i++) {
+            toast(`[${i + 1}/${images.length}] ${images[i].name} を処理中...`, 'info');
+            handleSingleImageSelect(images[i]);
+            await new Promise(r => setTimeout(r, IMAGE_PREVIEW_RENDER_DELAY));
+            await generatePrompt();
+            const resultBox = document.getElementById('result-box');
+            if (resultBox && !resultBox.classList.contains('hidden')) {
+                await sendToSDAndMultiGenerate();
+            }
+        }
+        toast(`一括実行完了 (${images.length} 枚)`, 'success');
+    } finally {
+        if (autoBtn) autoBtn.disabled = false;
+    }
+}
+
 
 function copyText(elementId, btn) {
     const el = document.getElementById(elementId);

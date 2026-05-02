@@ -124,6 +124,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .random-folder-btn { margin-top: 8px; }
 .random-folder-btn-group { display: flex; gap: 8px; margin-top: 8px; }
 .random-folder-btn-group .random-folder-btn { margin-top: 0; flex: 1; }
+.random-folder-count-group { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.random-folder-count-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+.random-folder-count-input { width: 70px; }
 
 /* ---- Forms ---- */
 .form-group { display: flex; flex-direction: column; gap: 6px; }
