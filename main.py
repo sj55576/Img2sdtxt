@@ -1,6 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi.concurrency import run_in_threadpool
 import base64
+import io
 import json
+import os
+import re
+import tempfile
+import threading
 import time
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +55,44 @@ app.mount("/outputs", StaticFiles(directory=str(outputs_dir)), name="outputs")
 
 
 # ------------------------------------------------------------------ #
+# 入力値バリデーション ヘルパー
+# ------------------------------------------------------------------ #
+
+def _as_int(data: dict, key: str, default: int) -> int:
+    """dict から int 値を取り出す。変換できない場合は HTTPException 422 を送出"""
+    val = data.get(key, default)
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Parameter '{key}' must be an integer, got: {val!r}"
+        )
+
+
+def _as_float(data: dict, key: str, default: float) -> float:
+    """dict から float 値を取り出す。変換できない場合は HTTPException 422 を送出"""
+    val = data.get(key, default)
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Parameter '{key}' must be a number, got: {val!r}"
+        )
+
+
+def _validate_image_bytes(data: bytes) -> str:
+    """PIL で画像バイトを検証し、無効な場合は HTTPException 400 を送出"""
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            img.verify()
+        return "ok"
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid image file: {exc}")
+
+
+# ------------------------------------------------------------------ #
 # Pages
 # ------------------------------------------------------------------ #
 
@@ -62,19 +106,15 @@ async def root():
 # ------------------------------------------------------------------ #
 
 @app.get("/health")
-async def health_check():
-    try:
-        response = llm_client.generate_response("Hello")
-        status = "healthy" if response else "degraded"
-        return {"status": status, "llm_server": "connected", "message": "OK"}
-    except ConnectionError:
-        raise HTTPException(status_code=503, detail="LLM server is not available.")
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
+def health_check():
+    """LLM サーバーへの軽量な疎通確認（/v1/models GET のみ）"""
+    available = llm_client.is_available()
+    status = "healthy" if available else "degraded"
+    return {"status": status, "llm_server": "connected" if available else "unreachable", "message": "OK"}
 
 
 @app.get("/api/config")
-async def get_config():
+def get_config():
     from config import LLM_SERVER_URL, LLM_MODEL, SD_API_URL
     return {
         "llm_server": LLM_SERVER_URL,
@@ -106,11 +146,15 @@ async def generate_prompts(
     if len(contents) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail="Image too large (max 10MB).")
 
+    # PIL による実態検証
+    _validate_image_bytes(contents)
+
     preset = preset_mgr.get_preset(preset_id) if preset_id else None
     suffix_pos = preset.get("positive_suffix", "") if preset else ""
     suffix_neg = preset.get("negative_suffix", "") if preset else ""
 
-    result = prompt_generator.generate_prompts(
+    result = await run_in_threadpool(
+        prompt_generator.generate_prompts,
         contents,
         style=style or (preset.get("style", "") if preset else ""),
         tone=tone or (preset.get("tone", "") if preset else ""),
@@ -166,7 +210,15 @@ async def generate_prompts_batch(
             results.append({"filename": f.filename, "success": False, "error": "File too large"})
             continue
 
-        r = prompt_generator.generate_prompts(
+        # PIL による実態検証（ファイル単位でエラーを記録して続行）
+        try:
+            _validate_image_bytes(contents)
+        except HTTPException as exc:
+            results.append({"filename": f.filename, "success": False, "error": exc.detail})
+            continue
+
+        r = await run_in_threadpool(
+            prompt_generator.generate_prompts,
             contents,
             style=eff_style, tone=eff_tone, quality=eff_quality,
             preset_suffix_positive=suffix_pos, preset_suffix_negative=suffix_neg
@@ -195,10 +247,14 @@ async def generate_prompts_batch(
 # ------------------------------------------------------------------ #
 
 @app.post("/api/generate-prompts-text")
-async def generate_prompts_text(request_data: dict):
+def generate_prompts_text(request_data: dict):
     description = request_data.get("description", "").strip()
     if not description:
         raise HTTPException(status_code=400, detail="Description is required.")
+
+    # 説明文の長さ制限
+    if len(description) > 5000:
+        raise HTTPException(status_code=422, detail="Description must not exceed 5000 characters.")
 
     style = request_data.get("style", "")
     tone = request_data.get("tone", "")
@@ -236,10 +292,14 @@ async def generate_prompts_text(request_data: dict):
 # ------------------------------------------------------------------ #
 
 @app.post("/api/refine-prompt")
-async def refine_prompt(request_data: dict):
+def refine_prompt(request_data: dict):
     positive = request_data.get("positive", "").strip()
     if not positive:
         raise HTTPException(status_code=400, detail="Positive prompt is required.")
+
+    # ポジティブプロンプトの長さ制限
+    if len(positive) > 10000:
+        raise HTTPException(status_code=422, detail="Positive prompt must not exceed 10000 characters.")
 
     negative = request_data.get("negative", "").strip()
     instruction = request_data.get("instruction", "").strip()
@@ -259,6 +319,16 @@ async def refine_prompt(request_data: dict):
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
 
+    # リファイン結果を履歴に保存
+    hist.save_history(
+        positive=result["positive"],
+        negative=result["negative"],
+        image_name="[refine]",
+        style=style,
+        tone=tone,
+        quality=quality
+    )
+
     return {
         "success": True,
         "data": {
@@ -274,7 +344,7 @@ async def refine_prompt(request_data: dict):
 # ------------------------------------------------------------------ #
 
 @app.get("/api/history")
-async def get_history(
+def get_history(
     limit: int = 50,
     offset: int = 0,
     search: str = "",
@@ -295,11 +365,11 @@ async def get_history(
 
 
 @app.get("/api/history/export")
-async def export_history():
+def export_history():
     """全履歴をJSONとしてダウンロード"""
     from datetime import datetime as _dt
     from fastapi.responses import JSONResponse
-    items = hist.get_history(limit=10000)
+    items = hist.get_history(limit=None)
     return JSONResponse(
         content={"exported_at": _dt.now().isoformat(), "items": items},
         headers={"Content-Disposition": "attachment; filename=prompt_history.json"}
@@ -307,7 +377,7 @@ async def export_history():
 
 
 @app.put("/api/history/{item_id}/favorite")
-async def toggle_history_favorite(item_id: int):
+def toggle_history_favorite(item_id: int):
     updated = hist.toggle_favorite(item_id)
     if not updated:
         raise HTTPException(status_code=404, detail="History item not found.")
@@ -315,7 +385,7 @@ async def toggle_history_favorite(item_id: int):
 
 
 @app.delete("/api/history/{item_id}")
-async def delete_history(item_id: int):
+def delete_history(item_id: int):
     deleted = hist.delete_history_item(item_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="History item not found.")
@@ -323,7 +393,7 @@ async def delete_history(item_id: int):
 
 
 @app.delete("/api/history")
-async def clear_history():
+def clear_history():
     count = hist.clear_all_history()
     return {"success": True, "deleted": count}
 
@@ -333,12 +403,12 @@ async def clear_history():
 # ------------------------------------------------------------------ #
 
 @app.get("/api/presets")
-async def get_presets():
+def get_presets():
     return {"success": True, "presets": preset_mgr.get_all_presets()}
 
 
 @app.post("/api/presets")
-async def create_preset(preset: dict):
+def create_preset(preset: dict):
     for field in ["name", "positive_suffix", "negative_suffix"]:
         if not preset.get(field):
             raise HTTPException(status_code=400, detail=f"Field '{field}' is required.")
@@ -347,7 +417,7 @@ async def create_preset(preset: dict):
 
 
 @app.delete("/api/presets/{preset_id}")
-async def delete_preset(preset_id: str):
+def delete_preset(preset_id: str):
     deleted = preset_mgr.delete_preset(preset_id)
     if not deleted:
         raise HTTPException(status_code=400, detail="Cannot delete default preset or not found.")
@@ -359,7 +429,7 @@ async def delete_preset(preset_id: str):
 # ------------------------------------------------------------------ #
 
 @app.get("/api/sd/status")
-async def sd_status():
+def sd_status():
     available = sd_client.is_available()
     model = ""
     samplers = []
@@ -378,8 +448,22 @@ async def sd_status():
     return {"available": available, "model": model, "samplers": samplers, "models": models, "upscalers": upscalers, "loras": loras}
 
 
+@app.get("/api/sd/progress")
+def sd_progress():
+    """SD WebUI の生成進捗を返す。SD が未到達でも例外を送出しない"""
+    data = sd_client.get_progress()
+    if data is None:
+        return {"available": False, "progress": 0.0, "eta_relative": 0.0, "state": {}}
+    return {
+        "available": True,
+        "progress": float(data.get("progress", 0.0)),
+        "eta_relative": float(data.get("eta_relative", 0.0)),
+        "state": data.get("state", {}),
+    }
+
+
 @app.get("/api/sd/loras")
-async def sd_loras_list():
+def sd_loras_list():
     try:
         loras = sd_client.get_loras()
         return {"success": True, "loras": loras}
@@ -388,7 +472,7 @@ async def sd_loras_list():
 
 
 @app.get("/api/sd/upscalers")
-async def sd_upscalers():
+def sd_upscalers():
     try:
         upscalers = sd_client.get_upscalers()
         return {"success": True, "upscalers": upscalers}
@@ -397,26 +481,26 @@ async def sd_upscalers():
 
 
 @app.post("/api/sd/generate")
-async def sd_generate(request_data: dict):
+def sd_generate(request_data: dict):
     positive = request_data.get("positive", "").strip()
     negative = request_data.get("negative", "").strip()
     if not positive:
         raise HTTPException(status_code=400, detail="Positive prompt is required.")
 
-    width = int(request_data.get("width", 512))
-    height = int(request_data.get("height", 512))
-    steps = int(request_data.get("steps", 20))
-    cfg_scale = float(request_data.get("cfg_scale", 7.0))
+    width = _as_int(request_data, "width", 512)
+    height = _as_int(request_data, "height", 512)
+    steps = _as_int(request_data, "steps", 20)
+    cfg_scale = _as_float(request_data, "cfg_scale", 7.0)
     sampler = request_data.get("sampler", "Euler a")
-    seed = int(request_data.get("seed", -1))
-    batch_size = min(int(request_data.get("batch_size", 1)), 4)
+    seed = _as_int(request_data, "seed", -1)
+    batch_size = min(_as_int(request_data, "batch_size", 1), 4)
     model = request_data.get("model", "")
     loras = request_data.get("loras", "")
     enable_hr = bool(request_data.get("enable_hr", False))
-    hr_scale = float(request_data.get("hr_scale", 2.0))
+    hr_scale = _as_float(request_data, "hr_scale", 2.0)
     hr_upscaler = request_data.get("hr_upscaler", "R-ESRGAN 4x+")
-    hr_second_pass_steps = int(request_data.get("hr_second_pass_steps", 0))
-    hr_denoising_strength = float(request_data.get("hr_denoising_strength", 0.7))
+    hr_second_pass_steps = _as_int(request_data, "hr_second_pass_steps", 0)
+    hr_denoising_strength = _as_float(request_data, "hr_denoising_strength", 0.7)
 
     try:
         images = sd_client.txt2img(
@@ -496,10 +580,14 @@ async def sd_img2img(
     if len(contents) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail="Image too large (max 10MB).")
 
+    # PIL による実態検証
+    _validate_image_bytes(contents)
+
     init_image = base64.b64encode(contents).decode("utf-8")
 
     try:
-        images = sd_client.img2img(
+        images = await run_in_threadpool(
+            sd_client.img2img,
             init_image=init_image,
             positive=positive,
             negative=negative,
@@ -521,7 +609,8 @@ async def sd_img2img(
             hr_denoising_strength=hr_denoising_strength
         )
 
-        saved_files = sd_client.save_images(
+        saved_files = await run_in_threadpool(
+            sd_client.save_images,
             images=images,
             positive=positive,
             negative=negative,
@@ -579,10 +668,14 @@ async def sd_inpaint(
     if len(contents) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail="Image too large (max 10MB).")
 
+    # PIL による実態検証
+    _validate_image_bytes(contents)
+
     init_image = base64.b64encode(contents).decode("utf-8")
 
     try:
-        images = sd_client.inpaint(
+        images = await run_in_threadpool(
+            sd_client.inpaint,
             init_image=init_image,
             mask=mask,
             positive=positive,
@@ -603,7 +696,8 @@ async def sd_inpaint(
             loras=loras
         )
 
-        saved_files = sd_client.save_images(
+        saved_files = await run_in_threadpool(
+            sd_client.save_images,
             images=images,
             positive=positive,
             negative=negative,
@@ -634,7 +728,7 @@ async def sd_inpaint(
 
 
 @app.post("/api/sd/generate-multi-model")
-async def sd_generate_multi_model(request_data: dict):
+def sd_generate_multi_model(request_data: dict):
     models = request_data.get("models", [])
     if not models:
         raise HTTPException(status_code=400, detail="At least one model is required.")
@@ -644,19 +738,19 @@ async def sd_generate_multi_model(request_data: dict):
         raise HTTPException(status_code=400, detail="Positive prompt is required.")
 
     negative = request_data.get("negative", "").strip()
-    width = int(request_data.get("width", 512))
-    height = int(request_data.get("height", 512))
-    steps = int(request_data.get("steps", 20))
-    cfg_scale = float(request_data.get("cfg_scale", 7.0))
+    width = _as_int(request_data, "width", 512)
+    height = _as_int(request_data, "height", 512)
+    steps = _as_int(request_data, "steps", 20)
+    cfg_scale = _as_float(request_data, "cfg_scale", 7.0)
     sampler = request_data.get("sampler", "Euler a")
-    seed = int(request_data.get("seed", -1))
-    batch_size = min(int(request_data.get("batch_size", 1)), 4)
+    seed = _as_int(request_data, "seed", -1)
+    batch_size = min(_as_int(request_data, "batch_size", 1), 4)
     loras = request_data.get("loras", "")
     enable_hr = bool(request_data.get("enable_hr", False))
-    hr_scale = float(request_data.get("hr_scale", 2.0))
+    hr_scale = _as_float(request_data, "hr_scale", 2.0)
     hr_upscaler = request_data.get("hr_upscaler", "R-ESRGAN 4x+")
-    hr_second_pass_steps = int(request_data.get("hr_second_pass_steps", 0))
-    hr_denoising_strength = float(request_data.get("hr_denoising_strength", 0.7))
+    hr_second_pass_steps = _as_int(request_data, "hr_second_pass_steps", 0)
+    hr_denoising_strength = _as_float(request_data, "hr_denoising_strength", 0.7)
 
     results = []
     for model in models:
@@ -710,7 +804,7 @@ async def sd_generate_multi_model(request_data: dict):
 
 
 @app.get("/api/sd/models")
-async def sd_models():
+def sd_models():
     try:
         models = sd_client.get_models()
         return {"success": True, "models": [m.get("model_name", m.get("title", "")) for m in models]}
@@ -725,6 +819,7 @@ async def sd_models():
 _DATA_DIR = Path(__file__).parent / "data"
 _LAST_PARAMS_FILE = _DATA_DIR / "last_params.json"
 _VALID_FEATURES = {"generate", "sd", "img2img", "inpaint", "multi_model"}
+_last_params_lock = threading.Lock()
 
 
 def _read_last_params() -> dict:
@@ -737,28 +832,40 @@ def _read_last_params() -> dict:
 
 
 def _write_last_params(data: dict):
+    """アトミックな書き込みで last_params.json を更新する"""
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    _LAST_PARAMS_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    content = json.dumps(data, ensure_ascii=False, indent=2)
+    fd, tmp_path = tempfile.mkstemp(dir=str(_DATA_DIR), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp_path, str(_LAST_PARAMS_FILE))
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 @app.get("/api/last-params/{feature}")
-async def get_last_params(feature: str):
+def get_last_params(feature: str):
     if feature not in _VALID_FEATURES:
         raise HTTPException(status_code=400, detail="Invalid feature name.")
-    data = _read_last_params()
+    with _last_params_lock:
+        data = _read_last_params()
     params = data.get(feature, {})
     return {"success": True, "params": params}
 
 
 @app.post("/api/last-params/{feature}")
-async def save_last_params(feature: str, request_data: dict):
+def save_last_params(feature: str, request_data: dict):
     if feature not in _VALID_FEATURES:
         raise HTTPException(status_code=400, detail="Invalid feature name.")
-    data = _read_last_params()
-    data[feature] = request_data
-    _write_last_params(data)
+    with _last_params_lock:
+        data = _read_last_params()
+        data[feature] = request_data
+        _write_last_params(data)
     return {"success": True}
 
 
@@ -768,6 +875,7 @@ async def save_last_params(feature: str, request_data: dict):
 
 # date_str → (dir_mtime, cache_time, images_list) のインメモリキャッシュ
 _gallery_cache: dict = {}
+_gallery_cache_lock = threading.Lock()
 _GALLERY_CACHE_TTL = 30  # 秒
 
 
@@ -796,17 +904,31 @@ def _scan_date_dir(date_dir: Path, date_str: str) -> list:
         timestamp = "_".join(parts[1:3]) if len(parts) >= 3 else ""
         meta = metadata_map.get(timestamp, {})
 
-        thumb_path = date_dir / "thumbs" / fname
-        if not thumb_path.exists():
+        # サムネイルは .jpg を優先、レガシー .png もフォールバックとして確認
+        stem = img_file.stem
+        thumbs_dir = date_dir / "thumbs"
+        thumb_jpg = thumbs_dir / f"{stem}.jpg"
+        thumb_png_legacy = thumbs_dir / f"{fname}"
+
+        if thumb_jpg.exists():
+            thumb_path = thumb_jpg
+            thumb_url = f"/outputs/{date_str}/thumbs/{stem}.jpg"
+        elif thumb_png_legacy.exists():
+            # レガシー .png サムネイルをそのまま使用
+            thumb_path = thumb_png_legacy
+            thumb_url = f"/outputs/{date_str}/thumbs/{fname}"
+        else:
+            # 新規作成は .jpg で行う
+            thumb_path = thumb_jpg
             try:
-                thumbs_dir = date_dir / "thumbs"
                 thumbs_dir.mkdir(exist_ok=True)
                 with Image.open(img_file) as pil_img:
                     pil_img.thumbnail((200, 200), Image.LANCZOS)
                     pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
+                thumb_url = f"/outputs/{date_str}/thumbs/{stem}.jpg"
             except Exception as e:
                 print(f"Warning: on-demand thumbnail generation failed for {fname}: {e}")
-        thumb_url = f"/outputs/{date_str}/thumbs/{fname}" if thumb_path.exists() else None
+                thumb_url = None
 
         date_images.append({
             "date": date_str,
@@ -821,7 +943,7 @@ def _scan_date_dir(date_dir: Path, date_str: str) -> list:
 
 
 @app.get("/api/outputs")
-async def list_outputs(
+def list_outputs(
     date: Optional[str] = None,
     mode: Optional[str] = None,
     limit: int = 24,
@@ -832,6 +954,10 @@ async def list_outputs(
         raise HTTPException(status_code=400, detail="limit must be a positive integer.")
     if offset < 0:
         raise HTTPException(status_code=400, detail="offset must be non-negative.")
+
+    # date パラメータの形式バリデーション
+    if date is not None and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        raise HTTPException(status_code=422, detail="date must be in YYYY-MM-DD format.")
 
     _OUTPUTS_DIR = Path(__file__).parent / "outputs"
     if not _OUTPUTS_DIR.exists():
@@ -844,7 +970,7 @@ async def list_outputs(
 
     target_dates = [date] if date else dates
 
-    # 全件収集（キャッシュ活用）してからフィルタ・スライス
+    # スキャンはロック外で実施（重複スキャンは許容）し、キャッシュ格納だけロック内で行う
     all_images = []
     for date_str in target_dates:
         date_dir = _OUTPUTS_DIR / date_str
@@ -852,12 +978,18 @@ async def list_outputs(
             continue
 
         dir_mtime = date_dir.stat().st_mtime
-        cached = _gallery_cache.get(date_str)
-        if cached and cached[0] == dir_mtime and (time.time() - cached[1]) < _GALLERY_CACHE_TTL:
-            date_images = cached[2]
-        else:
+
+        with _gallery_cache_lock:
+            cached = _gallery_cache.get(date_str)
+            if cached and cached[0] == dir_mtime and (time.time() - cached[1]) < _GALLERY_CACHE_TTL:
+                date_images = cached[2]
+            else:
+                date_images = None
+
+        if date_images is None:
             date_images = _scan_date_dir(date_dir, date_str)
-            _gallery_cache[date_str] = (dir_mtime, time.time(), date_images)
+            with _gallery_cache_lock:
+                _gallery_cache[date_str] = (dir_mtime, time.time(), date_images)
 
         if mode:
             all_images.extend(img for img in date_images if img["mode"] == mode)

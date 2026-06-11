@@ -324,6 +324,7 @@ Img2sdtxt/
 | `GET` | `/api/sd/models` | List available models |
 | `GET` | `/api/sd/loras` | List available LoRAs |
 | `GET` | `/api/sd/upscalers` | List available upscalers |
+| `GET` | `/api/sd/progress` | Current generation progress (for progress bar) |
 | `POST` | `/api/sd/generate` | txt2img generation |
 | `POST` | `/api/sd/generate-multi-model` | txt2img generation with multiple models sequentially |
 | `POST` | `/api/sd/img2img` | img2img generation |
@@ -340,6 +341,15 @@ Img2sdtxt/
 | `POST` | `/api/last-params/{feature}` | Save last parameters |
 
 Valid `feature` values: `generate`, `sd`, `img2img`, `inpaint`, `multi_model`
+
+---
+
+## Running Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+```
 
 ---
 

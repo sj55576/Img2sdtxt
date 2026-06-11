@@ -52,7 +52,7 @@ def save_history(
 
 
 def get_history(
-    limit: int = 50,
+    limit: Optional[int] = 50,
     offset: int = 0,
     search: str = "",
     style: str = "",
@@ -64,8 +64,12 @@ def get_history(
     params: List = []
 
     if search:
-        conditions.append("(positive LIKE ? OR negative LIKE ? OR image_name LIKE ?)")
-        term = f"%{search}%"
+        # LIKE 特殊文字をエスケープしてリテラルマッチにする
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        conditions.append(
+            "(positive LIKE ? ESCAPE '\\' OR negative LIKE ? ESCAPE '\\' OR image_name LIKE ? ESCAPE '\\')"
+        )
+        term = f"%{escaped}%"
         params.extend([term, term, term])
     if style:
         conditions.append("style = ?")
@@ -77,14 +81,18 @@ def get_history(
         conditions.append("is_favorite = 1")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-    params.extend([limit, offset])
+
+    if limit is None:
+        # LIMIT なし — 全件取得
+        params.append(offset)
+        query = f"SELECT * FROM prompt_history {where} ORDER BY created_at DESC LIMIT -1 OFFSET ?"
+    else:
+        params.extend([limit, offset])
+        query = f"SELECT * FROM prompt_history {where} ORDER BY created_at DESC LIMIT ? OFFSET ?"
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            f"SELECT * FROM prompt_history {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            params
-        ).fetchall()
+        rows = conn.execute(query, params).fetchall()
         return [dict(r) for r in rows]
 
 
@@ -99,8 +107,12 @@ def get_history_count(
     params: List = []
 
     if search:
-        conditions.append("(positive LIKE ? OR negative LIKE ? OR image_name LIKE ?)")
-        term = f"%{search}%"
+        # LIKE 特殊文字をエスケープしてリテラルマッチにする
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        conditions.append(
+            "(positive LIKE ? ESCAPE '\\' OR negative LIKE ? ESCAPE '\\' OR image_name LIKE ? ESCAPE '\\')"
+        )
+        term = f"%{escaped}%"
         params.extend([term, term, term])
     if style:
         conditions.append("style = ?")

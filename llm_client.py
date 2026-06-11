@@ -42,6 +42,14 @@ class LLMClient:
         converted_bytes = self._convert_webp_to_png(image_bytes)
         return base64.b64encode(converted_bytes).decode('utf-8')
 
+    def is_available(self) -> bool:
+        """LLMサーバーへの軽量な疎通確認 (GET /v1/models、タイムアウト5秒)"""
+        try:
+            r = requests.get(f"{self.base_url}/v1/models", timeout=5)
+            return r.status_code < 300
+        except Exception:
+            return False
+
     def generate_response(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
         """
         LLMサーバーに対してプロンプトを送信し、レスポンスを取得

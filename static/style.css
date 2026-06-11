@@ -755,3 +755,11 @@ textarea { resize: vertical; }
     /* Touch-friendly form elements */
     input[type="text"], input[type="number"], select, textarea { font-size: 16px; }
 }
+
+/* SD Progress Bar (FE-3) */
+.sd-progress-bar-wrap { width: 100%; background: var(--surface2); border-radius: 6px; overflow: hidden; margin-top: 8px; position: relative; height: 22px; }
+.sd-progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary-dark), var(--primary)); border-radius: 6px; transition: width 0.8s ease; width: 0%; }
+.sd-progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; color: #fff; white-space: nowrap; }
+
+/* Ctrl+Enter hint (FE-5) */
+.ctrl-enter-hint { font-size: 0.72rem; color: var(--text-muted); text-align: right; margin-top: 4px; }

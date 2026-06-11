@@ -24,7 +24,7 @@ SSL_KEYFILE = os.getenv("SSL_KEYFILE", "")
 
 # Image Configuration
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"]
 
 # Prompt Customization Options
 STYLES = [
