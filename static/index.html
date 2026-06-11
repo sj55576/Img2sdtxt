@@ -155,6 +155,7 @@
                                 🔁 生成＋マルチモデル
                             </button>
                         </div>
+                        <p class="ctrl-enter-hint">Ctrl+Enterで実行</p>
                     </div>
 
                     <!-- Right: Results -->
@@ -257,6 +258,7 @@
                         <button id="refine-btn" class="btn btn-primary btn-block">
                             🔧 プロンプトを改善
                         </button>
+                        <p class="ctrl-enter-hint">Ctrl+Enterで実行</p>
                     </div>
 
                     <!-- Right: Results -->
@@ -615,6 +617,7 @@
                         <div id="sd-loading" class="loading-box hidden">
                             <div class="spinner"></div>
                             <p>生成中... (しばらくお待ちください)</p>
+                            <div id="sd-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
                         </div>
                         <div id="sd-results" class="sd-results hidden">
                             <h3>生成された画像</h3>
@@ -623,6 +626,7 @@
                         <div id="sd-multi-loading" class="loading-box hidden">
                             <div class="spinner"></div>
                             <p id="sd-multi-loading-text">マルチモデル生成中...</p>
+                            <div id="sd-multi-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
                         </div>
                         <div id="sd-multi-results" class="hidden">
                             <h3>マルチモデル生成結果</h3>
@@ -809,6 +813,7 @@
                         <div id="i2i-loading" class="loading-box hidden">
                             <div class="spinner"></div>
                             <p>変換生成中... (しばらくお待ちください)</p>
+                            <div id="i2i-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
                         </div>
                         <div id="i2i-results" class="sd-results hidden">
                             <h3>生成された画像</h3>
@@ -988,6 +993,7 @@
                         <div id="inpaint-loading" class="loading-box hidden">
                             <div class="spinner"></div>
                             <p>インペイント生成中... (しばらくお待ちください)</p>
+                            <div id="inpaint-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
                         </div>
                         <div id="inpaint-results" class="sd-results hidden">
                             <h3>生成された画像</h3>
@@ -1045,6 +1051,7 @@
                             <div id="gallery-modal-params" class="gallery-params"></div>
                             <div class="gallery-modal-actions">
                                 <a id="gallery-modal-download" href="" download class="btn btn-primary">⬇ ダウンロード</a>
+                                <button id="gallery-modal-copy-btn" class="btn btn-secondary">📋 プロンプトコピー</button>
                             </div>
                         </div>
                     </div>

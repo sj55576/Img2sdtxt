@@ -14,6 +14,15 @@ const _selectedModel = { sd: '', img2img: '', inpaint: '' };
 // モデルリストの初回ロード済みフラグ（タブ切り替え時の再構築を防ぐ）
 const _modelsLoaded = { sd: false, img2img: false, inpaint: false };
 
+// FE-2: Status check promise cache (prevents concurrent duplicate fetches)
+const _sdStatusPromise = { sd: null, img2img: null, inpaint: null };
+
+// FE-1: Multi-model running guard
+let _multiModelRunning = false;
+
+// FE-6: History items map (id → item object)
+const _historyItems = new Map();
+
 /* =====================================================================
    Init
    ===================================================================== */
@@ -35,6 +44,22 @@ document.addEventListener('DOMContentLoaded', () => {
     checkSDStatus();
     checkImg2ImgStatus();
     checkInpaintStatus();
+
+    // FE-5: Ctrl+Enter shortcut to trigger generation
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            const activePage = document.querySelector('.page.active');
+            if (!activePage) return;
+            const pageId = activePage.id;
+            if (pageId === 'page-generate') {
+                const btn = document.getElementById('generate-btn');
+                if (!btn.disabled) btn.click();
+            } else if (pageId === 'page-refine') {
+                const btn = document.getElementById('refine-btn');
+                if (!btn.disabled) btn.click();
+            }
+        }
+    });
 
     // Prevent default drag and drop behavior on document
     document.addEventListener('dragover', e => {
@@ -118,66 +143,71 @@ async function checkStatus() {
 }
 
 async function checkSDStatus() {
-    const sdEl = document.getElementById('sd-status');
-    const badge = document.getElementById('sd-api-badge');
-    sdEl.classList.add('checking');
-    try {
-        const r = await fetch('/api/sd/status');
-        const d = await r.json();
-        sdEl.classList.remove('checking');
-        if (d.available) {
-            sdEl.classList.add('ok');
-            sdEl.querySelector('.label').textContent = 'SD ✓';
-            badge.className = 'badge badge-green';
-            badge.textContent = 'Connected';
+    if (!_sdStatusPromise.sd) {
+        _sdStatusPromise.sd = (async () => {
+            const sdEl = document.getElementById('sd-status');
+            const badge = document.getElementById('sd-api-badge');
+            sdEl.classList.add('checking');
+            try {
+                const r = await fetch('/api/sd/status');
+                const d = await r.json();
+                sdEl.classList.remove('checking');
+                if (d.available) {
+                    sdEl.classList.add('ok');
+                    sdEl.querySelector('.label').textContent = 'SD ✓';
+                    badge.className = 'badge badge-green';
+                    badge.textContent = 'Connected';
 
-            if (!_modelsLoaded.sd) {
-                // 初回のみリストを構築
-                if (d.samplers?.length) {
-                    const sel = document.getElementById('sd-sampler');
-                    sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
-                    if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                    if (!_modelsLoaded.sd) {
+                        // 初回のみリストを構築
+                        if (d.samplers?.length) {
+                            const sel = document.getElementById('sd-sampler');
+                            sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                            if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                        }
+                        if (d.models?.length) {
+                            const modelSel = document.getElementById('sd-model');
+                            const toRestore = _selectedModel.sd || modelSel.dataset.pendingValue || d.model || '';
+                            modelSel.innerHTML = d.models.map(m => {
+                                const name = m.model_name || m.title || '';
+                                return `<option value="${name}">${name}</option>`;
+                            }).join('');
+                            if (toRestore) modelSel.value = toRestore;
+                            if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
+                            if (modelSel.value) _selectedModel.sd = modelSel.value;
+                        }
+                        if (d.upscalers?.length) {
+                            const upscalerSel = document.getElementById('sd-hr-upscaler');
+                            upscalerSel.innerHTML = d.upscalers.map(u =>
+                                `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
+                            ).join('');
+                            if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
+                        }
+                        await loadLoras('sd', d.loras || []);
+                        if (d.models?.length) populateMultiModelList(d.models);
+                        _modelsLoaded.sd = true;
+                    } else {
+                        // タブ切り替え時は選択を復元するのみ
+                        const modelSel = document.getElementById('sd-model');
+                        if (_selectedModel.sd && modelSel.value !== _selectedModel.sd) {
+                            modelSel.value = _selectedModel.sd;
+                        }
+                    }
+                } else {
+                    sdEl.classList.add('error');
+                    sdEl.querySelector('.label').textContent = 'SD ✗';
+                    badge.className = 'badge badge-red';
+                    badge.textContent = 'Disconnected';
                 }
-                if (d.models?.length) {
-                    const modelSel = document.getElementById('sd-model');
-                    const toRestore = _selectedModel.sd || modelSel.dataset.pendingValue || d.model || '';
-                    modelSel.innerHTML = d.models.map(m => {
-                        const name = m.model_name || m.title || '';
-                        return `<option value="${name}">${name}</option>`;
-                    }).join('');
-                    if (toRestore) modelSel.value = toRestore;
-                    if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
-                    if (modelSel.value) _selectedModel.sd = modelSel.value;
-                }
-                if (d.upscalers?.length) {
-                    const upscalerSel = document.getElementById('sd-hr-upscaler');
-                    upscalerSel.innerHTML = d.upscalers.map(u =>
-                        `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
-                    ).join('');
-                    if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
-                }
-                await loadLoras('sd', d.loras || []);
-                if (d.models?.length) populateMultiModelList(d.models);
-                _modelsLoaded.sd = true;
-            } else {
-                // タブ切り替え時は選択を復元するのみ
-                const modelSel = document.getElementById('sd-model');
-                if (_selectedModel.sd && modelSel.value !== _selectedModel.sd) {
-                    modelSel.value = _selectedModel.sd;
-                }
+            } catch {
+                sdEl.classList.remove('checking');
+                sdEl.classList.add('error');
+                badge.className = 'badge badge-red';
+                badge.textContent = 'Error';
             }
-        } else {
-            sdEl.classList.add('error');
-            sdEl.querySelector('.label').textContent = 'SD ✗';
-            badge.className = 'badge badge-red';
-            badge.textContent = 'Disconnected';
-        }
-    } catch {
-        sdEl.classList.remove('checking');
-        sdEl.classList.add('error');
-        badge.className = 'badge badge-red';
-        badge.textContent = 'Error';
+        })().finally(() => { _sdStatusPromise.sd = null; });
     }
+    return _sdStatusPromise.sd;
 }
 
 async function loadLoras(prefix, preloadedLoras = null) {
@@ -407,7 +437,7 @@ async function sendToSDPageAndGenerate() {
     document.getElementById('sd-positive').value = document.getElementById('pos-prompt').value;
     document.getElementById('sd-negative').value = document.getElementById('neg-prompt').value;
     document.querySelector('[data-page="sd"]').click();
-    await new Promise(r => setTimeout(r, 150));
+    await checkSDStatus();
     runSDGenerate();
 }
 
@@ -415,7 +445,7 @@ async function sendToSDAndMultiGenerate() {
     document.getElementById('sd-positive').value = document.getElementById('pos-prompt').value;
     document.getElementById('sd-negative').value = document.getElementById('neg-prompt').value;
     document.querySelector('[data-page="sd"]').click();
-    await new Promise(r => setTimeout(r, 150));
+    await checkSDStatus();
     await runMultiModelGenerate();
 }
 
@@ -470,13 +500,15 @@ async function refineToSDPageAndGenerate() {
     document.getElementById('sd-positive').value = document.getElementById('refine-pos-output').value;
     document.getElementById('sd-negative').value = document.getElementById('refine-neg-output').value;
     document.querySelector('[data-page="sd"]').click();
-    await new Promise(r => setTimeout(r, 150));
+    await checkSDStatus();
     runSDGenerate();
 }
 
 function copyAllPrompts() {
     const text = `Positive:\n${document.getElementById('pos-prompt').value}\n\nNegative:\n${document.getElementById('neg-prompt').value}`;
-    navigator.clipboard.writeText(text).then(() => toast('全プロンプトをコピーしました', 'success'));
+    navigator.clipboard.writeText(text)
+        .then(() => toast('全プロンプトをコピーしました', 'success'))
+        .catch(() => toast('コピーに失敗しました', 'error'));
 }
 
 /* =====================================================================
@@ -583,7 +615,9 @@ function setupRefinePage() {
         const pos = document.getElementById('refine-pos-output').value;
         const neg = document.getElementById('refine-neg-output').value;
         const text = `Positive:\n${pos}\n\nNegative:\n${neg}`;
-        navigator.clipboard.writeText(text).then(() => toast('全プロンプトをコピーしました', 'success'));
+        navigator.clipboard.writeText(text)
+            .then(() => toast('全プロンプトをコピーしました', 'success'))
+            .catch(() => toast('コピーに失敗しました', 'error'));
     });
 
     document.getElementById('refine-send-to-sd-btn').addEventListener('click', () => {
@@ -659,9 +693,9 @@ function setupHistoryPage() {
     document.getElementById('refresh-history-btn').addEventListener('click', loadHistory);
     document.getElementById('clear-history-btn').addEventListener('click', async () => {
         if (!confirm('全履歴を削除しますか？')) return;
-        await fetch('/api/history', { method: 'DELETE' });
-        loadHistory();
-        toast('履歴を削除しました', 'success');
+        const res = await fetch('/api/history', { method: 'DELETE' });
+        if (res.ok) { loadHistory(); toast('履歴を削除しました', 'success'); }
+        else { toast('削除に失敗しました', 'error'); }
     });
     document.getElementById('export-history-btn').addEventListener('click', () => {
         window.location.href = '/api/history/export';
@@ -706,9 +740,10 @@ async function loadHistory() {
     try {
         const r = await fetch('/api/history?' + params.toString());
         const d = await r.json();
-        loading.classList.add('hidden');
 
         if (!d.items?.length) { empty.classList.remove('hidden'); return; }
+
+        d.items.forEach(item => _historyItems.set(item.id, item));
 
         list.innerHTML = d.items.map(item => `
             <div class="history-item" id="hist-${item.id}">
@@ -724,6 +759,8 @@ async function loadHistory() {
                             onclick="toggleFavorite(${item.id})" title="${item.is_favorite ? 'お気に入り解除' : 'お気に入り登録'}">⭐</button>
                         <button class="btn btn-sm btn-secondary" onclick="loadHistoryItem(${item.id})">使用</button>
                         <button class="btn btn-sm btn-secondary" onclick="sendToRefineFromHistory(${item.id})">🔧</button>
+                        <button class="btn btn-sm btn-ghost" onclick="copyHistoryPrompts(${item.id})" title="プロンプトをコピー">📋</button>
+                        <button class="btn btn-sm btn-secondary" onclick="sendHistoryToSD(${item.id})" title="SDページへ送る">🎨 SDへ送る</button>
                         <button class="btn btn-sm btn-ghost" onclick="deleteHistoryItem(${item.id})">🗑️</button>
                     </div>
                 </div>
@@ -738,8 +775,9 @@ async function loadHistory() {
             </div>
         `).join('');
     } catch (e) {
-        loading.classList.add('hidden');
         toast('履歴の読み込みに失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
     }
 }
 
@@ -760,29 +798,43 @@ async function toggleFavorite(id) {
 }
 
 function sendToRefineFromHistory(id) {
-    const el = document.getElementById(`hist-${id}`);
-    if (!el) return;
-    const positive = el.querySelectorAll('.history-prompt')[0]?.textContent.replace(/^Positive\s*/i, '').trim() || '';
-    const negative = el.querySelectorAll('.history-prompt')[1]?.textContent.replace(/^Negative\s*/i, '').trim() || '';
-    sendToRefine(positive, negative);
+    const item = _historyItems.get(id);
+    if (!item) return;
+    sendToRefine(item.positive, item.negative);
 }
 
 function loadHistoryItem(id) {
-    const el = document.getElementById(`hist-${id}`);
-    if (!el) return;
-    const positive = el.querySelectorAll('.history-prompt')[0]?.textContent.replace(/^Positive\s*/i, '').trim() || '';
-    const negative = el.querySelectorAll('.history-prompt')[1]?.textContent.replace(/^Negative\s*/i, '').trim() || '';
-    document.getElementById('pos-prompt').value = positive;
-    document.getElementById('neg-prompt').value = negative;
+    const item = _historyItems.get(id);
+    if (!item) return;
+    document.getElementById('pos-prompt').value = item.positive || '';
+    document.getElementById('neg-prompt').value = item.negative || '';
     document.getElementById('result-box').classList.remove('hidden');
     document.querySelector('[data-page="generate"]').click();
     toast('履歴を読み込みました', 'info');
 }
 
+function copyHistoryPrompts(id) {
+    const item = _historyItems.get(id);
+    if (!item) return;
+    const text = `Positive:\n${item.positive || ''}\n\nNegative:\n${item.negative || ''}`;
+    navigator.clipboard.writeText(text)
+        .then(() => toast('プロンプトをコピーしました', 'success'))
+        .catch(() => toast('コピーに失敗しました', 'error'));
+}
+
+function sendHistoryToSD(id) {
+    const item = _historyItems.get(id);
+    if (!item) return;
+    document.getElementById('sd-positive').value = item.positive || '';
+    document.getElementById('sd-negative').value = item.negative || '';
+    document.querySelector('[data-page="sd"]').click();
+    toast('SDページに送りました', 'info');
+}
+
 async function deleteHistoryItem(id) {
-    await fetch(`/api/history/${id}`, { method: 'DELETE' });
-    document.getElementById(`hist-${id}`)?.remove();
-    toast('削除しました', 'success');
+    const res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+    if (res.ok) { document.getElementById(`hist-${id}`)?.remove(); toast('削除しました', 'success'); }
+    else { toast('削除に失敗しました', 'error'); }
 }
 
 /* =====================================================================
@@ -830,7 +882,7 @@ function loadPresetsIntoSelects() {
         fetch('/api/presets').then(r => r.json()).then(d => {
             presetsCache = d.presets || [];
             refreshPresetSelects();
-        });
+        }).catch(e => console.warn('[PRESETS] Failed to load:', e));
     } else {
         refreshPresetSelects();
     }
@@ -892,8 +944,11 @@ async function savePreset() {
 
 async function deletePreset(id) {
     if (!confirm('このプリセットを削除しますか？')) return;
-    const r = await fetch(`/api/presets/${id}`, { method: 'DELETE' });
-    if (r.ok) { loadPresets(); toast('削除しました', 'success'); }
+    try {
+        const r = await fetch(`/api/presets/${id}`, { method: 'DELETE' });
+        if (r.ok) { loadPresets(); toast('削除しました', 'success'); }
+        else { toast('削除に失敗しました', 'error'); }
+    } catch { toast('削除に失敗しました', 'error'); }
 }
 
 function closePresetModal() {
@@ -916,23 +971,27 @@ function setupSDPage() {
     });
     document.getElementById('sd-multi-generate-btn').addEventListener('click', runMultiModelGenerate);
 
-    // Restore last used parameters (with delay for async operations)
-    setTimeout(() => loadLastParams('sd'), 100);
+    // Restore last used parameters after status check populates selectors
+    checkSDStatus().then(() => loadLastParams('sd'));
 }
 
 async function runSDGenerate() {
+    const btn = document.getElementById('sd-generate-btn');
+    if (btn.disabled) return;
     const positive = document.getElementById('sd-positive').value.trim();
     if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
     const _sdModel = document.getElementById('sd-model').value.trim();
     if (!_sdModel) { toast('モデルを選択してください', 'error'); return; }
     if (!await confirmModel(_sdModel)) return;
 
+    btn.disabled = true;
     const loading = document.getElementById('sd-loading');
     const results = document.getElementById('sd-results');
     const imagesEl = document.getElementById('sd-images');
 
     loading.classList.remove('hidden');
     results.classList.add('hidden');
+    const stopProgress = startSDProgress(loading);
 
     const enableHr = document.getElementById('sd-enable-hr').checked;
     const payload = {
@@ -978,7 +1037,9 @@ async function runSDGenerate() {
     } catch (e) {
         toast(e.message || '生成に失敗しました', 'error');
     } finally {
+        stopProgress();
         loading.classList.add('hidden');
+        btn.disabled = false;
     }
 }
 
@@ -1049,11 +1110,17 @@ async function loadMultiModelSelection() {
 }
 
 async function runMultiModelGenerate() {
+    if (_multiModelRunning) return;
+    const btn = document.getElementById('sd-multi-generate-btn');
+    if (btn) btn.disabled = true;
+
     const positive = document.getElementById('sd-positive').value.trim();
-    if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
+    if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); if (btn) btn.disabled = false; return; }
 
     const selectedModels = Array.from(document.querySelectorAll('.multi-model-checkbox:checked')).map(cb => cb.value);
-    if (!selectedModels.length) { toast('1つ以上のモデルを選択してください', 'error'); return; }
+    if (!selectedModels.length) { toast('1つ以上のモデルを選択してください', 'error'); if (btn) btn.disabled = false; return; }
+
+    _multiModelRunning = true;
 
     const loading = document.getElementById('sd-multi-loading');
     const loadingText = document.getElementById('sd-multi-loading-text');
@@ -1096,41 +1163,50 @@ async function runMultiModelGenerate() {
 
     let successCount = 0;
 
-    for (let i = 0; i < selectedModels.length; i++) {
-        const model = selectedModels[i];
-        const card = imagesEl.children[i];
-        loadingText.textContent = `${i + 1} / ${selectedModels.length} モデル処理中... (${model})`;
-        card.querySelector('.multi-model-result-header').textContent = `⏳ ${model}`;
-        card.querySelector('.multi-model-result-images').textContent = '生成中...';
-        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    try {
+        for (let i = 0; i < selectedModels.length; i++) {
+            const model = selectedModels[i];
+            const card = imagesEl.children[i];
+            loadingText.textContent = `${i + 1} / ${selectedModels.length} モデル処理中... (${model})`;
+            card.querySelector('.multi-model-result-header').textContent = `⏳ ${model}`;
+            card.querySelector('.multi-model-result-images').textContent = '生成中...';
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-        try {
-            const r = await fetch('/api/sd/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...basePayload, model })
-            });
-            if (!r.ok) throw new Error((await r.json()).detail);
-            const d = await r.json();
+            const stopProgress = startSDProgress(loading);
+            try {
+                const r = await fetch('/api/sd/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...basePayload, model })
+                });
+                if (!r.ok) throw new Error((await r.json()).detail);
+                const d = await r.json();
 
-            successCount++;
-            const imgs = d.images.map((img, j) => `
-                <div class="sd-image-wrap">
-                    <img src="data:image/png;base64,${img}" alt="${escHtml(model)} ${j + 1}">
-                    <button class="sd-image-download" onclick="downloadImage('${img}', ${j + 1})">⬇ 保存</button>
-                </div>`).join('');
-            card.innerHTML = `
-                <div class="multi-model-result-header success">✅ ${escHtml(model)} <span class="multi-model-result-count">${d.count}枚</span></div>
-                <div class="multi-model-result-images">${imgs}</div>`;
-        } catch (e) {
-            card.innerHTML = `
-                <div class="multi-model-result-header error">❌ ${escHtml(model)}</div>
-                <div style="padding:10px 14px;font-size:0.82rem;color:var(--danger)">${escHtml(e.message || '生成に失敗しました')}</div>`;
+                successCount++;
+                const imgs = d.images.map((img, j) => `
+                    <div class="sd-image-wrap">
+                        <img src="data:image/png;base64,${img}" alt="${escHtml(model)} ${j + 1}">
+                        <button class="sd-image-download" onclick="downloadImage('${img}', ${j + 1})">⬇ 保存</button>
+                    </div>`).join('');
+                card.innerHTML = `
+                    <div class="multi-model-result-header success">✅ ${escHtml(model)} <span class="multi-model-result-count">${d.count}枚</span></div>
+                    <div class="multi-model-result-images">${imgs}</div>`;
+            } catch (e) {
+                card.innerHTML = `
+                    <div class="multi-model-result-header error">❌ ${escHtml(model)}</div>
+                    <div style="padding:10px 14px;font-size:0.82rem;color:var(--danger)">${escHtml(e.message || '生成に失敗しました')}</div>`;
+            } finally {
+                stopProgress();
+            }
         }
-    }
 
-    loading.classList.add('hidden');
-    toast(`${successCount} / ${selectedModels.length} モデルで生成完了`, successCount > 0 ? 'success' : 'error');
+        toast(`${successCount} / ${selectedModels.length} モデルで生成完了`, successCount > 0 ? 'success' : 'error');
+    } finally {
+        loading.classList.add('hidden');
+        _multiModelRunning = false;
+        if (btn) btn.disabled = selectedModels.length === 0;
+        updateMultiModelCount();
+    }
 }
 
 /* =====================================================================
@@ -1209,8 +1285,8 @@ function setupImg2ImgPage() {
         });
     }
 
-    // Restore last used parameters (with delay for selector population)
-    setTimeout(() => loadLastParams('img2img'), 150);
+    // Restore last used parameters after status check populates selectors
+    checkImg2ImgStatus().then(() => loadLastParams('img2img'));
 }
 
 function handleI2IImageSelect(file) {
@@ -1270,59 +1346,66 @@ function clearI2IImage() {
 }
 
 async function checkImg2ImgStatus() {
-    const badge = document.getElementById('i2i-api-badge');
-    badge.className = 'badge badge-gray';
-    badge.textContent = 'Checking...';
-    try {
-        const r = await fetch('/api/sd/status');
-        const d = await r.json();
-        if (d.available) {
-            badge.className = 'badge badge-green';
-            badge.textContent = 'Connected';
+    if (!_sdStatusPromise.img2img) {
+        _sdStatusPromise.img2img = (async () => {
+            const badge = document.getElementById('i2i-api-badge');
+            badge.className = 'badge badge-gray';
+            badge.textContent = 'Checking...';
+            try {
+                const r = await fetch('/api/sd/status');
+                const d = await r.json();
+                if (d.available) {
+                    badge.className = 'badge badge-green';
+                    badge.textContent = 'Connected';
 
-            if (!_modelsLoaded.img2img) {
-                if (d.samplers?.length) {
-                    const sel = document.getElementById('i2i-sampler');
-                    sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
-                    if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                    if (!_modelsLoaded.img2img) {
+                        if (d.samplers?.length) {
+                            const sel = document.getElementById('i2i-sampler');
+                            sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                            if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                        }
+                        if (d.models?.length) {
+                            const modelSel = document.getElementById('i2i-model');
+                            const toRestore = _selectedModel.img2img || modelSel.dataset.pendingValue || d.model || '';
+                            modelSel.innerHTML = d.models.map(m => {
+                                const name = m.model_name || m.title || '';
+                                return `<option value="${name}">${name}</option>`;
+                            }).join('');
+                            if (toRestore) modelSel.value = toRestore;
+                            if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
+                            if (modelSel.value) _selectedModel.img2img = modelSel.value;
+                        }
+                        if (d.upscalers?.length) {
+                            const upscalerSel = document.getElementById('i2i-hr-upscaler');
+                            upscalerSel.innerHTML = d.upscalers.map(u =>
+                                `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
+                            ).join('');
+                            if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
+                        }
+                        await loadLoras('i2i', d.loras || []);
+                        _modelsLoaded.img2img = true;
+                    } else {
+                        const modelSel = document.getElementById('i2i-model');
+                        if (_selectedModel.img2img && modelSel.value !== _selectedModel.img2img) {
+                            modelSel.value = _selectedModel.img2img;
+                        }
+                    }
+                } else {
+                    badge.className = 'badge badge-red';
+                    badge.textContent = 'Disconnected';
                 }
-                if (d.models?.length) {
-                    const modelSel = document.getElementById('i2i-model');
-                    const toRestore = _selectedModel.img2img || modelSel.dataset.pendingValue || d.model || '';
-                    modelSel.innerHTML = d.models.map(m => {
-                        const name = m.model_name || m.title || '';
-                        return `<option value="${name}">${name}</option>`;
-                    }).join('');
-                    if (toRestore) modelSel.value = toRestore;
-                    if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
-                    if (modelSel.value) _selectedModel.img2img = modelSel.value;
-                }
-                if (d.upscalers?.length) {
-                    const upscalerSel = document.getElementById('i2i-hr-upscaler');
-                    upscalerSel.innerHTML = d.upscalers.map(u =>
-                        `<option${u === 'R-ESRGAN 4x+' ? ' selected' : ''}>${u}</option>`
-                    ).join('');
-                    if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
-                }
-                await loadLoras('i2i', d.loras || []);
-                _modelsLoaded.img2img = true;
-            } else {
-                const modelSel = document.getElementById('i2i-model');
-                if (_selectedModel.img2img && modelSel.value !== _selectedModel.img2img) {
-                    modelSel.value = _selectedModel.img2img;
-                }
+            } catch {
+                badge.className = 'badge badge-red';
+                badge.textContent = 'Error';
             }
-        } else {
-            badge.className = 'badge badge-red';
-            badge.textContent = 'Disconnected';
-        }
-    } catch {
-        badge.className = 'badge badge-red';
-        badge.textContent = 'Error';
+        })().finally(() => { _sdStatusPromise.img2img = null; });
     }
+    return _sdStatusPromise.img2img;
 }
 
 async function runImg2Img() {
+    const btn = document.getElementById('i2i-generate-btn');
+    if (btn.disabled) return;
     if (!i2iSelectedImage) { toast('入力画像を選択してください', 'error'); return; }
 
     const positive = document.getElementById('i2i-positive').value.trim();
@@ -1331,12 +1414,14 @@ async function runImg2Img() {
     if (!_i2iModel) { toast('モデルを選択してください', 'error'); return; }
     if (!await confirmModel(_i2iModel)) return;
 
+    btn.disabled = true;
     const loading = document.getElementById('i2i-loading');
     const results = document.getElementById('i2i-results');
     const imagesEl = document.getElementById('i2i-images');
 
     loading.classList.remove('hidden');
     results.classList.add('hidden');
+    const stopProgress = startSDProgress(loading);
 
     const i2iEnableHr = document.getElementById('i2i-enable-hr').checked;
     const i2iParams = {
@@ -1401,7 +1486,9 @@ async function runImg2Img() {
     } catch (e) {
         toast(e.message || '生成に失敗しました', 'error');
     } finally {
+        stopProgress();
         loading.classList.add('hidden');
+        btn.disabled = false;
     }
 }
 
@@ -1482,7 +1569,8 @@ function setupInpaintPage() {
     maskCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (_inpaint.drawing) paintMask(e.touches[0]); }, { passive: false });
     maskCanvas.addEventListener('touchend', () => { _inpaint.drawing = false; });
 
-    setTimeout(() => loadLastParams('inpaint'), 150);
+    // Restore last used parameters after status check populates selectors
+    checkInpaintStatus().then(() => loadLastParams('inpaint'));
 }
 
 function handleInpaintImageSelect(file) {
@@ -1584,50 +1672,55 @@ function clearInpaintImage() {
 }
 
 async function checkInpaintStatus() {
-    const badge = document.getElementById('inpaint-api-badge');
-    if (!badge) return;
-    badge.className = 'badge badge-gray';
-    badge.textContent = 'Checking...';
-    try {
-        const r = await fetch('/api/sd/status');
-        const d = await r.json();
-        if (d.available) {
-            badge.className = 'badge badge-green';
-            badge.textContent = 'Connected';
+    if (!_sdStatusPromise.inpaint) {
+        _sdStatusPromise.inpaint = (async () => {
+            const badge = document.getElementById('inpaint-api-badge');
+            if (!badge) return;
+            badge.className = 'badge badge-gray';
+            badge.textContent = 'Checking...';
+            try {
+                const r = await fetch('/api/sd/status');
+                const d = await r.json();
+                if (d.available) {
+                    badge.className = 'badge badge-green';
+                    badge.textContent = 'Connected';
 
-            if (!_modelsLoaded.inpaint) {
-                if (d.samplers?.length) {
-                    const sel = document.getElementById('inpaint-sampler');
-                    sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
-                    if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                    if (!_modelsLoaded.inpaint) {
+                        if (d.samplers?.length) {
+                            const sel = document.getElementById('inpaint-sampler');
+                            sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                            if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                        }
+                        if (d.models?.length) {
+                            const modelSel = document.getElementById('inpaint-model');
+                            const toRestore = _selectedModel.inpaint || modelSel.dataset.pendingValue || d.model || '';
+                            modelSel.innerHTML = d.models.map(m => {
+                                const name = m.model_name || m.title || '';
+                                return `<option value="${name}">${name}</option>`;
+                            }).join('');
+                            if (toRestore) modelSel.value = toRestore;
+                            if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
+                            if (modelSel.value) _selectedModel.inpaint = modelSel.value;
+                        }
+                        await loadLoras('inpaint', d.loras || []);
+                        _modelsLoaded.inpaint = true;
+                    } else {
+                        const modelSel = document.getElementById('inpaint-model');
+                        if (_selectedModel.inpaint && modelSel.value !== _selectedModel.inpaint) {
+                            modelSel.value = _selectedModel.inpaint;
+                        }
+                    }
+                } else {
+                    badge.className = 'badge badge-red';
+                    badge.textContent = 'Disconnected';
                 }
-                if (d.models?.length) {
-                    const modelSel = document.getElementById('inpaint-model');
-                    const toRestore = _selectedModel.inpaint || modelSel.dataset.pendingValue || d.model || '';
-                    modelSel.innerHTML = d.models.map(m => {
-                        const name = m.model_name || m.title || '';
-                        return `<option value="${name}">${name}</option>`;
-                    }).join('');
-                    if (toRestore) modelSel.value = toRestore;
-                    if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
-                    if (modelSel.value) _selectedModel.inpaint = modelSel.value;
-                }
-                await loadLoras('inpaint', d.loras || []);
-                _modelsLoaded.inpaint = true;
-            } else {
-                const modelSel = document.getElementById('inpaint-model');
-                if (_selectedModel.inpaint && modelSel.value !== _selectedModel.inpaint) {
-                    modelSel.value = _selectedModel.inpaint;
-                }
+            } catch {
+                badge.className = 'badge badge-red';
+                badge.textContent = 'Error';
             }
-        } else {
-            badge.className = 'badge badge-red';
-            badge.textContent = 'Disconnected';
-        }
-    } catch {
-        badge.className = 'badge badge-red';
-        badge.textContent = 'Error';
+        })().finally(() => { _sdStatusPromise.inpaint = null; });
     }
+    return _sdStatusPromise.inpaint;
 }
 
 function getMaskBase64() {
@@ -1662,6 +1755,8 @@ function getMaskBase64() {
 }
 
 async function runInpaint() {
+    const btn = document.getElementById('inpaint-generate-btn');
+    if (btn.disabled) return;
     if (!inpaintSelectedImage) { toast('入力画像を選択してください', 'error'); return; }
     const positive = document.getElementById('inpaint-positive').value.trim();
     if (!positive) { toast('ポジティブプロンプトを入力してください', 'error'); return; }
@@ -1669,6 +1764,7 @@ async function runInpaint() {
     if (!_inpaintModel) { toast('モデルを選択してください', 'error'); return; }
     if (!await confirmModel(_inpaintModel)) return;
 
+    btn.disabled = true;
     const maskBase64 = getMaskBase64();
 
     const loading = document.getElementById('inpaint-loading');
@@ -1677,6 +1773,7 @@ async function runInpaint() {
 
     loading.classList.remove('hidden');
     results.classList.add('hidden');
+    const stopProgress = startSDProgress(loading);
 
     const params = {
         positive,
@@ -1736,7 +1833,9 @@ async function runInpaint() {
     } catch (e) {
         toast(e.message || '生成に失敗しました', 'error');
     } finally {
+        stopProgress();
         loading.classList.add('hidden');
+        btn.disabled = false;
     }
 }
 
@@ -1884,6 +1983,37 @@ function applyLastParams(feature, params) {
 }
 
 /* =====================================================================
+   SD Progress Bar (FE-3)
+   ===================================================================== */
+function startSDProgress(containerEl) {
+    const wrap = containerEl.querySelector('.sd-progress-bar-wrap');
+    if (!wrap) return () => {};
+    const fill = wrap.querySelector('.sd-progress-fill');
+    const text = wrap.querySelector('.sd-progress-text');
+    wrap.classList.remove('hidden');
+    fill.style.width = '0%';
+    text.textContent = '';
+    const timer = setInterval(async () => {
+        try {
+            const r = await fetch('/api/sd/progress');
+            if (!r.ok) return;
+            const d = await r.json();
+            if (!d.available) return;
+            const pct = Math.round((d.progress || 0) * 100);
+            fill.style.width = pct + '%';
+            const eta = d.eta_relative != null ? ` (ETA: ${Math.ceil(d.eta_relative)}s)` : '';
+            text.textContent = `${pct}%${eta}`;
+        } catch {}
+    }, 1000);
+    return () => {
+        clearInterval(timer);
+        wrap.classList.add('hidden');
+        fill.style.width = '0%';
+        text.textContent = '';
+    };
+}
+
+/* =====================================================================
    Utilities
    ===================================================================== */
 
@@ -1962,7 +2092,7 @@ function copyText(elementId, btn) {
         btn.textContent = '✓ OK';
         btn.classList.add('copied');
         setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
-    });
+    }).catch(e => toast('コピーに失敗しました', 'error'));
 }
 
 // モデル確認ダイアログ（Promise を返す）
@@ -2155,6 +2285,18 @@ function openGalleryModal(imgJsonStr) {
             <span class="gallery-param-value">${escHtml(String(value))}</span>
         </div>
     `).join('');
+
+    const copyBtn = document.getElementById('gallery-modal-copy-btn');
+    if (copyBtn) {
+        copyBtn.onclick = () => {
+            const pos = p.positive_prompt || '';
+            const neg = p.negative_prompt || '';
+            const text = neg ? `Positive:\n${pos}\n\nNegative:\n${neg}` : pos;
+            navigator.clipboard.writeText(text)
+                .then(() => toast('プロンプトをコピーしました', 'success'))
+                .catch(() => toast('コピーに失敗しました', 'error'));
+        };
+    }
 
     modal.classList.remove('hidden');
 }
