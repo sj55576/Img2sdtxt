@@ -60,13 +60,8 @@ class SDClient:
             return False
 
     def get_model_list(self) -> List[Dict]:
-        """利用可能なモデル一覧を取得（ハッシュと名前付き）"""
-        try:
-            r = requests.get(f"{self.base_url}/sdapi/v1/sd-models", timeout=10)
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:
-            raise Exception(f"Failed to get models: {str(e)}")
+        """利用可能なモデル一覧を取得（get_models に委譲）"""
+        return self.get_models()
 
     def get_loras(self) -> List[Dict]:
         """利用可能なLoRA一覧を取得"""
@@ -81,6 +76,19 @@ class SDClient:
         except Exception as e:
             print(f"[get_loras] Failed to fetch LoRAs from {self.base_url}/sdapi/v1/loras: {e}")
             return []
+
+    def get_progress(self) -> Optional[Dict]:
+        """SD WebUI の生成進捗を取得。エラー時は None を返す (タイムアウト5秒)"""
+        try:
+            r = requests.get(
+                f"{self.base_url}/sdapi/v1/progress",
+                params={"skip_current_image": "true"},
+                timeout=5
+            )
+            r.raise_for_status()
+            return r.json()
+        except Exception:
+            return None
 
     def get_upscalers(self) -> List[str]:
         try:
@@ -390,14 +398,15 @@ class SDClient:
                 with open(filepath, "wb") as f:
                     f.write(image_bytes)
 
-                # サムネイル生成 (200px JPEG)
+                # サムネイル生成 (200px JPEG、.jpg 拡張子)
                 try:
                     thumbs_dir = date_dir / "thumbs"
                     thumbs_dir.mkdir(exist_ok=True)
-                    thumb_path = thumbs_dir / filename
-                    pil_img = Image.open(filepath)
-                    pil_img.thumbnail((200, 200), Image.LANCZOS)
-                    pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
+                    thumb_stem = Path(filename).stem
+                    thumb_path = thumbs_dir / f"{thumb_stem}.jpg"
+                    with Image.open(filepath) as pil_img:
+                        pil_img.thumbnail((200, 200), Image.LANCZOS)
+                        pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
                 except Exception as e:
                     print(f"Warning: thumbnail generation failed for {filename}: {e}")
 

@@ -2,8 +2,13 @@
 プリセットプロンプトテンプレートの管理
 """
 import json
+import os
+import tempfile
+import threading
 from pathlib import Path
 from typing import List, Dict, Optional
+
+_presets_lock = threading.Lock()
 
 PRESETS_PATH = Path(__file__).parent / "data" / "presets.json"
 
@@ -156,8 +161,21 @@ def _load_presets() -> List[Dict]:
 
 
 def _save_presets(presets: List[Dict]):
+    """アトミックな書き込みでプリセットを保存する"""
     PRESETS_PATH.parent.mkdir(exist_ok=True)
-    PRESETS_PATH.write_text(json.dumps(presets, ensure_ascii=False, indent=2), encoding="utf-8")
+    data = json.dumps(presets, ensure_ascii=False, indent=2)
+    # 同一ディレクトリに一時ファイルを作成し os.replace でアトミックに上書き
+    fd, tmp_path = tempfile.mkstemp(dir=str(PRESETS_PATH.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(data)
+        os.replace(tmp_path, str(PRESETS_PATH))
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def get_all_presets() -> List[Dict]:
@@ -169,21 +187,23 @@ def get_preset(preset_id: str) -> Optional[Dict]:
 
 
 def add_preset(preset: Dict) -> Dict:
-    presets = _load_presets()
-    if not preset.get("id"):
-        import uuid
-        preset["id"] = str(uuid.uuid4())[:8]
-    preset["is_default"] = False
-    presets.append(preset)
-    _save_presets(presets)
+    with _presets_lock:
+        presets = _load_presets()
+        if not preset.get("id"):
+            import uuid
+            preset["id"] = str(uuid.uuid4())[:8]
+        preset["is_default"] = False
+        presets.append(preset)
+        _save_presets(presets)
     return preset
 
 
 def delete_preset(preset_id: str) -> bool:
-    presets = _load_presets()
-    original_len = len(presets)
-    presets = [p for p in presets if not (p["id"] == preset_id and not p.get("is_default", False))]
-    if len(presets) < original_len:
-        _save_presets(presets)
-        return True
+    with _presets_lock:
+        presets = _load_presets()
+        original_len = len(presets)
+        presets = [p for p in presets if not (p["id"] == preset_id and not p.get("is_default", False))]
+        if len(presets) < original_len:
+            _save_presets(presets)
+            return True
     return False
