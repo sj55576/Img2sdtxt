@@ -5,12 +5,14 @@ import json
 import os
 import tempfile
 import threading
+import uuid
 from pathlib import Path
 from typing import List, Dict, Optional
 
 _presets_lock = threading.Lock()
 
 PRESETS_PATH = Path(__file__).parent / "data" / "presets.json"
+PRESET_ID_MAX_LENGTH = 64
 
 # デフォルトプリセット
 DEFAULT_PRESETS = [
@@ -186,16 +188,45 @@ def get_preset(preset_id: str) -> Optional[Dict]:
     return next((p for p in _load_presets() if p["id"] == preset_id), None)
 
 
+def _is_valid_preset_id(preset_id: str) -> bool:
+    """プリセットIDとして安全な文字列か判定する。"""
+    if not isinstance(preset_id, str):
+        return False
+    if not preset_id or len(preset_id) > PRESET_ID_MAX_LENGTH:
+        return False
+    return all(ch.isalnum() or ch in ("_", "-") for ch in preset_id)
+
+
+def _generate_unique_preset_id(existing_ids: set) -> str:
+    """既存IDと衝突しない短いIDを生成する。"""
+    while True:
+        preset_id = uuid.uuid4().hex[:8]
+        if preset_id not in existing_ids:
+            return preset_id
+
+
 def add_preset(preset: Dict) -> Dict:
     with _presets_lock:
         presets = _load_presets()
-        if not preset.get("id"):
-            import uuid
-            preset["id"] = str(uuid.uuid4())[:8]
-        preset["is_default"] = False
-        presets.append(preset)
+        existing_ids = {p.get("id") for p in presets}
+
+        new_preset = dict(preset)
+        requested_id = new_preset.get("id")
+        if requested_id:
+            if not _is_valid_preset_id(requested_id):
+                raise ValueError(
+                    "Preset id must be 1-64 characters and contain only letters, "
+                    "numbers, hyphens, or underscores."
+                )
+            if requested_id in existing_ids:
+                raise ValueError(f"Preset id already exists: {requested_id}")
+        else:
+            new_preset["id"] = _generate_unique_preset_id(existing_ids)
+
+        new_preset["is_default"] = False
+        presets.append(new_preset)
         _save_presets(presets)
-    return preset
+    return new_preset
 
 
 def delete_preset(preset_id: str) -> bool:

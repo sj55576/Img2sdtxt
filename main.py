@@ -412,7 +412,10 @@ def create_preset(preset: dict):
     for field in ["name", "positive_suffix", "negative_suffix"]:
         if not preset.get(field):
             raise HTTPException(status_code=400, detail=f"Field '{field}' is required.")
-    new_preset = preset_mgr.add_preset(preset)
+    try:
+        new_preset = preset_mgr.add_preset(preset)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return {"success": True, "preset": new_preset}
 
 
