@@ -67,6 +67,41 @@ def test_add_preset_with_explicit_id():
     assert added["id"] == "my_custom_id"
 
 
+def test_add_preset_rejects_duplicate_id():
+    new_p = {
+        "id": "anime",
+        "name": "Duplicate",
+        "positive_suffix": "pos",
+        "negative_suffix": "neg",
+    }
+    with pytest.raises(ValueError, match="already exists"):
+        preset_mgr.add_preset(new_p)
+
+
+@pytest.mark.parametrize("preset_id", ["bad id", "../preset", "x" * 65, "quote'bad"])
+def test_add_preset_rejects_invalid_id(preset_id):
+    new_p = {
+        "id": preset_id,
+        "name": "Invalid",
+        "positive_suffix": "pos",
+        "negative_suffix": "neg",
+    }
+    with pytest.raises(ValueError, match="Preset id"):
+        preset_mgr.add_preset(new_p)
+
+
+def test_add_preset_does_not_mutate_input():
+    new_p = {
+        "name": "No Mutation",
+        "positive_suffix": "pos",
+        "negative_suffix": "neg",
+    }
+    added = preset_mgr.add_preset(new_p)
+    assert "id" not in new_p
+    assert added["id"]
+    assert added["is_default"] is False
+
+
 def test_add_preset_saves_to_file(temp_presets):
     new_p = {
         "name": "File Test",
