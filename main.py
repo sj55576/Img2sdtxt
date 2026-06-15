@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request
 from fastapi.concurrency import run_in_threadpool
+import asyncio
 import base64
 import io
 import json
@@ -409,16 +410,17 @@ def get_history(
     search: str = "",
     style: str = "",
     quality: str = "",
-    favorites_only: bool = False
+    favorites_only: bool = False,
+    tag: str = ""
 ):
     items = hist.get_history(
         limit=limit, offset=offset,
         search=search, style=style, quality=quality,
-        favorites_only=favorites_only
+        favorites_only=favorites_only, tag=tag
     )
     total = hist.get_history_count(
         search=search, style=style, quality=quality,
-        favorites_only=favorites_only
+        favorites_only=favorites_only, tag=tag
     )
     return {"success": True, "items": items, "total": total}
 
@@ -475,6 +477,39 @@ def clear_history():
 
 
 # ------------------------------------------------------------------ #
+# History Tags
+# ------------------------------------------------------------------ #
+
+@app.get("/api/tags")
+def list_all_tags():
+    tags = hist.get_all_tags()
+    return {"success": True, "tags": tags}
+
+
+@app.post("/api/history/{item_id}/tags")
+def add_history_tags(item_id: int, request_data: dict):
+    tags = request_data.get("tags", [])
+    if not tags or not isinstance(tags, list):
+        raise HTTPException(status_code=400, detail="'tags' must be a non-empty list of strings.")
+    if any(not isinstance(t, str) or not t.strip() for t in tags):
+        raise HTTPException(status_code=400, detail="Each tag must be a non-empty string.")
+    item = hist.get_history_item(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="History item not found.")
+    result_tags = hist.add_tags(item_id, tags)
+    return {"success": True, "tags": result_tags}
+
+
+@app.delete("/api/history/{item_id}/tags/{tag}")
+def remove_history_tag(item_id: int, tag: str):
+    item = hist.get_history_item(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="History item not found.")
+    result_tags = hist.remove_tag(item_id, tag)
+    return {"success": True, "tags": result_tags}
+
+
+# ------------------------------------------------------------------ #
 # Cache
 # ------------------------------------------------------------------ #
 
@@ -523,8 +558,8 @@ def delete_preset(preset_id: str):
 # ------------------------------------------------------------------ #
 
 @app.get("/api/sd/status")
-def sd_status():
-    available = sd_client.is_available()
+async def sd_status():
+    available = await run_in_threadpool(sd_client.is_available)
     model = ""
     samplers = []
     models = []
@@ -532,13 +567,15 @@ def sd_status():
     loras = []
     if available:
         try:
-            model = sd_client.get_current_model()
-            samplers = sd_client.get_samplers()
-            models = sd_client.get_model_list()
-            upscalers = sd_client.get_upscalers()
+            model, samplers, models, upscalers, loras = await asyncio.gather(
+                run_in_threadpool(sd_client.get_current_model),
+                run_in_threadpool(sd_client.get_samplers),
+                run_in_threadpool(sd_client.get_model_list),
+                run_in_threadpool(sd_client.get_upscalers),
+                run_in_threadpool(sd_client.get_loras),
+            )
         except Exception:
             pass
-        loras = sd_client.get_loras()
     return {"available": available, "model": model, "samplers": samplers, "models": models, "upscalers": upscalers, "loras": loras}
 
 
@@ -575,7 +612,7 @@ def sd_upscalers():
 
 
 @app.post("/api/sd/generate")
-def sd_generate(request_data: dict):
+async def sd_generate(request_data: dict):
     positive = request_data.get("positive", "").strip()
     negative = request_data.get("negative", "").strip()
     if not positive:
@@ -597,7 +634,8 @@ def sd_generate(request_data: dict):
     hr_denoising_strength = _as_float(request_data, "hr_denoising_strength", 0.7)
 
     try:
-        images = sd_client.txt2img(
+        images = await run_in_threadpool(
+            sd_client.txt2img,
             positive=positive,
             negative=negative,
             width=width,
@@ -613,11 +651,11 @@ def sd_generate(request_data: dict):
             hr_scale=hr_scale,
             hr_upscaler=hr_upscaler,
             hr_second_pass_steps=hr_second_pass_steps,
-            hr_denoising_strength=hr_denoising_strength
+            hr_denoising_strength=hr_denoising_strength,
         )
 
-        # 画像を自動保存
-        saved_files = sd_client.save_images(
+        saved_files = await run_in_threadpool(
+            sd_client.save_images,
             images=images,
             positive=positive,
             negative=negative,
@@ -628,7 +666,7 @@ def sd_generate(request_data: dict):
             sampler=sampler,
             seed=seed,
             model=model,
-            loras=loras
+            loras=loras,
         )
 
         return {
@@ -822,7 +860,7 @@ async def sd_inpaint(
 
 
 @app.post("/api/sd/generate-multi-model")
-def sd_generate_multi_model(request_data: dict):
+async def sd_generate_multi_model(request_data: dict):
     models = request_data.get("models", [])
     if not models:
         raise HTTPException(status_code=400, detail="At least one model is required.")
@@ -849,7 +887,8 @@ def sd_generate_multi_model(request_data: dict):
     results = []
     for model in models:
         try:
-            images = sd_client.txt2img(
+            images = await run_in_threadpool(
+                sd_client.txt2img,
                 positive=positive,
                 negative=negative,
                 width=width,
@@ -865,9 +904,10 @@ def sd_generate_multi_model(request_data: dict):
                 hr_scale=hr_scale,
                 hr_upscaler=hr_upscaler,
                 hr_second_pass_steps=hr_second_pass_steps,
-                hr_denoising_strength=hr_denoising_strength
+                hr_denoising_strength=hr_denoising_strength,
             )
-            saved_files = sd_client.save_images(
+            saved_files = await run_in_threadpool(
+                sd_client.save_images,
                 images=images,
                 positive=positive,
                 negative=negative,
@@ -878,7 +918,7 @@ def sd_generate_multi_model(request_data: dict):
                 sampler=sampler,
                 seed=seed,
                 model=model,
-                loras=loras
+                loras=loras,
             )
             results.append({
                 "model": model,

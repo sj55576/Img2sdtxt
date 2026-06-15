@@ -7,6 +7,7 @@ from io import BytesIO
 from PIL import Image
 from config import LLM_SERVER_URL, LLM_MODEL
 from typing import Optional, List, Dict, Any
+from retry import retry_with_backoff
 
 logger = logging.getLogger("img2sdtxt.llm")
 
@@ -47,6 +48,7 @@ class LLMClient:
         converted_bytes = self._convert_webp_to_png(image_bytes)
         return base64.b64encode(converted_bytes).decode('utf-8')
 
+    @retry_with_backoff(max_retries=1, base_delay=0.5)
     def is_available(self) -> bool:
         """LLMサーバーへの軽量な疎通確認 (GET /v1/models、タイムアウト5秒)"""
         try:
@@ -55,6 +57,7 @@ class LLMClient:
         except Exception:
             return False
 
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
     def generate_response(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
         """
         LLMサーバーに対してプロンプトを送信し、レスポンスを取得
@@ -98,6 +101,7 @@ class LLMClient:
             logger.error("LLM server error: %s", str(e))
             raise Exception(f"LLM server error: {str(e)}")
 
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
     def generate_response_with_image(self, prompt: str, image_bytes: bytes, max_tokens: int = 500) -> Optional[str]:
         """
         画像を含めてLLMサーバーに対してプロンプトを送信し、レスポンスを取得
