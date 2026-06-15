@@ -161,11 +161,14 @@ def test_sd_progress_unavailable_shape(client):
 # ------------------------------------------------------------------ #
 
 def test_health_shape(client):
-    """/health は status と llm_server フィールドを含む"""
+    """/health は status, components, uptime_seconds フィールドを含む"""
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
     assert "status" in data
-    assert "llm_server" in data
+    assert "components" in data
+    assert "uptime_seconds" in data
+    assert "llm" in data["components"]
+    assert "sd_api" in data["components"]
     # モックが False を返すので degraded
     assert data["status"] == "degraded"

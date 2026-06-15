@@ -1,8 +1,11 @@
 import base64
 import json
+import logging
 from llm_client import LLMClient
 from typing import Dict
 from config import QUALITY_LEVELS
+
+logger = logging.getLogger("img2sdtxt.prompt")
 
 
 class PromptGenerator:
@@ -65,6 +68,7 @@ class PromptGenerator:
         preset_suffix_negative: str = ""
     ) -> Dict[str, str]:
         """画像からポジティブ・ネガティブプロンプトを生成"""
+        logger.info("generate_prompts start style=%s tone=%s quality=%s", style, tone, quality)
         try:
             style_instruction = self._build_style_instruction(style, tone, quality)
             customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
@@ -95,11 +99,14 @@ JSON形式のみで返してください：
             if preset_suffix_negative:
                 negative = f"{negative}, {preset_suffix_negative}"
 
+            logger.info("generate_prompts done")
             return {"positive": positive, "negative": negative, "status": "success"}
 
         except json.JSONDecodeError as e:
+            logger.error("generate_prompts JSON parse error: %s", str(e))
             return {"positive": "", "negative": "", "error": f"JSON parse error: {str(e)}", "status": "error"}
         except Exception as e:
+            logger.error("generate_prompts error: %s", str(e))
             return {"positive": "", "negative": "", "error": str(e), "status": "error"}
 
     def refine_prompt(
@@ -161,6 +168,7 @@ JSON形式のみで返してください：
         preset_suffix_negative: str = ""
     ) -> Dict[str, str]:
         """テキスト説明からプロンプトを生成"""
+        logger.info("generate_prompts_text_only start style=%s tone=%s quality=%s", style, tone, quality)
         try:
             style_instruction = self._build_style_instruction(style, tone, quality)
             customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
@@ -186,7 +194,9 @@ JSON形式のみで返してください：
             if preset_suffix_negative:
                 negative = f"{negative}, {preset_suffix_negative}"
 
+            logger.info("generate_prompts_text_only done")
             return {"positive": positive, "negative": negative, "status": "success"}
 
         except Exception as e:
+            logger.error("generate_prompts_text_only error: %s", str(e))
             return {"positive": "", "negative": "", "error": str(e), "status": "error"}

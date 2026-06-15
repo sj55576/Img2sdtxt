@@ -224,16 +224,52 @@ async function loadLoras(prefix, preloadedLoras = null) {
         }
         const loraSel = document.getElementById(`${prefix}-lora-select`);
         if (!loraSel) return;
-        loraSel.innerHTML = '<option value="">-- LoRA選択 --</option>' +
-            loras.map(l => {
-                const name = l.name || '';
-                const alias = l.alias || name;
-                const display = alias !== name ? `${alias} (${name})` : name;
-                return `<option value="${name}">${display}</option>`;
-            }).join('');
+
+        // Store full list for filtering
+        if (!window._allLoras) window._allLoras = {};
+        window._allLoras[prefix] = loras;
+
+        // Clear search box and render all options
+        const searchEl = document.getElementById(`${prefix}-lora-search`);
+        if (searchEl) searchEl.value = '';
+        _renderLoraOptions(prefix, loras);
+
+        const countEl = document.getElementById(`${prefix}-lora-count`);
+        if (countEl) countEl.textContent = `${loras.length} 件`;
     } catch (e) {
         console.error(`[LORA] Failed to load LoRAs for ${prefix}:`, e);
     }
+}
+
+function _renderLoraOptions(prefix, loras) {
+    const loraSel = document.getElementById(`${prefix}-lora-select`);
+    if (!loraSel) return;
+    loraSel.innerHTML = '<option value="">-- LoRA選択 --</option>' +
+        loras.map(l => {
+            const name = l.name || '';
+            const alias = l.alias || name;
+            const display = alias !== name ? `${alias} (${name})` : name;
+            return `<option value="${name}">${display}</option>`;
+        }).join('');
+}
+
+function filterLoras(prefix, query) {
+    const q = query.toLowerCase().trim();
+    const all = (window._allLoras && window._allLoras[prefix]) || [];
+    const filtered = q ? all.filter(l => (l.name || '').toLowerCase().includes(q) || (l.alias || '').toLowerCase().includes(q)) : all;
+    _renderLoraOptions(prefix, filtered);
+    const countEl = document.getElementById(`${prefix}-lora-count`);
+    if (countEl) countEl.textContent = q ? `${filtered.length} / ${all.length}` : `${all.length} 件`;
+}
+
+function exportHistory(format) {
+    const url = `/api/history/export?format=${format}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prompt_history.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
 
 function addLora(prefix) {
@@ -698,7 +734,7 @@ function setupHistoryPage() {
         else { toast('削除に失敗しました', 'error'); }
     });
     document.getElementById('export-history-btn').addEventListener('click', () => {
-        window.location.href = '/api/history/export';
+        exportHistory('json');
     });
 
     const debouncedLoad = () => {

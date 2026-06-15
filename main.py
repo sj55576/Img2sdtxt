@@ -1,12 +1,14 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Request
 from fastapi.concurrency import run_in_threadpool
 import base64
 import io
 import json
+import logging
 import os
 import re
 import tempfile
 import threading
+import time as _time
 import time
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +17,7 @@ from pathlib import Path
 from typing import List, Optional
 from PIL import Image
 
+import config
 from config import (
     API_HOST, API_PORT, DEBUG,
     HTTPS_ENABLED, SSL_CERTFILE, SSL_KEYFILE,
@@ -24,8 +27,17 @@ from config import (
 from llm_client import LLMClient
 from prompt_generator import PromptGenerator
 from sd_client import SDClient
+from cache import LLMCache
 import history as hist
 import presets as preset_mgr
+
+logging.basicConfig(
+    level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("img2sdtxt")
+APP_START_TIME = _time.time()
 
 app = FastAPI(
     title="Image to Stable Diffusion Prompt",
@@ -44,6 +56,17 @@ app.add_middleware(
 llm_client = LLMClient()
 prompt_generator = PromptGenerator(llm_client)
 sd_client = SDClient()
+llm_cache = LLMCache(ttl_seconds=config.LLM_CACHE_TTL, enabled=config.LLM_CACHE_ENABLED)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    t0 = _time.time()
+    response = await call_next(request)
+    elapsed = (_time.time() - t0) * 1000
+    logger.info("%s %s %d %.1fms", request.method, request.url.path, response.status_code, elapsed)
+    return response
+
 
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
@@ -106,11 +129,27 @@ async def root():
 # ------------------------------------------------------------------ #
 
 @app.get("/health")
-def health_check():
-    """LLM サーバーへの軽量な疎通確認（/v1/models GET のみ）"""
-    available = llm_client.is_available()
-    status = "healthy" if available else "degraded"
-    return {"status": status, "llm_server": "connected" if available else "unreachable", "message": "OK"}
+async def health():
+    """全コンポーネントの状態確認とアップタイムを返す"""
+    llm_ok = await run_in_threadpool(llm_client.is_available)
+    sd_ok = await run_in_threadpool(sd_client.is_available)
+
+    overall = "ok" if llm_ok else "degraded"
+
+    return {
+        "status": overall,
+        "components": {
+            "llm": {
+                "available": llm_ok,
+                "url": config.LLM_SERVER_URL,
+            },
+            "sd_api": {
+                "available": sd_ok,
+                "url": config.SD_API_URL,
+            },
+        },
+        "uptime_seconds": int(_time.time() - APP_START_TIME),
+    }
 
 
 @app.get("/api/config")
@@ -153,15 +192,25 @@ async def generate_prompts(
     suffix_pos = preset.get("positive_suffix", "") if preset else ""
     suffix_neg = preset.get("negative_suffix", "") if preset else ""
 
-    result = await run_in_threadpool(
-        prompt_generator.generate_prompts,
-        contents,
-        style=style or (preset.get("style", "") if preset else ""),
-        tone=tone or (preset.get("tone", "") if preset else ""),
-        quality=quality or (preset.get("quality", "high") if preset else "high"),
-        preset_suffix_positive=suffix_pos,
-        preset_suffix_negative=suffix_neg
-    )
+    eff_style = style or (preset.get("style", "") if preset else "")
+    eff_tone = tone or (preset.get("tone", "") if preset else "")
+    eff_quality = quality or (preset.get("quality", "high") if preset else "high")
+
+    cached = llm_cache.get(contents, None, eff_style, eff_tone, eff_quality)
+    if cached is not None:
+        result = cached
+    else:
+        result = await run_in_threadpool(
+            prompt_generator.generate_prompts,
+            contents,
+            style=eff_style,
+            tone=eff_tone,
+            quality=eff_quality,
+            preset_suffix_positive=suffix_pos,
+            preset_suffix_negative=suffix_neg
+        )
+        if result.get("status") == "success":
+            llm_cache.set(contents, None, eff_style, eff_tone, eff_quality, result)
 
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
@@ -266,14 +315,24 @@ def generate_prompts_text(request_data: dict):
     suffix_pos = preset.get("positive_suffix", "") if preset else ""
     suffix_neg = preset.get("negative_suffix", "") if preset else ""
 
-    result = prompt_generator.generate_prompts_text_only(
-        description,
-        style=style or (preset.get("style", "") if preset else ""),
-        tone=tone or (preset.get("tone", "") if preset else ""),
-        quality=quality or (preset.get("quality", "high") if preset else "high"),
-        preset_suffix_positive=suffix_pos,
-        preset_suffix_negative=suffix_neg
-    )
+    eff_style = style or (preset.get("style", "") if preset else "")
+    eff_tone = tone or (preset.get("tone", "") if preset else "")
+    eff_quality = quality or (preset.get("quality", "high") if preset else "high")
+
+    cached = llm_cache.get(None, description, eff_style, eff_tone, eff_quality)
+    if cached is not None:
+        result = cached
+    else:
+        result = prompt_generator.generate_prompts_text_only(
+            description,
+            style=eff_style,
+            tone=eff_tone,
+            quality=eff_quality,
+            preset_suffix_positive=suffix_pos,
+            preset_suffix_negative=suffix_neg
+        )
+        if result.get("status") == "success":
+            llm_cache.set(None, description, eff_style, eff_tone, eff_quality, result)
 
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
@@ -365,15 +424,32 @@ def get_history(
 
 
 @app.get("/api/history/export")
-def export_history():
-    """全履歴をJSONとしてダウンロード"""
-    from datetime import datetime as _dt
-    from fastapi.responses import JSONResponse
-    items = hist.get_history(limit=None)
-    return JSONResponse(
-        content={"exported_at": _dt.now().isoformat(), "items": items},
-        headers={"Content-Disposition": "attachment; filename=prompt_history.json"}
-    )
+async def export_history(format: str = "json"):
+    """全履歴をJSON/CSVとしてダウンロード"""
+    import csv
+    import io as _io
+    from fastapi.responses import Response
+
+    items = await run_in_threadpool(hist.get_history, limit=None, offset=0)
+
+    if format == "csv":
+        output = _io.StringIO()
+        if items:
+            fieldnames = list(items[0].keys())
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(items)
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=\"prompt_history.csv\""},
+        )
+    else:
+        return Response(
+            content=json.dumps(items, ensure_ascii=False, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": "attachment; filename=\"prompt_history.json\""},
+        )
 
 
 @app.put("/api/history/{item_id}/favorite")
@@ -396,6 +472,21 @@ def delete_history(item_id: int):
 def clear_history():
     count = hist.clear_all_history()
     return {"success": True, "deleted": count}
+
+
+# ------------------------------------------------------------------ #
+# Cache
+# ------------------------------------------------------------------ #
+
+@app.get("/api/cache/stats")
+async def cache_stats():
+    return llm_cache.stats()
+
+
+@app.delete("/api/cache")
+async def clear_cache():
+    count = llm_cache.clear()
+    return {"cleared": count}
 
 
 # ------------------------------------------------------------------ #

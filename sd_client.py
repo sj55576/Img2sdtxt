@@ -4,11 +4,14 @@ Stable Diffusion Web UI (AUTOMATIC1111) API クライアント
 import requests
 import base64
 import json
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List
 from PIL import Image
 from config import SD_API_URL, SD_OUTPUT_DIR
+
+logger = logging.getLogger("img2sdtxt.sd")
 
 
 class SDClient:
@@ -53,10 +56,10 @@ class SDClient:
                 timeout=30
             )
             response.raise_for_status()
-            print(f"✓ Model switched to: {model_name}")
+            logger.info("Model switched to: %s", model_name)
             return True
         except Exception as e:
-            print(f"Error switching model: {str(e)}")
+            logger.error("Error switching model: %s", str(e))
             return False
 
     def get_model_list(self) -> List[Dict]:
@@ -71,10 +74,10 @@ class SDClient:
             result = r.json()
             if isinstance(result, list):
                 return result
-            print(f"[get_loras] Unexpected response format: {type(result)}")
+            logger.warning("get_loras unexpected response format: %s", type(result))
             return []
         except Exception as e:
-            print(f"[get_loras] Failed to fetch LoRAs from {self.base_url}/sdapi/v1/loras: {e}")
+            logger.warning("get_loras failed to fetch LoRAs from %s/sdapi/v1/loras: %s", self.base_url, e)
             return []
 
     def get_progress(self) -> Optional[Dict]:
@@ -165,6 +168,7 @@ class SDClient:
             "hr_second_pass_steps": hr_second_pass_steps,
             "denoising_strength": hr_denoising_strength if enable_hr else 0.7
         }
+        logger.info("txt2img start url=%s width=%d height=%d steps=%d", self.base_url, width, height, steps)
         try:
             r = requests.post(
                 f"{self.base_url}/sdapi/v1/txt2img",
