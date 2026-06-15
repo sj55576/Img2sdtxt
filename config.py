@@ -26,6 +26,10 @@ SSL_KEYFILE = os.getenv("SSL_KEYFILE", "")
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp"]
 
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LLM_CACHE_ENABLED = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
+LLM_CACHE_TTL = int(os.getenv("LLM_CACHE_TTL", "3600"))
+
 # Prompt Customization Options
 STYLES = [
     "photorealistic", "anime", "painting", "watercolor",

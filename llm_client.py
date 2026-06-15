@@ -1,10 +1,15 @@
 import requests
 import json
 import base64
+import logging
+import time
 from io import BytesIO
 from PIL import Image
 from config import LLM_SERVER_URL, LLM_MODEL
 from typing import Optional, List, Dict, Any
+
+logger = logging.getLogger("img2sdtxt.llm")
+
 
 class LLMClient:
     def __init__(self, base_url: str = LLM_SERVER_URL, model: str = LLM_MODEL):
@@ -33,7 +38,7 @@ class LLMClient:
                 # WebP以外はそのまま返す
                 return image_bytes
         except Exception as e:
-            print(f"Warning: Image conversion failed ({str(e)}), using original image")
+            logger.warning("Image conversion failed (%s), using original image", str(e))
             return image_bytes
 
     def _encode_image_to_base64(self, image_bytes: bytes) -> str:
@@ -55,6 +60,8 @@ class LLMClient:
         LLMサーバーに対してプロンプトを送信し、レスポンスを取得
         LM Studio/Lemonade server 互換のOpenAI互換API
         """
+        logger.debug("generate_response url=%s model=%s", self.endpoint, self.model)
+        t0 = time.time()
         try:
             payload = {
                 "model": self.model,
@@ -76,14 +83,19 @@ class LLMClient:
 
             result = response.json()
             if result.get("choices") and len(result["choices"]) > 0:
+                elapsed = (time.time() - t0) * 1000
+                logger.info("LLM call succeeded model=%s %.0fms", self.model, elapsed)
                 return result["choices"][0]["message"]["content"]
 
             return None
         except requests.exceptions.ConnectionError:
+            logger.error("Cannot connect to LLM server at %s", self.base_url)
             raise ConnectionError(f"Cannot connect to LLM server at {self.base_url}")
         except requests.exceptions.Timeout:
+            logger.error("LLM server request timed out url=%s", self.endpoint)
             raise TimeoutError(f"LLM server request timed out")
         except Exception as e:
+            logger.error("LLM server error: %s", str(e))
             raise Exception(f"LLM server error: {str(e)}")
 
     def generate_response_with_image(self, prompt: str, image_bytes: bytes, max_tokens: int = 500) -> Optional[str]:
@@ -91,6 +103,8 @@ class LLMClient:
         画像を含めてLLMサーバーに対してプロンプトを送信し、レスポンスを取得
         LM Studio/Lemonade server 互換のOpenAI互換API (Vision Models対応)
         """
+        logger.debug("generate_response_with_image url=%s model=%s image_bytes=%d", self.endpoint, self.model, len(image_bytes))
+        t0 = time.time()
         try:
             image_base64 = self._encode_image_to_base64(image_bytes)
 
@@ -120,12 +134,17 @@ class LLMClient:
 
             result = response.json()
             if result.get("choices") and len(result["choices"]) > 0:
+                elapsed = (time.time() - t0) * 1000
+                logger.info("LLM vision call succeeded model=%s %.0fms", self.model, elapsed)
                 return result["choices"][0]["message"]["content"]
 
             return None
         except requests.exceptions.ConnectionError:
+            logger.error("Cannot connect to LLM server at %s", self.base_url)
             raise ConnectionError(f"Cannot connect to LLM server at {self.base_url}")
         except requests.exceptions.Timeout:
+            logger.error("LLM vision request timed out url=%s", self.endpoint)
             raise TimeoutError(f"LLM server request timed out (vision model analysis may take longer)")
         except Exception as e:
+            logger.error("LLM server error: %s", str(e))
             raise Exception(f"LLM server error: {str(e)}")

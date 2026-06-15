@@ -1,7 +1,10 @@
 import sqlite3
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
+
+logger = logging.getLogger("img2sdtxt.history")
 
 DB_PATH = Path(__file__).parent / "data" / "history.db"
 
@@ -38,6 +41,7 @@ def save_history(
     tone: str = "",
     quality: str = ""
 ) -> int:
+    logger.debug("save_history image_name=%s style=%s", image_name, style)
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.execute(
@@ -59,6 +63,7 @@ def get_history(
     quality: str = "",
     favorites_only: bool = False
 ) -> List[Dict]:
+    logger.debug("get_history limit=%s offset=%d search=%s", limit, offset, search)
     init_db()
     conditions = []
     params: List = []
