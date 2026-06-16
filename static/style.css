@@ -762,6 +762,51 @@ textarea { resize: vertical; }
     input[type="text"], input[type="number"], select, textarea { font-size: 16px; }
 }
 
+/* Gallery Nav Buttons */
+.gallery-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border: none;
+    font-size: 2.5rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    z-index: 10;
+    border-radius: 4px;
+    transition: background 0.2s;
+    line-height: 1;
+}
+.gallery-nav-btn:hover { background: rgba(0, 0, 0, 0.8); }
+.gallery-nav-prev { left: 0.5rem; }
+.gallery-nav-next { right: 0.5rem; }
+.gallery-modal-box { position: relative; }
+
+/* Token Counter */
+.token-counter {
+    display: block;
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 2px;
+    min-height: 1rem;
+}
+.token-counter.warning { color: #e6a817; }
+.token-counter.danger { color: #e64553; }
+
+/* Negative Prompt Template Selector */
+.neg-template-select {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #eee;
+    border: 1px solid #444;
+    cursor: pointer;
+    margin-top: 0.25rem;
+}
+.neg-template-select:hover { border-color: #666; }
+
 /* SD Progress Bar (FE-3) */
 .sd-progress-bar-wrap { width: 100%; background: var(--surface2); border-radius: 6px; overflow: hidden; margin-top: 8px; position: relative; height: 22px; }
 .sd-progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary-dark), var(--primary)); border-radius: 6px; transition: width 0.8s ease; width: 0%; }
