@@ -752,6 +752,7 @@ function setupHistoryPage() {
         this.classList.toggle('btn-secondary', active);
         loadHistory();
     });
+    document.getElementById('history-filter-tag').addEventListener('input', debouncedLoad);
 }
 
 async function loadHistory() {
@@ -766,12 +767,14 @@ async function loadHistory() {
     const style = document.getElementById('history-filter-style')?.value || '';
     const quality = document.getElementById('history-filter-quality')?.value || '';
     const favoritesOnly = document.getElementById('history-favorites-toggle')?.dataset.active === 'true';
+    const tagFilter = document.getElementById('history-filter-tag')?.value.trim() || '';
 
     const params = new URLSearchParams({ limit: 100 });
     if (search) params.set('search', search);
     if (style) params.set('style', style);
     if (quality) params.set('quality', quality);
     if (favoritesOnly) params.set('favorites_only', 'true');
+    if (tagFilter) params.set('tag', tagFilter);
 
     try {
         const r = await fetch('/api/history?' + params.toString());
@@ -807,6 +810,10 @@ async function loadHistory() {
                 <div class="history-prompt">
                     <div class="label">Negative</div>
                     ${escHtml(item.negative)}
+                </div>
+                <div class="history-tags">
+                    ${(item.tags || []).map(t => `<span class="history-tag" onclick="removeTagFromHistory(${item.id}, '${escHtml(t)}')" title="クリックで削除">${escHtml(t)}</span>`).join('')}
+                    <button class="btn-add-tag" onclick="showAddTagInput(${item.id})" title="タグを追加">+ タグ</button>
                 </div>
             </div>
         `).join('');
@@ -865,6 +872,56 @@ function sendHistoryToSD(id) {
     document.getElementById('sd-negative').value = item.negative || '';
     document.querySelector('[data-page="sd"]').click();
     toast('SDページに送りました', 'info');
+}
+
+async function addTagToHistory(historyId, tagInput) {
+    const tags = tagInput.value.trim().split(',').map(t => t.trim()).filter(Boolean);
+    if (!tags.length) return;
+    try {
+        const r = await fetch(`/api/history/${historyId}/tags`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags })
+        });
+        if (!r.ok) throw new Error();
+        loadHistory();
+        toast('タグを追加しました', 'success');
+    } catch {
+        toast('タグの追加に失敗しました', 'error');
+    }
+}
+
+async function removeTagFromHistory(id, tag) {
+    try {
+        const r = await fetch(`/api/history/${id}/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' });
+        if (!r.ok) throw new Error();
+        loadHistory();
+        toast('タグを削除しました', 'success');
+    } catch {
+        toast('タグの削除に失敗しました', 'error');
+    }
+}
+
+function showAddTagInput(historyId) {
+    const existing = document.getElementById(`tag-input-${historyId}`);
+    if (existing) { existing.focus(); return; }
+    const container = document.querySelector(`#hist-${historyId} .history-tags`);
+    if (!container) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = `tag-input-${historyId}`;
+    input.className = 'tag-input-inline';
+    input.placeholder = 'タグ入力 (カンマ区切り)';
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { addTagToHistory(historyId, input); }
+        if (e.key === 'Escape') { input.remove(); }
+    });
+    input.addEventListener('blur', () => {
+        if (input.value.trim()) addTagToHistory(historyId, input);
+        else input.remove();
+    });
+    container.insertBefore(input, container.querySelector('.btn-add-tag'));
+    input.focus();
 }
 
 async function deleteHistoryItem(id) {

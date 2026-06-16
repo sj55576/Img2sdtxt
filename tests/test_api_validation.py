@@ -172,3 +172,50 @@ def test_health_shape(client):
     assert "sd_api" in data["components"]
     # モックが False を返すので degraded
     assert data["status"] == "degraded"
+
+
+# ------------------------------------------------------------------ #
+# Tags API
+# ------------------------------------------------------------------ #
+
+def test_add_tags_to_history(client):
+    """POST /api/history/{id}/tags adds tags"""
+    # First create a history entry via text generation
+    response = client.post("/api/generate-prompts-text", json={"description": "test"})
+    assert response.status_code == 200
+    # Get the history to find the ID
+    hist_r = client.get("/api/history", params={"limit": 1})
+    items = hist_r.json()["items"]
+    if not items:
+        pytest.skip("No history items available")
+    item_id = items[0]["id"]
+    # Add tags
+    r = client.post(f"/api/history/{item_id}/tags", json={"tags": ["portrait", "test"]})
+    assert r.status_code == 200
+    assert "tags" in r.json()
+
+
+def test_add_tags_empty_list_returns_400(client):
+    """POST /api/history/{id}/tags with empty tags returns 400"""
+    r = client.post("/api/history/1/tags", json={"tags": []})
+    assert r.status_code == 400
+
+
+def test_add_tags_not_found_returns_404(client):
+    """POST /api/history/{id}/tags with non-existent ID returns 404"""
+    r = client.post("/api/history/99999/tags", json={"tags": ["test"]})
+    assert r.status_code == 404
+
+
+def test_list_all_tags(client):
+    """GET /api/tags returns tag list"""
+    r = client.get("/api/tags")
+    assert r.status_code == 200
+    assert "tags" in r.json()
+
+
+def test_history_with_tag_filter(client):
+    """GET /api/history with tag filter"""
+    r = client.get("/api/history", params={"tag": "nonexistent_tag_xyz"})
+    assert r.status_code == 200
+    assert r.json()["items"] == []

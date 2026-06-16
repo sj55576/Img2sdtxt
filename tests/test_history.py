@@ -148,3 +148,87 @@ def test_get_history_count():
     assert total == 2
     filtered = hist.get_history_count(style="anime")
     assert filtered == 1
+
+
+# ------------------------------------------------------------------ #
+# Tags
+# ------------------------------------------------------------------ #
+
+def test_add_tags():
+    rowid = hist.save_history(positive="tagged", negative="n")
+    tags = hist.add_tags(rowid, ["portrait", "anime"])
+    assert sorted(tags) == ["anime", "portrait"]
+
+
+def test_add_tags_normalized():
+    """Tags are lowercased and stripped"""
+    rowid = hist.save_history(positive="tagged", negative="n")
+    tags = hist.add_tags(rowid, ["  Portrait  ", "ANIME"])
+    assert sorted(tags) == ["anime", "portrait"]
+
+
+def test_add_duplicate_tags():
+    """Adding duplicate tags is idempotent"""
+    rowid = hist.save_history(positive="tagged", negative="n")
+    hist.add_tags(rowid, ["portrait"])
+    tags = hist.add_tags(rowid, ["portrait", "anime"])
+    assert sorted(tags) == ["anime", "portrait"]
+
+
+def test_remove_tag():
+    rowid = hist.save_history(positive="tagged", negative="n")
+    hist.add_tags(rowid, ["portrait", "anime"])
+    remaining = hist.remove_tag(rowid, "portrait")
+    assert remaining == ["anime"]
+
+
+def test_get_tags_empty():
+    rowid = hist.save_history(positive="no tags", negative="n")
+    assert hist.get_tags(rowid) == []
+
+
+def test_get_all_tags():
+    r1 = hist.save_history(positive="p1", negative="n")
+    r2 = hist.save_history(positive="p2", negative="n")
+    hist.add_tags(r1, ["portrait", "anime"])
+    hist.add_tags(r2, ["portrait"])
+    all_tags = hist.get_all_tags()
+    assert len(all_tags) == 2
+    assert all_tags[0]["tag"] == "portrait"
+    assert all_tags[0]["count"] == 2
+    assert all_tags[1]["tag"] == "anime"
+    assert all_tags[1]["count"] == 1
+
+
+def test_history_filter_by_tag():
+    r1 = hist.save_history(positive="p1", negative="n")
+    r2 = hist.save_history(positive="p2", negative="n")
+    hist.add_tags(r1, ["portrait"])
+    items = hist.get_history(tag="portrait")
+    assert len(items) == 1
+    assert items[0]["positive"] == "p1"
+
+
+def test_history_count_with_tag():
+    r1 = hist.save_history(positive="p1", negative="n")
+    r2 = hist.save_history(positive="p2", negative="n")
+    hist.add_tags(r1, ["portrait"])
+    assert hist.get_history_count(tag="portrait") == 1
+    assert hist.get_history_count() == 2
+
+
+def test_history_items_include_tags():
+    """get_history returns items with 'tags' key"""
+    rowid = hist.save_history(positive="with tags", negative="n")
+    hist.add_tags(rowid, ["landscape", "hdr"])
+    items = hist.get_history()
+    assert "tags" in items[0]
+    assert sorted(items[0]["tags"]) == ["hdr", "landscape"]
+
+
+def test_delete_history_cascades_tags():
+    """Deleting a history item should cascade-delete its tags"""
+    rowid = hist.save_history(positive="to delete", negative="n")
+    hist.add_tags(rowid, ["portrait"])
+    hist.delete_history_item(rowid)
+    assert hist.get_tags(rowid) == []

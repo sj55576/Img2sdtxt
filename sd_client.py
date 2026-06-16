@@ -9,7 +9,9 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, List
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 from config import SD_API_URL, SD_OUTPUT_DIR
+from retry import retry_with_backoff
 
 logger = logging.getLogger("img2sdtxt.sd")
 
@@ -20,6 +22,7 @@ class SDClient:
         # 出力ディレクトリを自動作成
         SD_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    @retry_with_backoff(max_retries=1, base_delay=0.5)
     def is_available(self) -> bool:
         try:
             r = requests.get(f"{self.base_url}/sdapi/v1/sd-models", timeout=5)
@@ -27,6 +30,7 @@ class SDClient:
         except Exception:
             return False
 
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
     def get_models(self) -> List[Dict]:
         try:
             r = requests.get(f"{self.base_url}/sdapi/v1/sd-models", timeout=10)
@@ -66,6 +70,7 @@ class SDClient:
         """利用可能なモデル一覧を取得（get_models に委譲）"""
         return self.get_models()
 
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
     def get_loras(self) -> List[Dict]:
         """利用可能なLoRA一覧を取得"""
         try:
@@ -93,6 +98,7 @@ class SDClient:
         except Exception:
             return None
 
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
     def get_upscalers(self) -> List[str]:
         try:
             r = requests.get(f"{self.base_url}/sdapi/v1/upscalers", timeout=10)
@@ -104,6 +110,7 @@ class SDClient:
                     "ESRGAN_4x", "LDSR", "R-ESRGAN 4x+", "R-ESRGAN 4x+ Anime6B",
                     "ScuNET GAN", "ScuNET PSNR", "SwinIR 4x"]
 
+    @retry_with_backoff(max_retries=2, base_delay=2.0)
     def txt2img(
         self,
         positive: str,
@@ -185,6 +192,7 @@ class SDClient:
         except Exception as e:
             raise Exception(f"SD API error: {str(e)}")
 
+    @retry_with_backoff(max_retries=2, base_delay=2.0)
     def img2img(
         self,
         init_image: str,
@@ -268,6 +276,7 @@ class SDClient:
         except Exception as e:
             raise Exception(f"SD API error: {str(e)}")
 
+    @retry_with_backoff(max_retries=2, base_delay=2.0)
     def inpaint(
         self,
         init_image: str,
@@ -347,6 +356,7 @@ class SDClient:
         except Exception as e:
             raise Exception(f"SD API error: {str(e)}")
 
+    @retry_with_backoff(max_retries=2, base_delay=1.0)
     def get_samplers(self) -> List[str]:
         try:
             r = requests.get(f"{self.base_url}/sdapi/v1/samplers", timeout=10)
@@ -402,6 +412,25 @@ class SDClient:
                 with open(filepath, "wb") as f:
                     f.write(image_bytes)
 
+                # PNG tEXt チャンクにA1111互換メタデータを埋め込む
+                try:
+                    png_meta = PngInfo()
+                    params_text = positive
+                    if negative:
+                        params_text += f"\nNegative prompt: {negative}"
+                    params_text += f"\nSteps: {steps}, Sampler: {sampler}, CFG scale: {cfg_scale}, Seed: {seed}, Size: {width}x{height}"
+                    if model:
+                        params_text += f", Model: {model}"
+                    if loras:
+                        params_text += f", LoRA: {loras}"
+                    if mode in ("img2img", "inpaint"):
+                        params_text += f", Denoising strength: {denoising_strength}"
+                    png_meta.add_text("parameters", params_text)
+                    with Image.open(filepath) as img:
+                        img.save(filepath, "PNG", pnginfo=png_meta)
+                except Exception as e:
+                    print(f"Warning: PNG metadata embedding failed for {filename}: {e}")
+
                 # サムネイル生成 (200px JPEG、.jpg 拡張子)
                 try:
                     thumbs_dir = date_dir / "thumbs"
@@ -456,3 +485,85 @@ class SDClient:
         except Exception as e:
             print(f"Error saving images: {str(e)}")
             return []
+
+    def read_png_metadata(self, filepath: str) -> Optional[Dict]:
+        """
+        PNGファイルのtEXtチャンクからA1111形式のパラメータを読み込み、辞書に変換して返す。
+        パラメータが存在しない場合はNoneを返す。
+        """
+        try:
+            with Image.open(filepath) as img:
+                info = img.info
+            raw = info.get("parameters")
+            if not raw:
+                return None
+
+            result: Dict = {}
+            lines = raw.split("\n")
+
+            positive_lines = []
+            negative_lines = []
+            settings_line = ""
+            in_negative = False
+
+            for line in lines:
+                if line.startswith("Negative prompt:"):
+                    in_negative = True
+                    negative_lines.append(line[len("Negative prompt:"):].strip())
+                elif in_negative and not line.startswith("Steps:"):
+                    negative_lines.append(line)
+                elif line.startswith("Steps:"):
+                    settings_line = line
+                    in_negative = False
+                elif not in_negative:
+                    positive_lines.append(line)
+
+            result["positive_prompt"] = "\n".join(positive_lines).strip()
+            if negative_lines:
+                result["negative_prompt"] = "\n".join(negative_lines).strip()
+
+            if settings_line:
+                for part in settings_line.split(","):
+                    part = part.strip()
+                    if ": " in part:
+                        key, _, value = part.partition(": ")
+                        key = key.strip()
+                        value = value.strip()
+                        mapping = {
+                            "Steps": "steps",
+                            "Sampler": "sampler",
+                            "CFG scale": "cfg_scale",
+                            "Seed": "seed",
+                            "Size": "size",
+                            "Model": "model",
+                            "LoRA": "loras",
+                            "Denoising strength": "denoising_strength",
+                        }
+                        if key in mapping:
+                            out_key = mapping[key]
+                            if out_key in ("steps", "seed"):
+                                try:
+                                    value = int(value)
+                                except ValueError:
+                                    pass
+                            elif out_key in ("cfg_scale", "denoising_strength"):
+                                try:
+                                    value = float(value)
+                                except ValueError:
+                                    pass
+                            elif out_key == "size":
+                                if "x" in value:
+                                    w, _, h = value.partition("x")
+                                    try:
+                                        result["width"] = int(w)
+                                        result["height"] = int(h)
+                                    except ValueError:
+                                        pass
+                                continue
+                            result[out_key] = value
+
+            result["raw"] = raw
+            return result
+        except Exception as e:
+            print(f"Warning: could not read PNG metadata from {filepath}: {e}")
+            return None
