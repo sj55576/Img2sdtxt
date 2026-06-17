@@ -9,6 +9,57 @@ let inpaintSelectedImage = null;
 let _galleryCache = {};   // key: "mode|date|offset" → API response
 let _galleryOffset = 0;   // 現在の Load More オフセット
 
+// Gallery modal navigation
+let _galleryImages = [];
+let _galleryCurrentIndex = -1;
+
+// Negative prompt templates
+const NEGATIVE_TEMPLATES = {
+    'general': { label: '🎯 汎用', text: 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry' },
+    'portrait': { label: '👤 人物', text: 'deformed iris, deformed pupils, bad eyes, cross-eyed, poorly drawn face, cloned face, extra fingers, mutated hands, fused fingers, too many fingers, extra arms, extra legs, malformed limbs, missing arms, missing legs, poorly drawn hands, bad proportions, ugly, duplicate, morbid, mutilated' },
+    'anime': { label: '🎨 アニメ', text: 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name, bad-artist, bad_prompt' },
+    'landscape': { label: '🏔️ 風景', text: 'lowres, text, error, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, blurry, bad photo, bad photography, watermark, signature, username, logo' },
+    'realistic': { label: '📷 リアル', text: 'illustration, painting, drawing, art, sketch, anime, cartoon, 3d render, lowres, text, error, cropped, worst quality, low quality, jpeg artifacts, ugly, duplicate, blurry, deformed, disfigured, mutation, extra limbs' }
+};
+
+function populateNegTemplates(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">📝 テンプレート挿入...</option>';
+    for (const [key, tmpl] of Object.entries(NEGATIVE_TEMPLATES)) {
+        sel.innerHTML += `<option value="${key}">${tmpl.label}</option>`;
+    }
+}
+
+function applyNegTemplate(selectId, textareaId, tokenCounterId) {
+    const sel = document.getElementById(selectId);
+    const textarea = document.getElementById(textareaId);
+    if (!sel || !textarea || !sel.value) return;
+    const tmpl = NEGATIVE_TEMPLATES[sel.value];
+    if (!tmpl) return;
+    textarea.value = textarea.value ? textarea.value + ', ' + tmpl.text : tmpl.text;
+    sel.value = '';
+    if (tokenCounterId) updateTokenCounter(textareaId, tokenCounterId);
+    toast('テンプレートを挿入しました', 'success');
+}
+
+function estimateTokens(text) {
+    if (!text.trim()) return 0;
+    const words = text.replace(/[,()[\]{}:]/g, ' $& ').split(/\s+/).filter(Boolean);
+    return words.length;
+}
+
+function updateTokenCounter(textareaId, counterId) {
+    const textarea = document.getElementById(textareaId);
+    const counter = document.getElementById(counterId);
+    if (!textarea || !counter) return;
+    const count = estimateTokens(textarea.value);
+    counter.textContent = count > 0 ? `~${count} tokens` : '';
+    counter.classList.remove('warning', 'danger');
+    if (count > 150) counter.classList.add('danger');
+    else if (count > 75) counter.classList.add('warning');
+}
+
 // モデル選択の永続化（タブ切り替えでリセットされないよう変数で保持）
 const _selectedModel = { sd: '', img2img: '', inpaint: '' };
 // モデルリストの初回ロード済みフラグ（タブ切り替え時の再構築を防ぐ）
@@ -446,6 +497,8 @@ async function generatePrompt() {
 
         document.getElementById('pos-prompt').value = data.positive;
         document.getElementById('neg-prompt').value = data.negative;
+        updateTokenCounter('pos-prompt', 'positive-output-tokens');
+        updateTokenCounter('neg-prompt', 'negative-output-tokens');
         resultBox.classList.remove('hidden');
         toast('プロンプト生成完了！', 'success');
     } catch (e) {
@@ -1064,6 +1117,14 @@ function setupSDPage() {
     });
     document.getElementById('sd-multi-generate-btn').addEventListener('click', runMultiModelGenerate);
 
+    // Token counters
+    document.getElementById('sd-positive')?.addEventListener('input', () => updateTokenCounter('sd-positive', 'sd-positive-tokens'));
+    document.getElementById('sd-negative')?.addEventListener('input', () => updateTokenCounter('sd-negative', 'sd-negative-tokens'));
+
+    // Negative prompt templates
+    populateNegTemplates('sd-neg-template');
+    document.getElementById('sd-neg-template')?.addEventListener('change', () => applyNegTemplate('sd-neg-template', 'sd-negative', 'sd-negative-tokens'));
+
     // Restore last used parameters after status check populates selectors
     checkSDStatus().then(() => loadLastParams('sd'));
 }
@@ -1378,6 +1439,14 @@ function setupImg2ImgPage() {
         });
     }
 
+    // Token counters
+    document.getElementById('i2i-positive')?.addEventListener('input', () => updateTokenCounter('i2i-positive', 'img2img-positive-tokens'));
+    document.getElementById('i2i-negative')?.addEventListener('input', () => updateTokenCounter('i2i-negative', 'img2img-negative-tokens'));
+
+    // Negative prompt templates
+    populateNegTemplates('img2img-neg-template');
+    document.getElementById('img2img-neg-template')?.addEventListener('change', () => applyNegTemplate('img2img-neg-template', 'i2i-negative', 'img2img-negative-tokens'));
+
     // Restore last used parameters after status check populates selectors
     checkImg2ImgStatus().then(() => loadLastParams('img2img'));
 }
@@ -1661,6 +1730,14 @@ function setupInpaintPage() {
     maskCanvas.addEventListener('touchstart', e => { e.preventDefault(); _inpaint.drawing = true; paintMask(e.touches[0]); }, { passive: false });
     maskCanvas.addEventListener('touchmove', e => { e.preventDefault(); if (_inpaint.drawing) paintMask(e.touches[0]); }, { passive: false });
     maskCanvas.addEventListener('touchend', () => { _inpaint.drawing = false; });
+
+    // Token counters
+    document.getElementById('inpaint-positive')?.addEventListener('input', () => updateTokenCounter('inpaint-positive', 'inpaint-positive-tokens'));
+    document.getElementById('inpaint-negative')?.addEventListener('input', () => updateTokenCounter('inpaint-negative', 'inpaint-negative-tokens'));
+
+    // Negative prompt templates
+    populateNegTemplates('inpaint-neg-template');
+    document.getElementById('inpaint-neg-template')?.addEventListener('change', () => applyNegTemplate('inpaint-neg-template', 'inpaint-negative', 'inpaint-negative-tokens'));
 
     // Restore last used parameters after status check populates selectors
     checkInpaintStatus().then(() => loadLastParams('inpaint'));
@@ -2086,20 +2163,45 @@ function startSDProgress(containerEl) {
     wrap.classList.remove('hidden');
     fill.style.width = '0%';
     text.textContent = '';
-    const timer = setInterval(async () => {
-        try {
-            const r = await fetch('/api/sd/progress');
-            if (!r.ok) return;
-            const d = await r.json();
-            if (!d.available) return;
-            const pct = Math.round((d.progress || 0) * 100);
-            fill.style.width = pct + '%';
-            const eta = d.eta_relative != null ? ` (ETA: ${Math.ceil(d.eta_relative)}s)` : '';
-            text.textContent = `${pct}%${eta}`;
-        } catch {}
-    }, 1000);
+
+    let stopped = false;
+
+    function applyProgress(d) {
+        if (!d || !d.available) return;
+        const pct = Math.round((d.progress || 0) * 100);
+        fill.style.width = pct + '%';
+        const eta = d.eta_relative != null ? ` (ETA: ${Math.ceil(d.eta_relative)}s)` : '';
+        text.textContent = `${pct}%${eta}`;
+    }
+
+    let ws = null;
+    let timer = null;
+
+    function startPollingFallback() {
+        if (stopped || timer) return;
+        timer = setInterval(async () => {
+            try {
+                const r = await fetch('/api/sd/progress');
+                if (!r.ok) return;
+                applyProgress(await r.json());
+            } catch {}
+        }, 1000);
+    }
+
+    try {
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${protocol}//${location.host}/api/sd/progress/ws`);
+        ws.onmessage = (e) => { try { applyProgress(JSON.parse(e.data)); } catch {} };
+        ws.onerror = () => { ws.close(); startPollingFallback(); };
+        ws.onclose = () => { if (!stopped) startPollingFallback(); };
+    } catch {
+        startPollingFallback();
+    }
+
     return () => {
-        clearInterval(timer);
+        stopped = true;
+        if (ws && ws.readyState <= WebSocket.OPEN) ws.close();
+        if (timer) clearInterval(timer);
         wrap.classList.add('hidden');
         fill.style.width = '0%';
         text.textContent = '';
@@ -2246,6 +2348,15 @@ function setupGalleryPage() {
     document.getElementById('gallery-modal').addEventListener('click', e => {
         if (e.target === document.getElementById('gallery-modal')) closeGalleryModal();
     });
+    document.getElementById('gallery-modal-prev').addEventListener('click', (e) => { e.stopPropagation(); galleryNavigate(-1); });
+    document.getElementById('gallery-modal-next').addEventListener('click', (e) => { e.stopPropagation(); galleryNavigate(1); });
+    document.addEventListener('keydown', e => {
+        const modal = document.getElementById('gallery-modal');
+        if (modal.classList.contains('hidden')) return;
+        if (e.key === 'ArrowLeft') { e.preventDefault(); galleryNavigate(-1); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); galleryNavigate(1); }
+        else if (e.key === 'Escape') { e.preventDefault(); closeGalleryModal(); }
+    });
 }
 
 async function loadGallery(offset = 0, forceRefresh = false) {
@@ -2318,6 +2429,8 @@ async function loadGallery(offset = 0, forceRefresh = false) {
                 </div>`;
             fragment.appendChild(div);
         });
+        if (offset === 0) _galleryImages = d.images || [];
+        else _galleryImages = _galleryImages.concat(d.images || []);
         grid.appendChild(fragment);
 
         // Load More ボタンの表示制御
@@ -2349,6 +2462,13 @@ function openGalleryModal(imgJsonStr) {
     modalTitle.textContent = img.filename;
     modalDownload.href = img.url;
     modalDownload.download = img.filename;
+
+    // Update navigation index
+    _galleryCurrentIndex = _galleryImages.findIndex(i => i.filename === img.filename);
+    const prevBtn = document.getElementById('gallery-modal-prev');
+    const nextBtn = document.getElementById('gallery-modal-next');
+    if (prevBtn) prevBtn.style.display = _galleryCurrentIndex > 0 ? '' : 'none';
+    if (nextBtn) nextBtn.style.display = _galleryCurrentIndex < _galleryImages.length - 1 ? '' : 'none';
 
     const p = img.parameters || {};
     const rows = [
@@ -2391,7 +2511,48 @@ function openGalleryModal(imgJsonStr) {
         };
     }
 
+    const sendBtn = document.getElementById('gallery-modal-send-sd');
+    if (sendBtn) {
+        sendBtn.onclick = () => {
+            const params = img.parameters || {};
+            // Navigate to SD page
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelector('.nav-btn[data-page="sd"]').classList.add('active');
+            document.getElementById('page-sd').classList.add('active');
+            // Fill parameters
+            const sdPos = document.getElementById('sd-positive');
+            const sdNeg = document.getElementById('sd-negative');
+            if (sdPos) sdPos.value = params.positive_prompt || '';
+            if (sdNeg) sdNeg.value = params.negative_prompt || '';
+            const fields = {
+                'sd-steps': params.steps,
+                'sd-cfg': params.cfg_scale,
+                'sd-seed': params.seed,
+                'sd-width': params.width,
+                'sd-height': params.height,
+            };
+            for (const [id, val] of Object.entries(fields)) {
+                const el = document.getElementById(id);
+                if (el && val != null) el.value = val;
+            }
+            if (params.sampler) {
+                const samplerEl = document.getElementById('sd-sampler');
+                if (samplerEl) samplerEl.value = params.sampler;
+            }
+            closeGalleryModal();
+            checkSDStatus();
+            toast('パラメータをSD生成に送りました', 'success');
+        };
+    }
+
     modal.classList.remove('hidden');
+}
+
+function galleryNavigate(direction) {
+    const newIndex = _galleryCurrentIndex + direction;
+    if (newIndex < 0 || newIndex >= _galleryImages.length) return;
+    openGalleryModal(JSON.stringify(_galleryImages[newIndex]));
 }
 
 function closeGalleryModal() {

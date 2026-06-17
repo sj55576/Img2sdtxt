@@ -172,6 +172,7 @@
                                     <button class="copy-btn" data-target="pos-prompt">Copy</button>
                                 </div>
                                 <textarea id="pos-prompt" class="prompt-ta"></textarea>
+                                <span class="token-counter" id="positive-output-tokens"></span>
                             </div>
                             <div class="prompt-card negative">
                                 <div class="prompt-card-header">
@@ -179,6 +180,7 @@
                                     <button class="copy-btn" data-target="neg-prompt">Copy</button>
                                 </div>
                                 <textarea id="neg-prompt" class="prompt-ta"></textarea>
+                                <span class="token-counter" id="negative-output-tokens"></span>
                             </div>
                             <div class="result-actions">
                                 <button id="copy-all-btn" class="btn btn-secondary">📋 全コピー</button>
@@ -501,10 +503,13 @@
                         <div class="form-group">
                             <label>Positive Prompt</label>
                             <textarea id="sd-positive" rows="4" placeholder="ポジティブプロンプト..."></textarea>
+                            <span class="token-counter" id="sd-positive-tokens"></span>
                         </div>
                         <div class="form-group">
                             <label>Negative Prompt</label>
                             <textarea id="sd-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                            <span class="token-counter" id="sd-negative-tokens"></span>
+                            <select id="sd-neg-template" class="neg-template-select"></select>
                         </div>
                         <div class="form-grid">
                             <div class="form-group">
@@ -676,10 +681,13 @@
                         <div class="form-group">
                             <label>Positive Prompt</label>
                             <textarea id="i2i-positive" rows="4" placeholder="ポジティブプロンプト..."></textarea>
+                            <span class="token-counter" id="img2img-positive-tokens"></span>
                         </div>
                         <div class="form-group" style="margin-top:10px;">
                             <label>Negative Prompt</label>
                             <textarea id="i2i-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                            <span class="token-counter" id="img2img-negative-tokens"></span>
+                            <select id="img2img-neg-template" class="neg-template-select"></select>
                         </div>
 
                         <!-- Model & LoRA -->
@@ -883,10 +891,13 @@
                         <div class="form-group">
                             <label>Positive Prompt</label>
                             <textarea id="inpaint-positive" rows="4" placeholder="描き直す領域に生成したい内容..."></textarea>
+                            <span class="token-counter" id="inpaint-positive-tokens"></span>
                         </div>
                         <div class="form-group" style="margin-top:10px;">
                             <label>Negative Prompt</label>
                             <textarea id="inpaint-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                            <span class="token-counter" id="inpaint-negative-tokens"></span>
+                            <select id="inpaint-neg-template" class="neg-template-select"></select>
                         </div>
 
                         <!-- Model & LoRA -->
@@ -1047,6 +1058,8 @@
             <!-- Gallery Image Modal -->
             <div id="gallery-modal" class="modal hidden">
                 <div class="modal-box gallery-modal-box">
+                    <button id="gallery-modal-prev" class="gallery-nav-btn gallery-nav-prev" title="前の画像">&#8249;</button>
+                    <button id="gallery-modal-next" class="gallery-nav-btn gallery-nav-next" title="次の画像">&#8250;</button>
                     <div class="gallery-modal-header">
                         <h3 id="gallery-modal-title">画像詳細</h3>
                         <button id="gallery-modal-close" class="btn btn-sm btn-ghost">✕ 閉じる</button>
@@ -1060,6 +1073,7 @@
                             <div class="gallery-modal-actions">
                                 <a id="gallery-modal-download" href="" download class="btn btn-primary">⬇ ダウンロード</a>
                                 <button id="gallery-modal-copy-btn" class="btn btn-secondary">📋 プロンプトコピー</button>
+                                <button id="gallery-modal-send-sd" class="btn btn-secondary">🖼️ SDへ送る</button>
                             </div>
                         </div>
                     </div>
