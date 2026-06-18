@@ -75,10 +75,62 @@ let _multiModelRunning = false;
 const _historyItems = new Map();
 
 /* =====================================================================
+   Theme Management
+   ===================================================================== */
+(function initThemeEarly() {
+    // Apply theme before first paint to avoid flash
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefersDark ? 'dark' : 'light');
+    if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+})();
+
+function applyTheme(theme) {
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) {
+        btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+        btn.title = theme === 'dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え';
+    }
+}
+
+function setupThemeToggle() {
+    // Determine initial theme: localStorage → system preference → light
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    let currentTheme = saved || (prefersDark ? 'dark' : 'light');
+    applyTheme(currentTheme);
+
+    // Listen for system preference changes (only when no user override)
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+        if (!localStorage.getItem('theme')) {
+            currentTheme = e.matches ? 'dark' : 'light';
+            applyTheme(currentTheme);
+        }
+    });
+
+    // Toggle button handler
+    const btn = document.getElementById('theme-toggle-btn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            currentTheme = isDark ? 'light' : 'dark';
+            localStorage.setItem('theme', currentTheme);
+            applyTheme(currentTheme);
+        });
+    }
+}
+
+/* =====================================================================
    Init
    ===================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
     const _setup = (name, fn) => { try { fn(); } catch(e) { console.error(`[SETUP] ${name} failed:`, e); } };
+    _setup('theme', setupThemeToggle);
     _setup('navigation', setupNavigation);
     _setup('generate', setupGeneratePage);
     _setup('batch', setupBatchPage);
@@ -89,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _setup('img2img', setupImg2ImgPage);
     _setup('inpaint', setupInpaintPage);
     _setup('gallery', setupGalleryPage);
+    _setup('weightEditors', setupWeightEditors);
     checkStatus();
 
     // Initialize SD and Img2Img selectors early for parameter restoration
@@ -1645,6 +1698,13 @@ async function runImg2Img() {
 
         results.classList.remove('hidden');
         toast(`${d.count}枚の画像を生成しました`, 'success');
+
+        // Show comparison slider for first generated image
+        if (d.images && d.images.length > 0) {
+            const beforeSrc = document.getElementById('i2i-preview-image').src;
+            const afterSrc = `data:image/png;base64,${d.images[0]}`;
+            showImageComparison(beforeSrc, afterSrc);
+        }
     } catch (e) {
         toast(e.message || '生成に失敗しました', 'error');
     } finally {
@@ -1652,6 +1712,76 @@ async function runImg2Img() {
         loading.classList.add('hidden');
         btn.disabled = false;
     }
+}
+
+/* =====================================================================
+   Image Compare Slider (FE3-3)
+   ===================================================================== */
+(function initImageCompare() {
+    let _dragging = false;
+
+    function setComparePosition(container, pct) {
+        const after = container.querySelector('.compare-after');
+        const divider = container.querySelector('.compare-divider');
+        after.style.clipPath = `inset(0 0 0 ${pct}%)`;
+        divider.style.left = `${pct}%`;
+    }
+
+    function getEventPct(container, e) {
+        const rect = container.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const pct = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+        return pct;
+    }
+
+    function onStart(e) {
+        _dragging = true;
+        e.preventDefault();
+        const container = document.getElementById('img2img-compare');
+        if (container) setComparePosition(container, getEventPct(container, e));
+    }
+
+    function onMove(e) {
+        if (!_dragging) return;
+        const container = document.getElementById('img2img-compare');
+        if (container && !container.classList.contains('hidden')) {
+            setComparePosition(container, getEventPct(container, e));
+        }
+    }
+
+    function onEnd() {
+        _dragging = false;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById('img2img-compare');
+        if (!container) return;
+
+        container.addEventListener('mousedown', onStart);
+        container.addEventListener('touchstart', onStart, { passive: false });
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchend', onEnd);
+    });
+})();
+
+function showImageComparison(beforeSrc, afterSrc) {
+    const container = document.getElementById('img2img-compare');
+    if (!container) return;
+
+    const beforeImg = container.querySelector('.compare-before');
+    const afterImg = container.querySelector('.compare-after');
+    const divider = container.querySelector('.compare-divider');
+
+    beforeImg.src = beforeSrc;
+    afterImg.src = afterSrc;
+
+    // Reset to 50%
+    afterImg.style.clipPath = 'inset(0 0 0 50%)';
+    divider.style.left = '50%';
+
+    container.classList.remove('hidden');
 }
 
 /* =====================================================================
@@ -2558,4 +2688,20 @@ function galleryNavigate(direction) {
 function closeGalleryModal() {
     document.getElementById('gallery-modal').classList.add('hidden');
     document.getElementById('gallery-modal-image').src = '';
+}
+
+// ------------------------------------------------------------------ //
+// Weight Editors
+// ------------------------------------------------------------------ //
+function setupWeightEditors() {
+    if (typeof WeightEditor === 'undefined') return;
+    const targets = [
+        'sd-positive', 'sd-negative',
+        'i2i-positive', 'i2i-negative',
+        'refine-positive-input', 'refine-negative-input',
+    ];
+    for (const id of targets) {
+        const ta = document.getElementById(id);
+        if (ta) WeightEditor.create(ta, { containerId: `we-${id}` });
+    }
 }

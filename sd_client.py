@@ -98,6 +98,45 @@ class SDClient:
         except Exception:
             return None
 
+    @retry_with_backoff(max_retries=1, base_delay=0.5)
+    def get_controlnet_models(self) -> List[str]:
+        """Get available ControlNet models from SD WebUI"""
+        try:
+            r = requests.get(f"{self.base_url}/controlnet/model_list", timeout=10)
+            r.raise_for_status()
+            result = r.json()
+            models = result.get("model_list", [])
+            logger.info("get_controlnet_models: found %d model(s)", len(models))
+            return models
+        except Exception as e:
+            logger.warning("get_controlnet_models failed (ControlNet may not be installed): %s", e)
+            return []
+
+    @retry_with_backoff(max_retries=1, base_delay=0.5)
+    def get_controlnet_modules(self) -> List[str]:
+        """Get available ControlNet preprocessor modules"""
+        try:
+            r = requests.get(f"{self.base_url}/controlnet/module_list", timeout=10)
+            r.raise_for_status()
+            result = r.json()
+            modules = result.get("module_list", [])
+            logger.info("get_controlnet_modules: found %d module(s)", len(modules))
+            return modules
+        except Exception as e:
+            logger.warning("get_controlnet_modules failed (ControlNet may not be installed): %s", e)
+            return []
+
+    @retry_with_backoff(max_retries=1, base_delay=0.5)
+    def get_controlnet_settings(self) -> Dict:
+        """Get ControlNet extension settings"""
+        try:
+            r = requests.get(f"{self.base_url}/controlnet/settings", timeout=10)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            logger.warning("get_controlnet_settings failed (ControlNet may not be installed): %s", e)
+            return {}
+
     @retry_with_backoff(max_retries=2, base_delay=1.0)
     def get_upscalers(self) -> List[str]:
         try:
@@ -128,7 +167,8 @@ class SDClient:
         hr_scale: float = 2.0,
         hr_upscaler: str = "R-ESRGAN 4x+",
         hr_second_pass_steps: int = 0,
-        hr_denoising_strength: float = 0.7
+        hr_denoising_strength: float = 0.7,
+        controlnet_args: Optional[List[Dict]] = None
     ) -> List[str]:
         """
         テキストから画像を生成し、Base64エンコードされた画像リストを返す
@@ -139,6 +179,7 @@ class SDClient:
         hr_upscaler: アップスケーラー名
         hr_second_pass_steps: Hires.fix 第2パスのステップ数（0=メインと同じ）
         hr_denoising_strength: Hires.fix のデノイジング強度
+        controlnet_args: ControlNet設定のリスト（None の場合は無効）
         """
         # モデルの切り替え（指定された場合）
         if model:
@@ -175,6 +216,14 @@ class SDClient:
             "hr_second_pass_steps": hr_second_pass_steps,
             "denoising_strength": hr_denoising_strength if enable_hr else 0.7
         }
+        if controlnet_args:
+            payload["alwayson_scripts"] = {
+                "controlnet": {
+                    "args": controlnet_args
+                }
+            }
+            logger.info("txt2img: controlnet enabled with %d unit(s)", len(controlnet_args))
+
         logger.info("txt2img start url=%s width=%d height=%d steps=%d", self.base_url, width, height, steps)
         try:
             r = requests.post(
@@ -213,7 +262,8 @@ class SDClient:
         hr_scale: float = 2.0,
         hr_upscaler: str = "R-ESRGAN 4x+",
         hr_second_pass_steps: int = 0,
-        hr_denoising_strength: float = 0.7
+        hr_denoising_strength: float = 0.7,
+        controlnet_args: Optional[List[Dict]] = None
     ) -> List[str]:
         """
         画像から画像を生成し、Base64エンコードされた画像リストを返す
@@ -225,6 +275,7 @@ class SDClient:
         hr_upscaler: アップスケーラー名
         hr_second_pass_steps: Hires.fix 第2パスのステップ数
         hr_denoising_strength: Hires.fix のデノイジング強度
+        controlnet_args: ControlNet設定のリスト（None の場合は無効）
         """
         if model:
             self.set_model(model)
@@ -260,6 +311,14 @@ class SDClient:
             "hr_second_pass_steps": hr_second_pass_steps,
             "hr_denoising_strength": hr_denoising_strength
         }
+        if controlnet_args:
+            payload["alwayson_scripts"] = {
+                "controlnet": {
+                    "args": controlnet_args
+                }
+            }
+            logger.info("img2img: controlnet enabled with %d unit(s)", len(controlnet_args))
+
         try:
             r = requests.post(
                 f"{self.base_url}/sdapi/v1/img2img",

@@ -30,6 +30,11 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LLM_CACHE_ENABLED = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
 LLM_CACHE_TTL = int(os.getenv("LLM_CACHE_TTL", "3600"))
 
+# Rate Limiting
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+RATE_LIMIT_GENERATION = int(os.getenv("RATE_LIMIT_GENERATION", "10"))  # requests per minute
+RATE_LIMIT_API = int(os.getenv("RATE_LIMIT_API", "60"))  # requests per minute
+
 # Prompt Customization Options
 STYLES = [
     "photorealistic", "anime", "painting", "watercolor",

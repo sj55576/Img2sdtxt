@@ -21,7 +21,10 @@ def _make_png_bytes() -> bytes:
 @pytest.fixture(scope="module")
 def client():
     """モック済みクライアントを注入した TestClient を生成"""
+    import config
     import main as main_module
+
+    config.RATE_LIMIT_ENABLED = False
 
     # SD/LLM クライアントをモックして実ネットワーク接続を回避
     mock_sd = MagicMock()
@@ -72,7 +75,11 @@ def test_sd_generate_bad_width_returns_422(client):
     }
     response = client.post("/api/sd/generate", json=payload)
     assert response.status_code == 422
-    assert "width" in response.json()["detail"]
+    detail = response.json()["detail"]
+    if isinstance(detail, list):
+        assert any("width" in str(e.get("loc", "")) for e in detail)
+    else:
+        assert "width" in detail
 
 
 def test_sd_generate_bad_steps_returns_422(client):

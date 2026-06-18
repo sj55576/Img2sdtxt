@@ -8,6 +8,7 @@ import presets as preset_mgr
 import history as hist
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import prompt_generator, llm_cache, _validate_image_bytes
+from models import TextPromptRequest, RefinePromptRequest
 
 router = APIRouter(prefix="/api", tags=["prompts"])
 
@@ -141,19 +142,13 @@ async def generate_prompts_batch(
 # ------------------------------------------------------------------ #
 
 @router.post("/generate-prompts-text")
-def generate_prompts_text(request_data: dict):
-    description = request_data.get("description", "").strip()
-    if not description:
-        raise HTTPException(status_code=400, detail="Description is required.")
-
-    if len(description) > 5000:
-        raise HTTPException(status_code=422, detail="Description must not exceed 5000 characters.")
-
-    style = request_data.get("style", "")
-    tone = request_data.get("tone", "")
-    quality = request_data.get("quality", "high")
-    preset_id = request_data.get("preset_id", "")
-    save = request_data.get("save_history", True)
+def generate_prompts_text(request: TextPromptRequest):
+    description = request.description.strip()
+    style = request.style
+    tone = request.tone
+    quality = request.quality
+    preset_id = request.preset_id
+    save = request.save_history
 
     preset = preset_mgr.get_preset(preset_id) if preset_id else None
     suffix_pos = preset.get("positive_suffix", "") if preset else ""
@@ -195,27 +190,14 @@ def generate_prompts_text(request_data: dict):
 # ------------------------------------------------------------------ #
 
 @router.post("/refine-prompt")
-def refine_prompt(request_data: dict):
-    positive = request_data.get("positive", "").strip()
-    if not positive:
-        raise HTTPException(status_code=400, detail="Positive prompt is required.")
-
-    if len(positive) > 10000:
-        raise HTTPException(status_code=422, detail="Positive prompt must not exceed 10000 characters.")
-
-    negative = request_data.get("negative", "").strip()
-    instruction = request_data.get("instruction", "").strip()
-    style = request_data.get("style", "")
-    tone = request_data.get("tone", "")
-    quality = request_data.get("quality", "high")
-
+def refine_prompt(request: RefinePromptRequest):
     result = prompt_generator.refine_prompt(
-        positive=positive,
-        negative=negative,
-        instruction=instruction,
-        style=style,
-        tone=tone,
-        quality=quality
+        positive=request.positive.strip(),
+        negative=request.negative.strip(),
+        instruction=request.instruction.strip(),
+        style=request.style,
+        tone=request.tone,
+        quality=request.quality
     )
 
     if result.get("status") == "error":
@@ -225,9 +207,9 @@ def refine_prompt(request_data: dict):
         positive=result["positive"],
         negative=result["negative"],
         image_name="[refine]",
-        style=style,
-        tone=tone,
-        quality=quality
+        style=request.style,
+        tone=request.tone,
+        quality=request.quality
     )
 
     return {
