@@ -2,12 +2,15 @@
 
 import asyncio
 import base64
+import json
 import logging
+from typing import Optional, List
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
-from deps import sd_client, _as_int, _as_float, _validate_image_bytes
+from deps import sd_client, _validate_image_bytes
+from models import SDGenerateRequest, SDMultiModelRequest
 
 logger = logging.getLogger("img2sdtxt.sd")
 
@@ -110,62 +113,57 @@ def sd_models():
         raise HTTPException(status_code=503, detail=str(e))
 
 
+@router.get("/controlnet/models")
+def sd_controlnet_models():
+    """Return available ControlNet models. Returns empty list if ControlNet is not installed."""
+    models = sd_client.get_controlnet_models()
+    return {"success": True, "models": models}
+
+
+@router.get("/controlnet/modules")
+def sd_controlnet_modules():
+    """Return available ControlNet preprocessor modules. Returns empty list if ControlNet is not installed."""
+    modules = sd_client.get_controlnet_modules()
+    return {"success": True, "modules": modules}
+
+
 @router.post("/generate")
-async def sd_generate(request_data: dict):
-    positive = request_data.get("positive", "").strip()
-    negative = request_data.get("negative", "").strip()
-    if not positive:
-        raise HTTPException(status_code=400, detail="Positive prompt is required.")
-
-    width = _as_int(request_data, "width", 512)
-    height = _as_int(request_data, "height", 512)
-    steps = _as_int(request_data, "steps", 20)
-    cfg_scale = _as_float(request_data, "cfg_scale", 7.0)
-    sampler = request_data.get("sampler", "Euler a")
-    seed = _as_int(request_data, "seed", -1)
-    batch_size = min(_as_int(request_data, "batch_size", 1), 4)
-    model = request_data.get("model", "")
-    loras = request_data.get("loras", "")
-    enable_hr = bool(request_data.get("enable_hr", False))
-    hr_scale = _as_float(request_data, "hr_scale", 2.0)
-    hr_upscaler = request_data.get("hr_upscaler", "R-ESRGAN 4x+")
-    hr_second_pass_steps = _as_int(request_data, "hr_second_pass_steps", 0)
-    hr_denoising_strength = _as_float(request_data, "hr_denoising_strength", 0.7)
-
+async def sd_generate(request: SDGenerateRequest):
     try:
         images = await run_in_threadpool(
             sd_client.txt2img,
-            positive=positive,
-            negative=negative,
-            width=width,
-            height=height,
-            steps=steps,
-            cfg_scale=cfg_scale,
-            sampler=sampler,
-            seed=seed,
-            batch_size=batch_size,
-            model=model,
-            loras=loras,
-            enable_hr=enable_hr,
-            hr_scale=hr_scale,
-            hr_upscaler=hr_upscaler,
-            hr_second_pass_steps=hr_second_pass_steps,
-            hr_denoising_strength=hr_denoising_strength,
+            positive=request.positive,
+            negative=request.negative,
+            width=request.width,
+            height=request.height,
+            steps=request.steps,
+            cfg_scale=request.cfg_scale,
+            sampler=request.sampler,
+            seed=request.seed,
+            batch_size=request.batch_size,
+            model=request.model,
+            loras=request.loras,
+            enable_hr=request.enable_hr,
+            hr_scale=request.hr_scale,
+            hr_upscaler=request.hr_upscaler,
+            hr_second_pass_steps=request.hr_second_pass_steps,
+            hr_denoising_strength=request.hr_denoising_strength,
+            controlnet_args=request.controlnet_args,
         )
 
         saved_files = await run_in_threadpool(
             sd_client.save_images,
             images=images,
-            positive=positive,
-            negative=negative,
-            width=width,
-            height=height,
-            steps=steps,
-            cfg_scale=cfg_scale,
-            sampler=sampler,
-            seed=seed,
-            model=model,
-            loras=loras,
+            positive=request.positive,
+            negative=request.negative,
+            width=request.width,
+            height=request.height,
+            steps=request.steps,
+            cfg_scale=request.cfg_scale,
+            sampler=request.sampler,
+            seed=request.seed,
+            model=request.model,
+            loras=request.loras,
         )
 
         return {
@@ -202,7 +200,8 @@ async def sd_img2img(
     hr_scale: float = Form(2.0),
     hr_upscaler: str = Form("R-ESRGAN 4x+"),
     hr_second_pass_steps: int = Form(0),
-    hr_denoising_strength: float = Form(0.7)
+    hr_denoising_strength: float = Form(0.7),
+    controlnet_args: str = Form("")
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")
@@ -214,6 +213,13 @@ async def sd_img2img(
     _validate_image_bytes(contents)
 
     init_image = base64.b64encode(contents).decode("utf-8")
+
+    parsed_controlnet_args: Optional[List[dict]] = None
+    if controlnet_args:
+        try:
+            parsed_controlnet_args = json.loads(controlnet_args)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HTTPException(status_code=400, detail=f"Invalid controlnet_args JSON: {e}")
 
     try:
         images = await run_in_threadpool(
@@ -237,6 +243,7 @@ async def sd_img2img(
             hr_upscaler=hr_upscaler,
             hr_second_pass_steps=hr_second_pass_steps,
             hr_denoising_strength=hr_denoising_strength,
+            controlnet_args=parsed_controlnet_args,
         )
 
         saved_files = await run_in_threadpool(
@@ -357,65 +364,42 @@ async def sd_inpaint(
 
 
 @router.post("/generate-multi-model")
-async def sd_generate_multi_model(request_data: dict):
-    models = request_data.get("models", [])
-    if not models:
-        raise HTTPException(status_code=400, detail="At least one model is required.")
-
-    positive = request_data.get("positive", "").strip()
-    if not positive:
-        raise HTTPException(status_code=400, detail="Positive prompt is required.")
-
-    negative = request_data.get("negative", "").strip()
-    width = _as_int(request_data, "width", 512)
-    height = _as_int(request_data, "height", 512)
-    steps = _as_int(request_data, "steps", 20)
-    cfg_scale = _as_float(request_data, "cfg_scale", 7.0)
-    sampler = request_data.get("sampler", "Euler a")
-    seed = _as_int(request_data, "seed", -1)
-    batch_size = min(_as_int(request_data, "batch_size", 1), 4)
-    loras = request_data.get("loras", "")
-    enable_hr = bool(request_data.get("enable_hr", False))
-    hr_scale = _as_float(request_data, "hr_scale", 2.0)
-    hr_upscaler = request_data.get("hr_upscaler", "R-ESRGAN 4x+")
-    hr_second_pass_steps = _as_int(request_data, "hr_second_pass_steps", 0)
-    hr_denoising_strength = _as_float(request_data, "hr_denoising_strength", 0.7)
-
+async def sd_generate_multi_model(request: SDMultiModelRequest):
     results = []
-    for model in models:
+    for model in request.models:
         try:
             images = await run_in_threadpool(
                 sd_client.txt2img,
-                positive=positive,
-                negative=negative,
-                width=width,
-                height=height,
-                steps=steps,
-                cfg_scale=cfg_scale,
-                sampler=sampler,
-                seed=seed,
-                batch_size=batch_size,
+                positive=request.positive,
+                negative=request.negative,
+                width=request.width,
+                height=request.height,
+                steps=request.steps,
+                cfg_scale=request.cfg_scale,
+                sampler=request.sampler,
+                seed=request.seed,
+                batch_size=request.batch_size,
                 model=model,
-                loras=loras,
-                enable_hr=enable_hr,
-                hr_scale=hr_scale,
-                hr_upscaler=hr_upscaler,
-                hr_second_pass_steps=hr_second_pass_steps,
-                hr_denoising_strength=hr_denoising_strength,
+                loras=request.loras,
+                enable_hr=request.enable_hr,
+                hr_scale=request.hr_scale,
+                hr_upscaler=request.hr_upscaler,
+                hr_second_pass_steps=request.hr_second_pass_steps,
+                hr_denoising_strength=request.hr_denoising_strength,
             )
             saved_files = await run_in_threadpool(
                 sd_client.save_images,
                 images=images,
-                positive=positive,
-                negative=negative,
-                width=width,
-                height=height,
-                steps=steps,
-                cfg_scale=cfg_scale,
-                sampler=sampler,
-                seed=seed,
+                positive=request.positive,
+                negative=request.negative,
+                width=request.width,
+                height=request.height,
+                steps=request.steps,
+                cfg_scale=request.cfg_scale,
+                sampler=request.sampler,
+                seed=request.seed,
                 model=model,
-                loras=loras,
+                loras=request.loras,
             )
             results.append({
                 "model": model,
@@ -431,4 +415,4 @@ async def sd_generate_multi_model(request_data: dict):
                 "error": str(e),
             })
 
-    return {"success": True, "results": results, "total_models": len(models)}
+    return {"success": True, "results": results, "total_models": len(request.models)}

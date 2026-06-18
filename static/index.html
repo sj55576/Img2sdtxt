@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Image to SD Prompt Generator</title>
-    <link rel="stylesheet" href="/static/style.css?v=3">
+    <link rel="stylesheet" href="/static/style.css?v=5">
+    <link rel="stylesheet" href="/static/weight-editor.css?v=1">
 </head>
 <body>
     <div class="app-layout">
@@ -25,6 +26,9 @@
                 <button class="nav-btn" data-page="inpaint">🖌️ Inpaint</button>
                 <button class="nav-btn" data-page="gallery">🗃️ Gallery</button>
             </nav>
+            <div class="theme-toggle-wrap">
+                <button id="theme-toggle-btn" class="theme-toggle-btn" title="テーマ切り替え">🌙 Dark</button>
+            </div>
             <div class="sidebar-status">
                 <div class="status-indicator" id="llm-status">
                     <span class="dot"></span><span class="label">LLM</span>
@@ -483,7 +487,7 @@
                                 <label>LoRA</label>
                                 <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
                                     <input type="text" id="sd-lora-search" placeholder="LoRAを検索..."
-                                           style="flex:1; padding:4px 8px; border-radius:4px; border:1px solid #555; background:#2a2a2a; color:#eee; font-size:0.85em;"
+                                           style="flex:1; padding:4px 8px; border-radius:4px; font-size:0.85em;"
                                            oninput="filterLoras('sd', this.value)" />
                                     <span id="sd-lora-count" style="font-size:0.8em; color:#888; white-space:nowrap;"></span>
                                 </div>
@@ -834,6 +838,13 @@
                         <div id="i2i-results" class="sd-results hidden">
                             <h3>生成された画像</h3>
                             <div id="i2i-images" class="sd-images"></div>
+                            <div id="img2img-compare" class="image-compare hidden">
+                                <img class="compare-before" src="" alt="Before">
+                                <img class="compare-after" src="" alt="After">
+                                <div class="compare-divider"></div>
+                                <span class="compare-label label-before">Before</span>
+                                <span class="compare-label label-after">After</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1108,6 +1119,7 @@
         <button class="mobile-nav-btn" data-page="gallery">🗃️<span>Gallery</span></button>
     </nav>
 
-    <script src="/static/script.js?v=2"></script>
+    <script src="/static/weight-editor.js?v=1"></script>
+    <script src="/static/script.js?v=3"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ import logging
 import time as _time
 
 import config
+from rate_limit import RateLimitMiddleware
 from config import (
     API_HOST, API_PORT, DEBUG,
     HTTPS_ENABLED, SSL_CERTFILE, SSL_KEYFILE,
@@ -20,6 +21,7 @@ from routes.history import router as history_router
 from routes.sd import router as sd_router
 from routes.presets import router as presets_router
 from routes.gallery import router as gallery_router
+from routes.jobs import router as jobs_router
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
@@ -42,6 +44,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RateLimitMiddleware)
 
 
 @app.middleware("http")
@@ -67,6 +70,7 @@ app.include_router(history_router)
 app.include_router(sd_router)
 app.include_router(presets_router)
 app.include_router(gallery_router)
+app.include_router(jobs_router)
 
 
 # ------------------------------------------------------------------ #
