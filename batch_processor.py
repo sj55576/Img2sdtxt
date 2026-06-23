@@ -23,6 +23,7 @@ from prompt_generator import PromptGenerator
 
 # Supported image extensions
 IMAGE_EXTENSIONS: Tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")
+OUTPUT_FORMATS: Tuple[str, ...] = ("json", "txt", "both")
 
 # How long (seconds) a file's size must be stable before processing in watch mode
 _STABLE_WAIT_SEC: float = 1.5
@@ -69,6 +70,24 @@ def _output_stem(image_path: Path, input_dir: Path) -> str:
     return "__".join(parts)
 
 
+def _validate_output_format(fmt: str) -> None:
+    """Raise ``ValueError`` when *fmt* is not a supported output format."""
+    if fmt not in OUTPUT_FORMATS:
+        allowed = ", ".join(OUTPUT_FORMATS)
+        raise ValueError(f"Unsupported output format: {fmt!r}. Expected one of: {allowed}.")
+
+
+def _output_paths_for_format(output_dir: Path, stem: str, fmt: str) -> List[Path]:
+    """Return the output file paths required for *fmt*."""
+    _validate_output_format(fmt)
+    paths: List[Path] = []
+    if fmt in ("json", "both"):
+        paths.append(output_dir / f"{stem}.json")
+    if fmt in ("txt", "both"):
+        paths.append(output_dir / f"{stem}.txt")
+    return paths
+
+
 def _save_outputs(
     result: Dict,
     output_dir: Path,
@@ -86,6 +105,7 @@ def _save_outputs(
     Returns:
         List of ``Path`` objects that were written.
     """
+    _validate_output_format(fmt)
     output_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
 
@@ -131,15 +151,17 @@ def process_single_image(
         and optionally ``error`` / ``skipped``.
     """
     stem = _output_stem(image_path, input_dir)
+    _validate_output_format(fmt)
 
     # Skip check
     if skip_existing:
-        check_ext = ".json" if fmt in ("json", "both") else ".txt"
-        if (output_dir / f"{stem}{check_ext}").exists():
+        output_paths = _output_paths_for_format(output_dir, stem, fmt)
+        if output_paths and all(path.exists() for path in output_paths):
             return {
                 "image_filename": image_path.name,
                 "skipped": True,
                 "output_stem": stem,
+                "existing_outputs": [str(path) for path in output_paths],
             }
 
     start_ms = time.time() * 1000
@@ -260,6 +282,8 @@ class BatchProcessor:
         Returns:
             List of per-image result dicts.
         """
+        _validate_output_format(fmt)
+
         # Collect (image_path, input_dir) pairs
         tasks: List[Tuple[Path, Path]] = []
         for d in input_dirs:

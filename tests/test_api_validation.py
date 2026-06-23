@@ -164,6 +164,29 @@ def test_sd_progress_unavailable_shape(client):
 
 
 # ------------------------------------------------------------------ #
+# Jobs API route ordering
+# ------------------------------------------------------------------ #
+
+def test_jobs_queue_stats_static_route_precedes_job_id_route(client):
+    """/api/jobs/queue/stats が動的 job_id ルートより先に登録されている"""
+    route_paths = [getattr(route, "path", "") for route in client.app.routes]
+
+    assert route_paths.index("/api/jobs/queue/stats") < route_paths.index(
+        "/api/jobs/{job_id}"
+    )
+
+
+def test_jobs_queue_stats_returns_stats(client):
+    """GET /api/jobs/queue/stats は job_id ルートではなく stats を返す"""
+    response = client.get("/api/jobs/queue/stats")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert set(data["stats"]) == {"total", "queue_size", "running", "by_status"}
+
+
+# ------------------------------------------------------------------ #
 # BE-4: /health の形状確認
 # ------------------------------------------------------------------ #
 

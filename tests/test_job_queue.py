@@ -1,7 +1,13 @@
 """Tests for job_queue module."""
 
 import asyncio
+import sys
+from pathlib import Path
+
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from job_queue import JobQueue, JobStatus, register_job_handler, _JOB_HANDLERS
 
 
@@ -73,6 +79,67 @@ async def test_cancel_pending_job(queue):
     gate.set()
     await asyncio.sleep(0.1)
     _JOB_HANDLERS.pop("test_slow", None)
+
+
+@pytest.mark.asyncio
+async def test_cancel_running_job_stays_cancelled(queue):
+    gate = asyncio.Event()
+    started = asyncio.Event()
+
+    async def _slow_running(job, update_progress):
+        started.set()
+        await gate.wait()
+        return {"should_not": "complete"}
+
+    _JOB_HANDLERS["test_slow_running"] = _slow_running
+
+    job = await queue.submit("test_slow_running", {})
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    cancelled = await queue.cancel_job(job.id)
+    assert cancelled
+
+    gate.set()
+    await asyncio.sleep(0.1)
+
+    result = queue.get_job(job.id)
+    assert result.status == JobStatus.CANCELLED
+    assert result.result is None
+
+    _JOB_HANDLERS.pop("test_slow_running", None)
+
+
+@pytest.mark.asyncio
+async def test_max_concurrent_allows_parallel_jobs():
+    queue = JobQueue(max_concurrent=2, max_history=10)
+    gate = asyncio.Event()
+    started = 0
+    started_event = asyncio.Event()
+
+    async def _parallel(job, update_progress):
+        nonlocal started
+        started += 1
+        if started == 2:
+            started_event.set()
+        await gate.wait()
+        return {"ok": True}
+
+    _JOB_HANDLERS["test_parallel"] = _parallel
+
+    j1 = await queue.submit("test_parallel", {})
+    j2 = await queue.submit("test_parallel", {})
+
+    await asyncio.wait_for(started_event.wait(), timeout=1.0)
+    stats = queue.stats()
+    assert stats["running"] == 2
+
+    gate.set()
+    await asyncio.sleep(0.1)
+
+    assert queue.get_job(j1.id).status == JobStatus.COMPLETED
+    assert queue.get_job(j2.id).status == JobStatus.COMPLETED
+
+    _JOB_HANDLERS.pop("test_parallel", None)
 
 
 @pytest.mark.asyncio

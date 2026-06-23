@@ -20,6 +20,8 @@ import batch_processor
 from batch_processor import (
     BatchProcessor,
     _output_stem,
+    _output_paths_for_format,
+    _validate_output_format,
     process_single_image,
     scan_directory,
 )
@@ -94,6 +96,21 @@ class TestOutputStem(unittest.TestCase):
         root = Path("/images")
         img = Path("/images/cat.jpg")
         self.assertEqual(_output_stem(img, root), "cat")
+
+
+class TestOutputFormatHelpers(unittest.TestCase):
+    """Output format helpers validate and resolve required files."""
+
+    def test_output_paths_for_both_requires_json_and_txt(self):
+        out = Path("/tmp/out")
+        self.assertEqual(
+            _output_paths_for_format(out, "cat", "both"),
+            [out / "cat.json", out / "cat.txt"],
+        )
+
+    def test_invalid_format_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            _validate_output_format("yaml")
 
     def test_nested_file(self):
         root = Path("/images")
@@ -193,6 +210,59 @@ class TestProcessSingleImage(unittest.TestCase):
 
             self.assertTrue(result.get("skipped"), "Should be skipped")
             # generate_prompts must NOT have been called
+            gen.generate_prompts.assert_not_called()
+
+    def test_skip_existing_both_requires_all_outputs(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "input"
+            root.mkdir()
+            out = Path(td) / "output"
+            out.mkdir()
+            img = root / "test.png"
+            img.write_bytes(_make_png_bytes())
+            # Only JSON exists; "both" still needs to generate the missing TXT.
+            (out / "test.json").write_text("{}")
+
+            gen = self._make_processor()
+            result = process_single_image(
+                image_path=img,
+                input_dir=root,
+                output_dir=out,
+                prompt_generator=gen,
+                model_name="test-model",
+                fmt="both",
+                skip_existing=True,
+            )
+
+            self.assertEqual(result["status"], "success")
+            self.assertTrue((out / "test.txt").exists())
+            gen.generate_prompts.assert_called_once()
+
+    def test_skip_existing_both_skips_when_all_outputs_exist(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "input"
+            root.mkdir()
+            out = Path(td) / "output"
+            out.mkdir()
+            img = root / "test.png"
+            img.write_bytes(_make_png_bytes())
+            (out / "test.json").write_text("{}")
+            (out / "test.txt").write_text("already done")
+
+            gen = self._make_processor()
+            result = process_single_image(
+                image_path=img,
+                input_dir=root,
+                output_dir=out,
+                prompt_generator=gen,
+                model_name="test-model",
+                fmt="both",
+                skip_existing=True,
+            )
+
+            self.assertTrue(result.get("skipped"), "Should be skipped only when all outputs exist")
             gen.generate_prompts.assert_not_called()
 
     def test_error_on_llm_failure(self):

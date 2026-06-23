@@ -144,6 +144,11 @@ async def submit_job(request_data: dict):
     return {"success": True, "job": job.to_dict()}
 
 
+@router.get("/queue/stats")
+async def queue_stats():
+    return {"success": True, "stats": job_queue.stats()}
+
+
 @router.get("/{job_id}")
 async def get_job(job_id: str):
     job = job_queue.get_job(job_id)
@@ -164,11 +169,6 @@ async def cancel_job(job_id: str):
     if not cancelled:
         raise HTTPException(status_code=400, detail="Cannot cancel job (not found or already finished)")
     return {"success": True}
-
-
-@router.get("/queue/stats")
-async def queue_stats():
-    return {"success": True, "stats": job_queue.stats()}
 
 
 # ------------------------------------------------------------------ #
