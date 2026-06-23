@@ -58,12 +58,16 @@ class JobQueue:
         self._running_count = 0
         self._lock = asyncio.Lock()
         self._subscribers: Dict[str, List[asyncio.Queue]] = {}
-        self._worker_task: Optional[asyncio.Task] = None
+        self._worker_tasks: List[asyncio.Task] = []
+        self._job_tasks: Dict[str, asyncio.Task] = {}
 
     def start(self):
-        if self._worker_task is None or self._worker_task.done():
-            self._worker_task = asyncio.create_task(self._worker_loop())
-            logger.info("Job queue worker started (max_concurrent=%d)", self._max_concurrent)
+        self._worker_tasks = [task for task in self._worker_tasks if not task.done()]
+        missing = self._max_concurrent - len(self._worker_tasks)
+        for _ in range(max(0, missing)):
+            self._worker_tasks.append(asyncio.create_task(self._worker_loop()))
+        if missing > 0:
+            logger.info("Job queue workers started (max_concurrent=%d)", self._max_concurrent)
 
     async def _worker_loop(self):
         while True:
@@ -77,8 +81,10 @@ class JobQueue:
                 self._running_count += 1
 
             try:
+                self._job_tasks[job.id] = asyncio.current_task()
                 await self._execute_job(job)
             finally:
+                self._job_tasks.pop(job.id, None)
                 async with self._lock:
                     self._running_count -= 1
                 self._queue.task_done()
@@ -96,6 +102,10 @@ class JobQueue:
                 raise ValueError(f"Unknown job type: {job.job_type}")
 
             result = await handler(job, self._progress_callback(job))
+            if job.status == JobStatus.CANCELLED:
+                job.completed_at = job.completed_at or time.time()
+                logger.info("Job %s finished after cancellation request", job.id)
+                return
             job.status = JobStatus.COMPLETED
             job.result = result
             job.progress = 1.0
@@ -150,6 +160,9 @@ class JobQueue:
             return False
         job.status = JobStatus.CANCELLED
         job.completed_at = time.time()
+        task = self._job_tasks.get(job_id)
+        if task is not None:
+            task.cancel()
         await self._notify(job)
         return True
 
