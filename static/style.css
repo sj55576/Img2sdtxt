@@ -166,6 +166,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .status-indicator.ok .dot { background: var(--success); }
 .status-indicator.error .dot { background: var(--danger); }
 .status-indicator.checking .dot { background: var(--warn); animation: pulse 1s infinite; }
+.connection-help {
+    padding: 9px 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+.connection-help strong { display: block; color: var(--text); font-size: 0.74rem; margin-bottom: 2px; }
+.connection-help span { display: block; }
+.connection-help.ok { border-color: color-mix(in srgb, var(--success) 35%, var(--border)); }
+.connection-help.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
 
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
