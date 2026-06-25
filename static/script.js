@@ -74,6 +74,38 @@ let _multiModelRunning = false;
 // FE-6: History items map (id → item object)
 const _historyItems = new Map();
 
+
+function updateConnectionHelp(service, isOk, detail = '') {
+    const help = document.getElementById('connection-help');
+    if (!help) return;
+
+    const state = help.dataset.state ? JSON.parse(help.dataset.state) : {};
+    state[service] = { ok: isOk, detail };
+    help.dataset.state = JSON.stringify(state);
+
+    const llm = state.llm;
+    const sd = state.sd;
+    help.classList.remove('ok', 'warn');
+
+    if (llm?.ok && sd?.ok) {
+        help.classList.add('ok');
+        help.innerHTML = '<strong>接続済み</strong><span>LLM と SD API を利用できます。</span>';
+        return;
+    }
+
+    help.classList.add('warn');
+    if (llm && !llm.ok) {
+        help.innerHTML = '<strong>LLM 未接続</strong><span>プロンプト生成には LLM サーバー設定を確認してください。</span>';
+        return;
+    }
+    if (sd && !sd.ok) {
+        help.innerHTML = '<strong>SD API 未接続</strong><span>SD Generate を使うには WebUI API 起動と接続設定を確認してください。</span>';
+        return;
+    }
+
+    help.innerHTML = '<strong>接続を確認中...</strong><span>LLM / SD API の状態を確認しています。</span>';
+}
+
 /* =====================================================================
    Theme Management
    ===================================================================== */
@@ -230,19 +262,23 @@ function setupNavigation() {
    ===================================================================== */
 async function checkStatus() {
     const llmEl = document.getElementById('llm-status');
+    llmEl.classList.remove('ok', 'error');
     llmEl.classList.add('checking');
     try {
         const r = await fetch('/health');
         if (r.ok) {
             const d = await r.json();
+            const isHealthy = d.status === 'ok' || d.status === 'healthy';
             llmEl.classList.remove('checking');
-            llmEl.classList.add(d.status === 'healthy' ? 'ok' : 'error');
-            llmEl.querySelector('.label').textContent = 'LLM ✓';
+            llmEl.classList.add(isHealthy ? 'ok' : 'error');
+            llmEl.querySelector('.label').textContent = isHealthy ? 'LLM ✓' : 'LLM ✗';
+            updateConnectionHelp('llm', isHealthy, d.components?.llm?.url || '');
         } else { throw new Error(); }
     } catch {
         llmEl.classList.remove('checking');
         llmEl.classList.add('error');
         llmEl.querySelector('.label').textContent = 'LLM ✗';
+        updateConnectionHelp('llm', false);
     }
 }
 
@@ -251,6 +287,7 @@ async function checkSDStatus() {
         _sdStatusPromise.sd = (async () => {
             const sdEl = document.getElementById('sd-status');
             const badge = document.getElementById('sd-api-badge');
+            sdEl.classList.remove('ok', 'error');
             sdEl.classList.add('checking');
             try {
                 const r = await fetch('/api/sd/status');
@@ -259,6 +296,7 @@ async function checkSDStatus() {
                 if (d.available) {
                     sdEl.classList.add('ok');
                     sdEl.querySelector('.label').textContent = 'SD ✓';
+                    updateConnectionHelp('sd', true);
                     badge.className = 'badge badge-green';
                     badge.textContent = 'Connected';
 
@@ -300,12 +338,15 @@ async function checkSDStatus() {
                 } else {
                     sdEl.classList.add('error');
                     sdEl.querySelector('.label').textContent = 'SD ✗';
+                    updateConnectionHelp('sd', false);
                     badge.className = 'badge badge-red';
                     badge.textContent = 'Disconnected';
                 }
             } catch {
                 sdEl.classList.remove('checking');
                 sdEl.classList.add('error');
+                sdEl.querySelector('.label').textContent = 'SD ✗';
+                updateConnectionHelp('sd', false);
                 badge.className = 'badge badge-red';
                 badge.textContent = 'Error';
             }
