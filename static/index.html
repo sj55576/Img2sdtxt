@@ -29,6 +29,9 @@
             <div class="theme-toggle-wrap">
                 <button id="theme-toggle-btn" class="theme-toggle-btn" title="テーマ切り替え">🌙 Dark</button>
             </div>
+            <div class="lang-toggle-wrap">
+                <button id="lang-toggle-btn" class="lang-toggle-btn" title="Language / 言語">🌐 日本語</button>
+            </div>
             <div class="sidebar-status">
                 <div class="status-indicator" id="llm-status">
                     <span class="dot"></span><span class="label">LLM</span>
@@ -1137,7 +1140,36 @@
         <button class="mobile-nav-btn" data-page="gallery">🗃️<span>Gallery</span></button>
     </nav>
 
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcuts-modal" class="modal hidden">
+        <div class="modal-box shortcuts-modal-content">
+            <div class="modal-header">
+                <h3>Keyboard Shortcuts</h3>
+                <button id="shortcuts-modal-close" class="btn btn-sm btn-ghost">Close</button>
+            </div>
+            <div class="shortcuts-list">
+                <div class="shortcut-group">
+                    <h4>General</h4>
+                    <div class="shortcut-item"><kbd>?</kbd><span>Show this help</span></div>
+                    <div class="shortcut-item"><kbd>1</kbd>-<kbd>9</kbd><span>Navigate pages</span></div>
+                    <div class="shortcut-item"><kbd>Esc</kbd><span>Close modal / dialog</span></div>
+                </div>
+                <div class="shortcut-group">
+                    <h4>Generation</h4>
+                    <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Enter</kbd><span>Run generation</span></div>
+                    <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>V</kbd><span>Paste image</span></div>
+                </div>
+                <div class="shortcut-group">
+                    <h4>Gallery</h4>
+                    <div class="shortcut-item"><kbd>&larr;</kbd><kbd>&rarr;</kbd><span>Navigate images</span></div>
+                    <div class="shortcut-item"><kbd>Esc</kbd><span>Close viewer</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/weight-editor.js?v=1"></script>
+    <script src="/static/i18n.js?v=1"></script>
     <script src="/static/script.js?v=3"></script>
 </body>
 </html>
