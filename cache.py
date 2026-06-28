@@ -1,18 +1,39 @@
 import hashlib
+import json
+import sqlite3
 import time
 import logging
+from pathlib import Path
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger("img2sdtxt.cache")
 
+DB_PATH = Path(__file__).parent / "data" / "llm_cache.db"
+
 
 class LLMCache:
     def __init__(self, ttl_seconds: int = 3600, enabled: bool = True):
-        self._cache: Dict[str, Dict[str, Any]] = {}
         self.ttl = ttl_seconds
         self.enabled = enabled
-        self.hits = 0
-        self.misses = 0
+        DB_PATH.parent.mkdir(exist_ok=True)
+        with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS cache_entries (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS cache_stats (
+                    id INTEGER PRIMARY KEY CHECK(id=1),
+                    hits INTEGER DEFAULT 0,
+                    misses INTEGER DEFAULT 0
+                )
+            """)
+            conn.execute("INSERT OR IGNORE INTO cache_stats (id, hits, misses) VALUES (1, 0, 0)")
+            conn.execute("DELETE FROM cache_entries WHERE ? - created_at >= ?", (time.time(), self.ttl))
+            conn.commit()
 
     def _make_key(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str, provider: str = "", model: str = "") -> str:
         h = hashlib.sha256()
@@ -29,14 +50,19 @@ class LLMCache:
         if not self.enabled:
             return None
         key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model)
-        entry = self._cache.get(key)
-        if entry is not None:
-            if time.time() - entry["timestamp"] < self.ttl:
-                self.hits += 1
-                logger.debug("Cache HIT key=%.16s", key)
-                return entry["result"]
-            del self._cache[key]
-        self.misses += 1
+        with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
+            row = conn.execute(
+                "SELECT value, created_at FROM cache_entries WHERE key = ?", (key,)
+            ).fetchone()
+            if row is not None:
+                if time.time() - row[1] < self.ttl:
+                    conn.execute("UPDATE cache_stats SET hits = hits + 1 WHERE id = 1")
+                    conn.commit()
+                    logger.debug("Cache HIT key=%.16s", key)
+                    return json.loads(row[0])
+                conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
+            conn.execute("UPDATE cache_stats SET misses = misses + 1 WHERE id = 1")
+            conn.commit()
         logger.debug("Cache MISS key=%.16s", key)
         return None
 
@@ -44,24 +70,36 @@ class LLMCache:
         if not self.enabled:
             return
         key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model)
-        self._cache[key] = {"result": result, "timestamp": time.time()}
-        logger.debug("Cache SET key=%.16s size=%d", key, len(self._cache))
+        with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO cache_entries (key, value, created_at) VALUES (?, ?, ?)",
+                (key, json.dumps(result), time.time())
+            )
+            conn.commit()
+            size = conn.execute("SELECT COUNT(*) FROM cache_entries").fetchone()[0]
+        logger.debug("Cache SET key=%.16s size=%d", key, size)
 
     def clear(self) -> int:
-        count = len(self._cache)
-        self._cache.clear()
-        self.hits = 0
-        self.misses = 0
+        with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
+            count = conn.execute("SELECT COUNT(*) FROM cache_entries").fetchone()[0]
+            conn.execute("DELETE FROM cache_entries")
+            conn.execute("UPDATE cache_stats SET hits = 0, misses = 0 WHERE id = 1")
+            conn.commit()
         return count
 
     def stats(self) -> Dict:
-        total = self.hits + self.misses
+        with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
+            size = conn.execute("SELECT COUNT(*) FROM cache_entries").fetchone()[0]
+            row = conn.execute("SELECT hits, misses FROM cache_stats WHERE id = 1").fetchone()
+        hits = row[0] if row else 0
+        misses = row[1] if row else 0
+        total = hits + misses
         return {
             "enabled": self.enabled,
-            "size": len(self._cache),
-            "hits": self.hits,
-            "misses": self.misses,
-            "hit_rate_pct": round(self.hits / total * 100, 1) if total > 0 else 0.0,
+            "size": size,
+            "hits": hits,
+            "misses": misses,
+            "hit_rate_pct": round(hits / total * 100, 1) if total > 0 else 0.0,
             "ttl_seconds": self.ttl,
         }
 

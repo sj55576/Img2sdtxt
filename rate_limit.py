@@ -9,9 +9,11 @@ Two tiers:
 """
 
 import time
+import sqlite3
 import threading
 import logging
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -31,6 +33,7 @@ GENERATION_PREFIXES = (
     "/api/generate-prompts",
 )
 
+DB_PATH = Path(__file__).parent / "data" / "rate_limit.db"
 
 
 def _classify_path(path: str) -> Optional[str]:
@@ -56,17 +59,28 @@ def _get_client_ip(request: Request) -> str:
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
-    Sliding-window rate limiter.
+    Sliding-window rate limiter backed by SQLite.
 
-    Internal state:
-        _store: {ip: {"generation": [t1, t2, …], "api": [t1, t2, …]}}
+    Table: rate_limit_entries(ip TEXT, tier TEXT, timestamp REAL)
     """
 
     def __init__(self, app):
         super().__init__(app)
-        self._store: Dict[str, Dict[str, List[float]]] = {}
         self._lock = threading.Lock()
         self._last_cleanup = time.time()
+        DB_PATH.parent.mkdir(exist_ok=True)
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS rate_limit_entries (
+                    ip TEXT NOT NULL,
+                    tier TEXT NOT NULL,
+                    timestamp REAL NOT NULL
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ip_tier ON rate_limit_entries (ip, tier)"
+            )
+            conn.commit()
 
     # ------------------------------------------------------------------ #
     # Middleware entry point
@@ -115,42 +129,50 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         with self._lock:
             self._maybe_cleanup(now)
 
-            ip_data = self._store.setdefault(ip, {"generation": [], "api": []})
-            timestamps: List[float] = ip_data[tier]
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute(
+                    "DELETE FROM rate_limit_entries WHERE ip = ? AND tier = ? AND timestamp <= ?",
+                    (ip, tier, window_start),
+                )
 
-            # Drop timestamps outside the sliding window
-            pruned = [t for t in timestamps if t > window_start]
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM rate_limit_entries WHERE ip = ? AND tier = ?",
+                    (ip, tier),
+                ).fetchone()[0]
 
-            if len(pruned) >= limit:
-                # Oldest request in window determines when a slot frees up
-                oldest = pruned[0]
-                retry_after = int(oldest + WINDOW_SECONDS - now) + 1
-                ip_data[tier] = pruned
-                return False, max(retry_after, 1)
+                if count >= limit:
+                    oldest = conn.execute(
+                        "SELECT MIN(timestamp) FROM rate_limit_entries WHERE ip = ? AND tier = ?",
+                        (ip, tier),
+                    ).fetchone()[0]
+                    retry_after = int(oldest + WINDOW_SECONDS - now) + 1
+                    return False, max(retry_after, 1)
 
-            pruned.append(now)
-            ip_data[tier] = pruned
-            return True, 0
+                conn.execute(
+                    "INSERT INTO rate_limit_entries (ip, tier, timestamp) VALUES (?, ?, ?)",
+                    (ip, tier, now),
+                )
+                conn.commit()
+                return True, 0
 
     # ------------------------------------------------------------------ #
     # Periodic cleanup
     # ------------------------------------------------------------------ #
 
     def _maybe_cleanup(self, now: float) -> None:
-        """Remove stale IP entries. Must be called while holding self._lock."""
+        """Remove stale entries. Must be called while holding self._lock."""
         if now - self._last_cleanup < CLEANUP_INTERVAL:
             return
 
         window_start = now - WINDOW_SECONDS
-        stale_ips = [
-            ip
-            for ip, data in self._store.items()
-            if not any(t > window_start for ts in data.values() for t in ts)
-        ]
-        for ip in stale_ips:
-            del self._store[ip]
+        with sqlite3.connect(DB_PATH) as conn:
+            result = conn.execute(
+                "DELETE FROM rate_limit_entries WHERE timestamp <= ?",
+                (window_start,),
+            )
+            conn.commit()
 
-        if stale_ips:
-            logger.debug("Rate-limit cleanup: removed %d stale IP entries", len(stale_ips))
+        if result.rowcount:
+            logger.debug("Rate-limit cleanup: removed %d stale entries", result.rowcount)
 
         self._last_cleanup = now
