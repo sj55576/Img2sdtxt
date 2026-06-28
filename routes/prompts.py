@@ -6,8 +6,9 @@ from typing import List
 
 import presets as preset_mgr
 import history as hist
+import deps
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
-from deps import prompt_generator, llm_cache, _validate_image_bytes
+from deps import _validate_image_bytes
 from models import TextPromptRequest, RefinePromptRequest
 
 router = APIRouter(prefix="/api", tags=["prompts"])
@@ -43,12 +44,14 @@ async def generate_prompts(
     eff_tone = tone or (preset.get("tone", "") if preset else "")
     eff_quality = quality or (preset.get("quality", "high") if preset else "high")
 
-    cached = llm_cache.get(contents, None, eff_style, eff_tone, eff_quality)
+    _prov = deps.llm_client.provider_name
+    _mdl = deps.llm_client.model
+    cached = deps.llm_cache.get(contents, None, eff_style, eff_tone, eff_quality, provider=_prov, model=_mdl)
     if cached is not None:
         result = cached
     else:
         result = await run_in_threadpool(
-            prompt_generator.generate_prompts,
+            deps.prompt_generator.generate_prompts,
             contents,
             style=eff_style,
             tone=eff_tone,
@@ -57,7 +60,7 @@ async def generate_prompts(
             preset_suffix_negative=suffix_neg
         )
         if result.get("status") == "success":
-            llm_cache.set(contents, None, eff_style, eff_tone, eff_quality, result)
+            deps.llm_cache.set(contents, None, eff_style, eff_tone, eff_quality, result, provider=_prov, model=_mdl)
 
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
@@ -113,7 +116,7 @@ async def generate_prompts_batch(
             continue
 
         r = await run_in_threadpool(
-            prompt_generator.generate_prompts,
+            deps.prompt_generator.generate_prompts,
             contents,
             style=eff_style, tone=eff_tone, quality=eff_quality,
             preset_suffix_positive=suffix_pos, preset_suffix_negative=suffix_neg
@@ -158,11 +161,13 @@ def generate_prompts_text(request: TextPromptRequest):
     eff_tone = tone or (preset.get("tone", "") if preset else "")
     eff_quality = quality or (preset.get("quality", "high") if preset else "high")
 
-    cached = llm_cache.get(None, description, eff_style, eff_tone, eff_quality)
+    _prov = deps.llm_client.provider_name
+    _mdl = deps.llm_client.model
+    cached = deps.llm_cache.get(None, description, eff_style, eff_tone, eff_quality, provider=_prov, model=_mdl)
     if cached is not None:
         result = cached
     else:
-        result = prompt_generator.generate_prompts_text_only(
+        result = deps.prompt_generator.generate_prompts_text_only(
             description,
             style=eff_style,
             tone=eff_tone,
@@ -171,7 +176,7 @@ def generate_prompts_text(request: TextPromptRequest):
             preset_suffix_negative=suffix_neg
         )
         if result.get("status") == "success":
-            llm_cache.set(None, description, eff_style, eff_tone, eff_quality, result)
+            deps.llm_cache.set(None, description, eff_style, eff_tone, eff_quality, result, provider=_prov, model=_mdl)
 
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
@@ -191,7 +196,7 @@ def generate_prompts_text(request: TextPromptRequest):
 
 @router.post("/refine-prompt")
 def refine_prompt(request: RefinePromptRequest):
-    result = prompt_generator.refine_prompt(
+    result = deps.prompt_generator.refine_prompt(
         positive=request.positive.strip(),
         negative=request.negative.strip(),
         instruction=request.instruction.strip(),

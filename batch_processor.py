@@ -18,7 +18,7 @@ from typing import Dict, List, Optional, Tuple
 from tqdm import tqdm
 
 import history as hist
-from llm_client import LLMClient
+from llm_provider import LLMProvider
 from prompt_generator import PromptGenerator
 
 # Supported image extensions
@@ -249,12 +249,11 @@ class BatchProcessor:
     """Orchestrates batch prompt generation for a set of image directories.
 
     Args:
-        llm_client: An initialised ``LLMClient`` (shared across threads;
-                    ``requests.Session`` is **not** used so this is safe).
+        llm_client: An initialised ``LLMProvider`` (shared across threads).
         concurrency: Maximum number of worker threads (default 1).
     """
 
-    def __init__(self, llm_client: LLMClient, concurrency: int = 1) -> None:
+    def __init__(self, llm_client: LLMProvider, concurrency: int = 1) -> None:
         self.llm_client = llm_client
         self.concurrency = max(1, concurrency)
         self.model_name: str = llm_client.model

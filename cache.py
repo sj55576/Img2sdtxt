@@ -14,19 +14,21 @@ class LLMCache:
         self.hits = 0
         self.misses = 0
 
-    def _make_key(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str) -> str:
+    def _make_key(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str, provider: str = "", model: str = "") -> str:
         h = hashlib.sha256()
         if image_bytes:
             h.update(image_bytes)
         if text_input:
             h.update(text_input.encode())
         h.update(f"{style}:{tone}:{quality}".encode())
+        h.update(provider.encode("utf-8"))
+        h.update(model.encode("utf-8"))
         return h.hexdigest()
 
-    def get(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str) -> Optional[Dict]:
+    def get(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str, provider: str = "", model: str = "") -> Optional[Dict]:
         if not self.enabled:
             return None
-        key = self._make_key(image_bytes, text_input, style, tone, quality)
+        key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model)
         entry = self._cache.get(key)
         if entry is not None:
             if time.time() - entry["timestamp"] < self.ttl:
@@ -38,10 +40,10 @@ class LLMCache:
         logger.debug("Cache MISS key=%.16s", key)
         return None
 
-    def set(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str, result: Dict):
+    def set(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str, result: Dict, provider: str = "", model: str = ""):
         if not self.enabled:
             return
-        key = self._make_key(image_bytes, text_input, style, tone, quality)
+        key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model)
         self._cache[key] = {"result": result, "timestamp": time.time()}
         logger.debug("Cache SET key=%.16s size=%d", key, len(self._cache))
 

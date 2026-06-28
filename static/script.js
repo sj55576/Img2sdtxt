@@ -175,6 +175,15 @@ document.addEventListener('DOMContentLoaded', () => {
     _setup('gallery', setupGalleryPage);
     _setup('weightEditors', setupWeightEditors);
     checkStatus();
+    loadProviders();
+
+    document.getElementById('llm-provider-select')?.addEventListener('change', function() {
+        updateProviderUI();
+        const modelInput = document.getElementById('provider-model');
+        const opt = this.options[this.selectedIndex];
+        if (modelInput && opt) modelInput.value = opt.dataset.defaultModel || '';
+    });
+    document.getElementById('provider-apply-btn')?.addEventListener('click', applyProvider);
 
     // Initialize SD and Img2Img selectors early for parameter restoration
     checkSDStatus();
@@ -279,6 +288,89 @@ async function checkStatus() {
         llmEl.classList.add('error');
         llmEl.querySelector('.label').textContent = 'LLM ✗';
         updateConnectionHelp('llm', false);
+    }
+}
+
+// ------------------------------------------------------------------ //
+// LLM Provider Management
+// ------------------------------------------------------------------ //
+
+async function loadProviders() {
+    try {
+        const r = await fetch('/api/llm/providers');
+        if (!r.ok) return;
+        const data = await r.json();
+        const sel = document.getElementById('llm-provider-select');
+        if (!sel) return;
+        sel.innerHTML = '';
+        (data.providers || []).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name + (p.configured ? '' : ' (未設定)');
+            opt.dataset.requiresApiKey = p.requires_api_key ? '1' : '0';
+            opt.dataset.defaultModel = p.default_model || '';
+            sel.appendChild(opt);
+        });
+        if (data.current) {
+            sel.value = data.current.provider;
+            const modelInput = document.getElementById('provider-model');
+            if (modelInput) modelInput.value = data.current.model || '';
+        }
+        updateProviderUI();
+    } catch (e) {
+        console.error('Failed to load providers:', e);
+    }
+}
+
+function updateProviderUI() {
+    const sel = document.getElementById('llm-provider-select');
+    const keyGroup = document.getElementById('provider-api-key-group');
+    const modelGroup = document.getElementById('provider-model-group');
+    const applyBtn = document.getElementById('provider-apply-btn');
+    if (!sel) return;
+    const opt = sel.options[sel.selectedIndex];
+    const needsKey = opt && opt.dataset.requiresApiKey === '1';
+    keyGroup.style.display = needsKey ? 'block' : 'none';
+    modelGroup.style.display = (sel.value !== 'openai_compatible') ? 'block' : 'none';
+    applyBtn.style.display = 'block';
+    if (opt && opt.dataset.defaultModel) {
+        const modelInput = document.getElementById('provider-model');
+        if (modelInput && !modelInput.value) {
+            modelInput.value = opt.dataset.defaultModel;
+        }
+    }
+}
+
+async function applyProvider() {
+    const sel = document.getElementById('llm-provider-select');
+    const apiKeyInput = document.getElementById('provider-api-key');
+    const modelInput = document.getElementById('provider-model');
+    const statusMsg = document.getElementById('provider-status-msg');
+    if (!sel) return;
+    const body = { provider: sel.value };
+    if (modelInput && modelInput.value.trim()) body.model = modelInput.value.trim();
+    if (apiKeyInput && apiKeyInput.value.trim()) body.api_key = apiKeyInput.value.trim();
+    statusMsg.textContent = '切替中...';
+    statusMsg.className = 'provider-status-msg';
+    try {
+        const r = await fetch('/api/llm/provider', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await r.json();
+        if (r.ok && data.success) {
+            statusMsg.textContent = `${data.provider} (${data.model}) に切替完了`;
+            statusMsg.className = 'provider-status-msg success';
+            if (apiKeyInput) apiKeyInput.value = '';
+            checkStatus();
+        } else {
+            statusMsg.textContent = data.detail || '切替に失敗しました';
+            statusMsg.className = 'provider-status-msg error';
+        }
+    } catch (e) {
+        statusMsg.textContent = '通信エラー';
+        statusMsg.className = 'provider-status-msg error';
     }
 }
 

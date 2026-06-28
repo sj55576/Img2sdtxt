@@ -40,6 +40,20 @@
                     <strong>接続を確認中...</strong>
                     <span>LLM / SD API の状態を確認しています。</span>
                 </div>
+                <div class="provider-selector" id="provider-selector">
+                    <label for="llm-provider-select">LLMプロバイダー:</label>
+                    <select id="llm-provider-select">
+                        <option value="openai_compatible">OpenAI Compatible</option>
+                    </select>
+                    <div id="provider-api-key-group" style="display:none;">
+                        <input type="password" id="provider-api-key" placeholder="APIキーを入力..." />
+                    </div>
+                    <div id="provider-model-group" style="display:none;">
+                        <input type="text" id="provider-model" placeholder="モデル名" />
+                    </div>
+                    <button id="provider-apply-btn" class="btn-small" style="display:none;">適用</button>
+                    <span id="provider-status-msg" class="provider-status-msg"></span>
+                </div>
             </div>
         </aside>
 

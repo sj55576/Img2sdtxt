@@ -8,15 +8,24 @@ from PIL import Image
 from config import LLM_SERVER_URL, LLM_MODEL
 from typing import Optional, List, Dict, Any
 from retry import retry_with_backoff
+from llm_provider import LLMProvider
 
 logger = logging.getLogger("img2sdtxt.llm")
 
 
-class LLMClient:
+class LLMClient(LLMProvider):
     def __init__(self, base_url: str = LLM_SERVER_URL, model: str = LLM_MODEL):
         self.base_url = base_url
-        self.model = model
+        self._model = model
         self.endpoint = f"{base_url}/chat/completions"
+
+    @property
+    def provider_name(self) -> str:
+        return "openai_compatible"
+
+    @property
+    def model(self) -> str:
+        return self._model
 
     def _convert_webp_to_png(self, image_bytes: bytes) -> bytes:
         """WebP形式の画像をPNG形式に変換"""
