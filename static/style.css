@@ -991,3 +991,63 @@ textarea { resize: vertical; }
 
 .image-compare .label-before { left: 8px; }
 .image-compare .label-after { right: 8px; }
+
+/* LLM Provider Selector */
+.provider-selector {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border-color, #e0e0e0);
+    margin-top: 8px;
+}
+
+.provider-selector label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-secondary, #666);
+}
+
+.provider-selector select,
+.provider-selector input[type="password"],
+.provider-selector input[type="text"] {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 4px;
+    background: var(--input-bg, #fff);
+    color: var(--text-primary, #333);
+    margin-bottom: 4px;
+    box-sizing: border-box;
+}
+
+.provider-selector .btn-small {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    border: 1px solid var(--primary-color, #4a90d9);
+    background: var(--primary-color, #4a90d9);
+    color: #fff;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.provider-selector .btn-small:hover {
+    opacity: 0.9;
+}
+
+.provider-status-msg {
+    display: block;
+    font-size: 11px;
+    margin-top: 4px;
+    min-height: 14px;
+}
+
+.provider-status-msg.success {
+    color: var(--success-color, #27ae60);
+}
+
+.provider-status-msg.error {
+    color: var(--error-color, #e74c3c);
+}

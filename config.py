@@ -30,6 +30,17 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LLM_CACHE_ENABLED = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
 LLM_CACHE_TTL = int(os.getenv("LLM_CACHE_TTL", "3600"))
 
+# LLM Provider Selection
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai_compatible")
+
+# Anthropic Configuration
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+
+# Google Gemini Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
 # Rate Limiting
 RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
 RATE_LIMIT_GENERATION = int(os.getenv("RATE_LIMIT_GENERATION", "10"))  # requests per minute

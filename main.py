@@ -14,7 +14,7 @@ from config import (
     HTTPS_ENABLED, SSL_CERTFILE, SSL_KEYFILE,
     STYLES, TONES, QUALITY_LEVELS
 )
-from deps import llm_client, sd_client
+import deps
 
 from routes.prompts import router as prompts_router
 from routes.history import router as history_router
@@ -22,6 +22,7 @@ from routes.sd import router as sd_router
 from routes.presets import router as presets_router
 from routes.gallery import router as gallery_router
 from routes.jobs import router as jobs_router
+from routes.llm import router as llm_router
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
@@ -71,6 +72,7 @@ app.include_router(sd_router)
 app.include_router(presets_router)
 app.include_router(gallery_router)
 app.include_router(jobs_router)
+app.include_router(llm_router)
 
 
 # ------------------------------------------------------------------ #
@@ -89,8 +91,8 @@ async def root():
 @app.get("/health")
 async def health():
     """Check all component status and return uptime."""
-    llm_ok = await run_in_threadpool(llm_client.is_available)
-    sd_ok = await run_in_threadpool(sd_client.is_available)
+    llm_ok = await run_in_threadpool(deps.llm_client.is_available)
+    sd_ok = await run_in_threadpool(deps.sd_client.is_available)
 
     overall = "ok" if llm_ok else "degraded"
 
@@ -99,6 +101,8 @@ async def health():
         "components": {
             "llm": {
                 "available": llm_ok,
+                "provider": deps.llm_client.provider_name,
+                "model": deps.llm_client.model,
                 "url": config.LLM_SERVER_URL,
             },
             "sd_api": {
@@ -112,10 +116,13 @@ async def health():
 
 @app.get("/api/config")
 def get_config():
-    from config import LLM_SERVER_URL, LLM_MODEL, SD_API_URL
+    from config import LLM_SERVER_URL, SD_API_URL
+    from deps import llm_client as current_provider, get_available_providers
     return {
         "llm_server": LLM_SERVER_URL,
-        "model": LLM_MODEL,
+        "model": current_provider.model,
+        "provider": current_provider.provider_name,
+        "available_providers": get_available_providers(),
         "sd_api": SD_API_URL,
         "styles": STYLES,
         "tones": TONES,

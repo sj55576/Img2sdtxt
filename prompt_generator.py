@@ -1,7 +1,7 @@
 import base64
 import json
 import logging
-from llm_client import LLMClient
+from llm_provider import LLMProvider
 from typing import Dict
 from config import QUALITY_LEVELS
 
@@ -9,7 +9,7 @@ logger = logging.getLogger("img2sdtxt.prompt")
 
 
 class PromptGenerator:
-    def __init__(self, llm_client: LLMClient):
+    def __init__(self, llm_client: LLMProvider):
         self.llm_client = llm_client
 
     def _parse_json_response(self, text: str) -> Dict:

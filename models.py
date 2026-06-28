@@ -59,3 +59,10 @@ class RefinePromptRequest(BaseModel):
     style: str = Field("")
     tone: str = Field("")
     quality: str = Field("high")
+
+
+class SwitchProviderRequest(BaseModel):
+    provider: str
+    model: str = ""
+    api_key: str = ""
+
