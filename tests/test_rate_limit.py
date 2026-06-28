@@ -1,41 +1,46 @@
 """Tests for rate_limit module."""
 
+import sqlite3
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import config
+import rate_limit as _rate_limit_module
+
 
 
 @pytest.fixture(autouse=True)
-def reset_rate_limiter():
-    """Reset rate limiter state between tests."""
-    from main import app
-    for mw in app.user_middleware:
-        pass
-    yield
-    from rate_limit import RateLimitMiddleware
-    for route in app.routes:
-        pass
-    # Clear the middleware's internal store directly
-    for mw_instance in getattr(app, '_middleware_stack', None) or []:
-        if hasattr(mw_instance, '_store'):
-            mw_instance._store.clear()
-            break
+def temp_rate_limit_db(tmp_path, monkeypatch):
+    """Redirect rate_limit.DB_PATH to a temp file and reset state between tests."""
+    db_file = tmp_path / "test_rate_limit.db"
+    monkeypatch.setattr(_rate_limit_module, "DB_PATH", db_file)
+    with sqlite3.connect(db_file) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS rate_limit_entries (
+                ip TEXT NOT NULL,
+                tier TEXT NOT NULL,
+                timestamp REAL NOT NULL
+            )
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ip_tier ON rate_limit_entries (ip, tier)"
+        )
+        conn.commit()
+    yield db_file
 
 
 @pytest.fixture
-def client():
+def client(temp_rate_limit_db):
     config.RATE_LIMIT_ENABLED = True
     config.RATE_LIMIT_GENERATION = 3
     config.RATE_LIMIT_API = 5
     from main import app
-    # Clear rate limiter state by accessing the middleware
-    stack = app.middleware_stack
-    while stack:
-        if hasattr(stack, '_store'):
-            stack._store.clear()
-            break
-        stack = getattr(stack, 'app', None)
     return TestClient(app)
 
 

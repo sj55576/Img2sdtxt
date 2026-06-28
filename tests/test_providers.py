@@ -10,7 +10,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from llm_provider import LLMProvider
 from llm_client import LLMClient
 from cache import LLMCache
+import cache as _cache_module
 from models import SwitchProviderRequest
+
+
+@pytest.fixture()
+def temp_cache_db(tmp_path, monkeypatch):
+    """Redirect cache DB_PATH to a temp file so tests don't touch data/."""
+    db_file = tmp_path / "test_llm_cache.db"
+    monkeypatch.setattr(_cache_module, "DB_PATH", db_file)
+    yield db_file
 
 
 # ------------------------------------------------------------------ #
@@ -299,31 +308,31 @@ class TestSwitchProviderRequest:
 # ------------------------------------------------------------------ #
 
 class TestCacheKeyIncludesProvider:
-    def test_different_providers_produce_different_keys(self):
+    def test_different_providers_produce_different_keys(self, temp_cache_db):
         cache = LLMCache()
         key_a = cache._make_key(None, "hello", "anime", "dark", "high", provider="anthropic", model="claude-3")
         key_b = cache._make_key(None, "hello", "anime", "dark", "high", provider="gemini", model="claude-3")
         assert key_a != key_b
 
-    def test_different_models_produce_different_keys(self):
+    def test_different_models_produce_different_keys(self, temp_cache_db):
         cache = LLMCache()
         key_a = cache._make_key(None, "hello", "anime", "dark", "high", provider="anthropic", model="model-a")
         key_b = cache._make_key(None, "hello", "anime", "dark", "high", provider="anthropic", model="model-b")
         assert key_a != key_b
 
-    def test_same_inputs_produce_same_key(self):
+    def test_same_inputs_produce_same_key(self, temp_cache_db):
         cache = LLMCache()
         key_a = cache._make_key(b"img", "hello", "anime", "dark", "high", provider="gemini", model="gemini-2.5-flash")
         key_b = cache._make_key(b"img", "hello", "anime", "dark", "high", provider="gemini", model="gemini-2.5-flash")
         assert key_a == key_b
 
-    def test_empty_provider_and_model_are_valid(self):
+    def test_empty_provider_and_model_are_valid(self, temp_cache_db):
         cache = LLMCache()
         key = cache._make_key(None, "text", "style", "tone", "quality")
         assert isinstance(key, str)
         assert len(key) == 64  # sha256 hex digest length
 
-    def test_get_and_set_pass_through_provider_model(self):
+    def test_get_and_set_pass_through_provider_model(self, temp_cache_db):
         cache = LLMCache()
         result_data = {"positive": "flowers", "negative": "blurry"}
 
