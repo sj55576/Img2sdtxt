@@ -12,46 +12,49 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1>🎨 Img2SD</h1>
-                <p>Prompt Generator</p>
+                <h1 data-i18n="sidebar.title">🎨 Img2SD</h1>
+                <p data-i18n="sidebar.subtitle">Prompt Generator</p>
             </div>
             <nav class="sidebar-nav">
-                <button class="nav-btn active" data-page="generate">📤 Generate</button>
-                <button class="nav-btn" data-page="batch">🗂️ Batch</button>
-                <button class="nav-btn" data-page="refine">🔧 Refine</button>
-                <button class="nav-btn" data-page="history">📋 History</button>
-                <button class="nav-btn" data-page="presets">🎨 Presets</button>
-                <button class="nav-btn" data-page="sd">🖼️ SD Generate</button>
-                <button class="nav-btn" data-page="img2img">🔄 Img2Img</button>
-                <button class="nav-btn" data-page="inpaint">🖌️ Inpaint</button>
-                <button class="nav-btn" data-page="gallery">🗃️ Gallery</button>
+                <button class="nav-btn active" data-page="generate" data-i18n="sidebar.nav.generate">📤 Generate</button>
+                <button class="nav-btn" data-page="batch" data-i18n="sidebar.nav.batch">🗂️ Batch</button>
+                <button class="nav-btn" data-page="refine" data-i18n="sidebar.nav.refine">🔧 Refine</button>
+                <button class="nav-btn" data-page="history" data-i18n="sidebar.nav.history">📋 History</button>
+                <button class="nav-btn" data-page="presets" data-i18n="sidebar.nav.presets">🎨 Presets</button>
+                <button class="nav-btn" data-page="sd" data-i18n="sidebar.nav.sd">🖼️ SD Generate</button>
+                <button class="nav-btn" data-page="img2img" data-i18n="sidebar.nav.img2img">🔄 Img2Img</button>
+                <button class="nav-btn" data-page="inpaint" data-i18n="sidebar.nav.inpaint">🖌️ Inpaint</button>
+                <button class="nav-btn" data-page="gallery" data-i18n="sidebar.nav.gallery">🗃️ Gallery</button>
             </nav>
             <div class="theme-toggle-wrap">
-                <button id="theme-toggle-btn" class="theme-toggle-btn" title="テーマ切り替え">🌙 Dark</button>
+                <button id="theme-toggle-btn" class="theme-toggle-btn" data-i18n="sidebar.theme.dark" data-i18n-title="sidebar.theme.toggle_title" title="テーマ切り替え">🌙 Dark</button>
+            </div>
+            <div class="lang-toggle-wrap">
+                <button id="lang-toggle-btn" class="lang-toggle-btn" title="Language / 言語">🌐 日本語</button>
             </div>
             <div class="sidebar-status">
                 <div class="status-indicator" id="llm-status">
-                    <span class="dot"></span><span class="label">LLM</span>
+                    <span class="dot"></span><span class="label" data-i18n="sidebar.status.llm">LLM</span>
                 </div>
                 <div class="status-indicator" id="sd-status">
-                    <span class="dot"></span><span class="label">SD API</span>
+                    <span class="dot"></span><span class="label" data-i18n="sidebar.status.sd">SD API</span>
                 </div>
                 <div id="connection-help" class="connection-help" role="status" aria-live="polite">
-                    <strong>接続を確認中...</strong>
-                    <span>LLM / SD API の状態を確認しています。</span>
+                    <strong data-i18n="sidebar.connection_help.checking_title">接続を確認中...</strong>
+                    <span data-i18n="sidebar.connection_help.checking_detail">LLM / SD API の状態を確認しています。</span>
                 </div>
                 <div class="provider-selector" id="provider-selector">
-                    <label for="llm-provider-select">LLMプロバイダー:</label>
+                    <label for="llm-provider-select" data-i18n="sidebar.provider.label">LLMプロバイダー:</label>
                     <select id="llm-provider-select">
                         <option value="openai_compatible">OpenAI Compatible</option>
                     </select>
                     <div id="provider-api-key-group" style="display:none;">
-                        <input type="password" id="provider-api-key" placeholder="APIキーを入力..." />
+                        <input type="password" id="provider-api-key" data-i18n-placeholder="sidebar.provider.api_key_placeholder" placeholder="APIキーを入力..." />
                     </div>
                     <div id="provider-model-group" style="display:none;">
-                        <input type="text" id="provider-model" placeholder="モデル名" />
+                        <input type="text" id="provider-model" data-i18n-placeholder="sidebar.provider.model_placeholder" placeholder="モデル名" />
                     </div>
-                    <button id="provider-apply-btn" class="btn-small" style="display:none;">適用</button>
+                    <button id="provider-apply-btn" class="btn-small" style="display:none;" data-i18n="sidebar.provider.apply_btn">適用</button>
                     <span id="provider-status-msg" class="provider-status-msg"></span>
                 </div>
             </div>
@@ -65,8 +68,8 @@
             <!-- ======================== GENERATE PAGE ======================== -->
             <section id="page-generate" class="page active">
                 <div class="page-header">
-                    <h2>Generate Prompt</h2>
-                    <p>画像またはテキストからプロンプトを生成</p>
+                    <h2 data-i18n="page.generate.title">Generate Prompt</h2>
+                    <p data-i18n="page.generate.subtitle">画像またはテキストからプロンプトを生成</p>
                 </div>
 
                 <div class="page-body two-col">
@@ -74,41 +77,41 @@
                     <div class="col">
                         <!-- Source Tabs -->
                         <div class="inner-tabs">
-                            <button class="inner-tab active" data-inner="tab-img">📸 Image</button>
-                            <button class="inner-tab" data-inner="tab-txt">✍️ Text</button>
+                            <button class="inner-tab active" data-inner="tab-img" data-i18n="page.generate.tab_image">📸 Image</button>
+                            <button class="inner-tab" data-inner="tab-txt" data-i18n="page.generate.tab_text">✍️ Text</button>
                         </div>
 
                         <!-- Image input -->
                         <div id="tab-img" class="inner-content active">
                             <div class="upload-area" id="upload-area">
                                 <div class="upload-icon">📸</div>
-                                <p>クリックまたはドラッグ&ドロップ</p>
-                                <small>JPG, PNG, WebP, GIF (最大 10MB)</small>
+                                <p data-i18n="page.generate.upload_text">クリックまたはドラッグ&ドロップ</p>
+                                <small data-i18n="page.generate.upload_hint">JPG, PNG, WebP, GIF (最大 10MB)</small>
                             </div>
                             <input type="file" id="image-input" accept="image/*" hidden>
                             <div id="preview-wrap" class="preview-wrap hidden">
                                 <img id="preview-image" src="" alt="Preview">
-                                <button id="clear-image-btn" class="btn btn-sm btn-ghost">✕ クリア</button>
+                                <button id="clear-image-btn" class="btn btn-sm btn-ghost" data-i18n="page.generate.clear_image">✕ クリア</button>
                             </div>
                             <input type="file" id="random-folder-input" webkitdirectory hidden>
                             <input type="file" id="random-folder-auto-input" webkitdirectory hidden>
                             <div class="random-folder-btn-group">
-                                <button id="random-folder-btn" class="btn btn-secondary random-folder-btn">
+                                <button id="random-folder-btn" class="btn btn-secondary random-folder-btn" data-i18n="page.generate.random_folder_btn">
                                     📁 フォルダからランダム読み込み
                                 </button>
-                                <button id="random-folder-auto-btn" class="btn btn-primary random-folder-btn" title="フォルダからランダム読み込み＋プロンプト生成＋マルチモデル実行" aria-label="フォルダからランダム読み込みとプロンプト自動生成とマルチモデル実行">
+                                <button id="random-folder-auto-btn" class="btn btn-primary random-folder-btn" data-i18n="page.generate.random_folder_auto_btn" data-i18n-title="page.generate.random_folder_auto_title" title="フォルダからランダム読み込み＋プロンプト生成＋マルチモデル実行" aria-label="フォルダからランダム読み込みとプロンプト自動生成とマルチモデル実行">
                                     ⚡ 一括実行
                                 </button>
                             </div>
                             <div class="random-folder-count-group">
-                                <label for="random-folder-count" class="random-folder-count-label">一括実行枚数:</label>
+                                <label for="random-folder-count" class="random-folder-count-label" data-i18n="page.generate.batch_count_label">一括実行枚数:</label>
                                 <input type="number" id="random-folder-count" class="random-folder-count-input" value="1" min="1" max="50" title="フォルダからランダムに取得する画像枚数">
                             </div>
                             <div class="random-folder-btn-group">
-                                <button id="clipboard-load-btn" class="btn btn-secondary random-folder-btn" title="クリップボードの画像を読み込む">
+                                <button id="clipboard-load-btn" class="btn btn-secondary random-folder-btn" data-i18n="page.generate.clipboard_load_btn" data-i18n-title="page.generate.clipboard_load_title" title="クリップボードの画像を読み込む">
                                     📋 クリップボードから読み込み
                                 </button>
-                                <button id="clipboard-auto-btn" class="btn btn-primary random-folder-btn" title="クリップボードから読み込み＋プロンプト生成＋マルチモデル実行" aria-label="クリップボードから読み込みとプロンプト自動生成とマルチモデル実行">
+                                <button id="clipboard-auto-btn" class="btn btn-primary random-folder-btn" data-i18n="page.generate.clipboard_auto_btn" data-i18n-title="page.generate.clipboard_auto_title" title="クリップボードから読み込み＋プロンプト生成＋マルチモデル実行" aria-label="クリップボードから読み込みとプロンプト自動生成とマルチモデル実行">
                                     ⚡ クリップボード一括実行
                                 </button>
                             </div>
@@ -116,16 +119,16 @@
 
                         <!-- Text input -->
                         <div id="tab-txt" class="inner-content">
-                            <label class="field-label">画像の説明:</label>
-                            <textarea id="description-input" rows="5" placeholder="生成したい画像を説明してください..."></textarea>
+                            <label class="field-label" data-i18n="page.generate.description_label">画像の説明:</label>
+                            <textarea id="description-input" rows="5" data-i18n-placeholder="page.generate.description_placeholder" placeholder="生成したい画像を説明してください..."></textarea>
                         </div>
 
                         <!-- Customization Panel -->
                         <div class="customization-panel">
-                            <h3>⚙️ カスタマイズ</h3>
+                            <h3 data-i18n="page.generate.customize_title">⚙️ カスタマイズ</h3>
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label>スタイル</label>
+                                    <label data-i18n="page.generate.style_label">スタイル</label>
                                     <select id="select-style">
                                         <option value="">-- なし --</option>
                                         <option value="photorealistic">Photorealistic</option>
@@ -139,7 +142,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>トーン</label>
+                                    <label data-i18n="page.generate.tone_label">トーン</label>
                                     <select id="select-tone">
                                         <option value="">-- なし --</option>
                                         <option value="natural">Natural</option>
@@ -153,7 +156,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>品質</label>
+                                    <label data-i18n="page.generate.quality_label">品質</label>
                                     <select id="select-quality">
                                         <option value="standard">Standard</option>
                                         <option value="high" selected>High</option>
@@ -161,7 +164,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>プリセット</label>
+                                    <label data-i18n="page.generate.preset_label">プリセット</label>
                                     <select id="select-preset">
                                         <option value="">-- なし --</option>
                                     </select>
@@ -170,47 +173,47 @@
                         </div>
 
                         <div class="generate-btn-group">
-                            <button id="generate-btn" class="btn btn-primary" disabled>
+                            <button id="generate-btn" class="btn btn-primary" disabled data-i18n="page.generate.generate_btn">
                                 ✨ プロンプト生成
                             </button>
-                            <button id="generate-and-multi-btn" class="btn btn-primary" disabled>
+                            <button id="generate-and-multi-btn" class="btn btn-primary" disabled data-i18n="page.generate.generate_multi_btn">
                                 🔁 生成＋マルチモデル
                             </button>
                         </div>
-                        <p class="ctrl-enter-hint">Ctrl+Enterで実行</p>
+                        <p class="ctrl-enter-hint" data-i18n="page.generate.ctrl_enter_hint">Ctrl+Enterで実行</p>
                     </div>
 
                     <!-- Right: Results -->
                     <div class="col">
                         <div id="loading-generate" class="loading-box hidden">
                             <div class="spinner"></div>
-                            <p>LLMで生成中...</p>
+                            <p data-i18n="page.generate.loading">LLMで生成中...</p>
                         </div>
 
                         <div id="result-box" class="result-box hidden">
                             <div class="prompt-card positive">
                                 <div class="prompt-card-header">
-                                    <span>✅ Positive Prompt</span>
-                                    <button class="copy-btn" data-target="pos-prompt">Copy</button>
+                                    <span data-i18n="page.generate.positive_prompt_label">✅ Positive Prompt</span>
+                                    <button class="copy-btn" data-target="pos-prompt" data-i18n="page.generate.copy_btn">Copy</button>
                                 </div>
                                 <textarea id="pos-prompt" class="prompt-ta"></textarea>
                                 <span class="token-counter" id="positive-output-tokens"></span>
                             </div>
                             <div class="prompt-card negative">
                                 <div class="prompt-card-header">
-                                    <span>❌ Negative Prompt</span>
-                                    <button class="copy-btn" data-target="neg-prompt">Copy</button>
+                                    <span data-i18n="page.generate.negative_prompt_label">❌ Negative Prompt</span>
+                                    <button class="copy-btn" data-target="neg-prompt" data-i18n="page.generate.copy_btn">Copy</button>
                                 </div>
                                 <textarea id="neg-prompt" class="prompt-ta"></textarea>
                                 <span class="token-counter" id="negative-output-tokens"></span>
                             </div>
                             <div class="result-actions">
-                                <button id="copy-all-btn" class="btn btn-secondary">📋 全コピー</button>
-                                <button id="refine-prompt-btn" class="btn btn-secondary">🔧 Refine</button>
-                                <button id="send-to-sd-btn" class="btn btn-accent">🖼️ SDで生成</button>
-                                <button id="send-to-sd-and-generate-btn" class="btn btn-primary">🚀 SD自動生成</button>
-                                <button id="send-to-sd-and-multi-generate-btn" class="btn btn-primary">🔁 マルチモデル自動生成</button>
-                                <button id="send-to-img2img-btn" class="btn btn-accent">🔄 Img2Imgへ</button>
+                                <button id="copy-all-btn" class="btn btn-secondary" data-i18n="page.generate.copy_all_btn">📋 全コピー</button>
+                                <button id="refine-prompt-btn" class="btn btn-secondary" data-i18n="page.generate.refine_btn">🔧 Refine</button>
+                                <button id="send-to-sd-btn" class="btn btn-accent" data-i18n="page.generate.send_to_sd_btn">🖼️ SDで生成</button>
+                                <button id="send-to-sd-and-generate-btn" class="btn btn-primary" data-i18n="page.generate.send_to_sd_auto_btn">🚀 SD自動生成</button>
+                                <button id="send-to-sd-and-multi-generate-btn" class="btn btn-primary" data-i18n="page.generate.send_to_sd_multi_btn">🔁 マルチモデル自動生成</button>
+                                <button id="send-to-img2img-btn" class="btn btn-accent" data-i18n="page.generate.send_to_img2img_btn">🔄 Img2Imgへ</button>
                             </div>
                         </div>
                     </div>
@@ -220,29 +223,29 @@
             <!-- ======================== REFINE PAGE ======================== -->
             <section id="page-refine" class="page">
                 <div class="page-header">
-                    <h2>Refine Prompt</h2>
-                    <p>既存のプロンプトをLLMで改善・強化</p>
+                    <h2 data-i18n="page.refine.title">Refine Prompt</h2>
+                    <p data-i18n="page.refine.subtitle">既存のプロンプトをLLMで改善・強化</p>
                 </div>
                 <div class="page-body two-col">
                     <!-- Left: Input -->
                     <div class="col">
                         <div class="form-group">
-                            <label class="field-label">Positive Prompt <span class="required">*</span></label>
-                            <textarea id="refine-positive-input" class="prompt-ta" rows="6" placeholder="改善したいポジティブプロンプトを入力..."></textarea>
+                            <label class="field-label">Positive Prompt <span class="required" data-i18n="page.refine.positive_required">*</span></label>
+                            <textarea id="refine-positive-input" class="prompt-ta" rows="6" data-i18n-placeholder="page.refine.positive_placeholder" placeholder="改善したいポジティブプロンプトを入力..."></textarea>
                         </div>
                         <div class="form-group">
                             <label class="field-label">Negative Prompt</label>
-                            <textarea id="refine-negative-input" class="prompt-ta" rows="4" placeholder="ネガティブプロンプト（省略可）"></textarea>
+                            <textarea id="refine-negative-input" class="prompt-ta" rows="4" data-i18n-placeholder="page.refine.negative_placeholder" placeholder="ネガティブプロンプト（省略可）"></textarea>
                         </div>
                         <div class="form-group">
-                            <label class="field-label">改善の指示（オプション）</label>
-                            <input type="text" id="refine-instruction-input" class="form-input" placeholder="例: アニメスタイルに変更して, より詳細なライティングを追加して">
+                            <label class="field-label" data-i18n="page.refine.instruction_label">改善の指示（オプション）</label>
+                            <input type="text" id="refine-instruction-input" class="form-input" data-i18n-placeholder="page.refine.instruction_placeholder" placeholder="例: アニメスタイルに変更して, より詳細なライティングを追加して">
                         </div>
                         <div class="customization-panel">
-                            <h3>⚙️ カスタマイズ</h3>
+                            <h3 data-i18n="page.refine.customize_title">⚙️ カスタマイズ</h3>
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label>スタイル</label>
+                                    <label data-i18n="page.refine.style_label">スタイル</label>
                                     <select id="refine-style">
                                         <option value="">-- なし --</option>
                                         <option value="photorealistic">Photorealistic</option>
@@ -256,7 +259,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>トーン</label>
+                                    <label data-i18n="page.refine.tone_label">トーン</label>
                                     <select id="refine-tone">
                                         <option value="">-- なし --</option>
                                         <option value="natural">Natural</option>
@@ -270,7 +273,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>品質</label>
+                                    <label data-i18n="page.refine.quality_label">品質</label>
                                     <select id="refine-quality">
                                         <option value="standard">Standard</option>
                                         <option value="high" selected>High</option>
@@ -279,42 +282,42 @@
                                 </div>
                             </div>
                         </div>
-                        <button id="refine-btn" class="btn btn-primary btn-block">
+                        <button id="refine-btn" class="btn btn-primary btn-block" data-i18n="page.refine.refine_btn">
                             🔧 プロンプトを改善
                         </button>
-                        <p class="ctrl-enter-hint">Ctrl+Enterで実行</p>
+                        <p class="ctrl-enter-hint" data-i18n="page.refine.ctrl_enter_hint">Ctrl+Enterで実行</p>
                     </div>
 
                     <!-- Right: Results -->
                     <div class="col">
                         <div id="loading-refine" class="loading-box hidden">
                             <div class="spinner"></div>
-                            <p>LLMで改善中...</p>
+                            <p data-i18n="page.refine.loading">LLMで改善中...</p>
                         </div>
                         <div id="refine-result-box" class="result-box hidden">
                             <div id="refine-changes-box" class="refine-changes-box hidden">
-                                <div class="refine-changes-header">💡 改善ポイント</div>
+                                <div class="refine-changes-header" data-i18n="page.refine.changes_header">💡 改善ポイント</div>
                                 <div id="refine-changes-text"></div>
                             </div>
                             <div class="prompt-card positive">
                                 <div class="prompt-card-header">
-                                    <span>✅ Positive Prompt</span>
-                                    <button class="copy-btn" data-target="refine-pos-output">Copy</button>
+                                    <span data-i18n="page.refine.positive_output_label">✅ Positive Prompt</span>
+                                    <button class="copy-btn" data-target="refine-pos-output" data-i18n="page.refine.copy_btn">Copy</button>
                                 </div>
                                 <textarea id="refine-pos-output" class="prompt-ta"></textarea>
                             </div>
                             <div class="prompt-card negative">
                                 <div class="prompt-card-header">
-                                    <span>❌ Negative Prompt</span>
-                                    <button class="copy-btn" data-target="refine-neg-output">Copy</button>
+                                    <span data-i18n="page.refine.negative_output_label">❌ Negative Prompt</span>
+                                    <button class="copy-btn" data-target="refine-neg-output" data-i18n="page.refine.copy_btn">Copy</button>
                                 </div>
                                 <textarea id="refine-neg-output" class="prompt-ta"></textarea>
                             </div>
                             <div class="result-actions">
-                                <button id="refine-copy-all-btn" class="btn btn-secondary">📋 全コピー</button>
-                                <button id="refine-send-to-sd-btn" class="btn btn-accent">🖼️ SDで生成</button>
-                                <button id="refine-send-to-sd-and-generate-btn" class="btn btn-primary">🚀 SD自動生成</button>
-                                <button id="refine-apply-btn" class="btn btn-secondary">↩️ 入力に反映</button>
+                                <button id="refine-copy-all-btn" class="btn btn-secondary" data-i18n="page.refine.copy_all_btn">📋 全コピー</button>
+                                <button id="refine-send-to-sd-btn" class="btn btn-accent" data-i18n="page.refine.send_to_sd_btn">🖼️ SDで生成</button>
+                                <button id="refine-send-to-sd-and-generate-btn" class="btn btn-primary" data-i18n="page.refine.send_to_sd_auto_btn">🚀 SD自動生成</button>
+                                <button id="refine-apply-btn" class="btn btn-secondary" data-i18n="page.refine.apply_btn">↩️ 入力に反映</button>
                             </div>
                         </div>
                     </div>
@@ -324,14 +327,14 @@
             <!-- ======================== BATCH PAGE ======================== -->
             <section id="page-batch" class="page">
                 <div class="page-header">
-                    <h2>Batch Processing</h2>
-                    <p>複数画像を一括処理</p>
+                    <h2 data-i18n="page.batch.title">Batch Processing</h2>
+                    <p data-i18n="page.batch.subtitle">複数画像を一括処理</p>
                 </div>
                 <div class="page-body">
                     <div class="upload-area multi" id="batch-upload-area">
                         <div class="upload-icon">🗂️</div>
-                        <p>複数の画像をドラッグ&ドロップ (最大10枚)</p>
-                        <small>JPG, PNG, WebP, GIF (各最大 10MB)</small>
+                        <p data-i18n="page.batch.upload_text">複数の画像をドラッグ&ドロップ (最大10枚)</p>
+                        <small data-i18n="page.batch.upload_hint">JPG, PNG, WebP, GIF (各最大 10MB)</small>
                     </div>
                     <input type="file" id="batch-input" accept="image/*" multiple hidden>
 
@@ -339,7 +342,7 @@
 
                     <div class="form-grid">
                         <div class="form-group">
-                            <label>スタイル</label>
+                            <label data-i18n="page.batch.style_label">スタイル</label>
                             <select id="batch-style">
                                 <option value="">-- なし --</option>
                                 <option value="photorealistic">Photorealistic</option>
@@ -350,7 +353,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>品質</label>
+                            <label data-i18n="page.batch.quality_label">品質</label>
                             <select id="batch-quality">
                                 <option value="standard">Standard</option>
                                 <option value="high" selected>High</option>
@@ -358,20 +361,20 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>プリセット</label>
+                            <label data-i18n="page.batch.preset_label">プリセット</label>
                             <select id="batch-preset">
                                 <option value="">-- なし --</option>
                             </select>
                         </div>
                     </div>
 
-                    <button id="batch-generate-btn" class="btn btn-primary" disabled>
+                    <button id="batch-generate-btn" class="btn btn-primary" disabled data-i18n="page.batch.generate_btn">
                         ✨ 一括生成
                     </button>
 
                     <div id="batch-loading" class="loading-box hidden">
                         <div class="spinner"></div>
-                        <p id="batch-progress-text">処理中...</p>
+                        <p id="batch-progress-text" data-i18n="page.batch.processing">処理中...</p>
                     </div>
 
                     <div id="batch-results" class="batch-results hidden"></div>
@@ -381,19 +384,19 @@
             <!-- ======================== HISTORY PAGE ======================== -->
             <section id="page-history" class="page">
                 <div class="page-header">
-                    <h2>History</h2>
-                    <p>生成履歴の管理</p>
+                    <h2 data-i18n="page.history.title">History</h2>
+                    <p data-i18n="page.history.subtitle">生成履歴の管理</p>
                     <div class="header-actions">
-                        <button id="export-history-btn" class="btn btn-sm btn-secondary" onclick="exportHistory('json')">📥 JSON</button>
-                        <button class="btn btn-sm btn-secondary" onclick="exportHistory('csv')">📥 CSV</button>
-                        <button id="refresh-history-btn" class="btn btn-sm btn-secondary">🔄 更新</button>
-                        <button id="clear-history-btn" class="btn btn-sm btn-danger">🗑️ 全削除</button>
+                        <button id="export-history-btn" class="btn btn-sm btn-secondary" onclick="exportHistory('json')" data-i18n="page.history.export_json_btn">📥 JSON</button>
+                        <button class="btn btn-sm btn-secondary" onclick="exportHistory('csv')" data-i18n="page.history.export_csv_btn">📥 CSV</button>
+                        <button id="refresh-history-btn" class="btn btn-sm btn-secondary" data-i18n="page.history.refresh_btn">🔄 更新</button>
+                        <button id="clear-history-btn" class="btn btn-sm btn-danger" data-i18n="page.history.clear_btn">🗑️ 全削除</button>
                     </div>
                 </div>
                 <div class="history-filters">
-                    <input type="text" id="history-search" class="history-search-input" placeholder="🔍 プロンプト・ファイル名で検索...">
+                    <input type="text" id="history-search" class="history-search-input" data-i18n-placeholder="page.history.search_placeholder" placeholder="🔍 プロンプト・ファイル名で検索...">
                     <select id="history-filter-style" class="history-filter-select">
-                        <option value="">全スタイル</option>
+                        <option value="" data-i18n="page.history.filter_all_styles">全スタイル</option>
                         <option value="photorealistic">Photorealistic</option>
                         <option value="anime">Anime</option>
                         <option value="painting">Painting</option>
@@ -404,20 +407,20 @@
                         <option value="3d_render">3D Render</option>
                     </select>
                     <select id="history-filter-quality" class="history-filter-select">
-                        <option value="">全クオリティ</option>
+                        <option value="" data-i18n="page.history.filter_all_quality">全クオリティ</option>
                         <option value="standard">Standard</option>
                         <option value="high">High</option>
                         <option value="ultra">Ultra</option>
                     </select>
-                    <button id="history-favorites-toggle" class="btn btn-sm btn-secondary" data-active="false">⭐ お気に入り</button>
-                    <input type="text" id="history-filter-tag" class="history-search-input" placeholder="🏷️ タグでフィルタ..." style="max-width: 180px;">
+                    <button id="history-favorites-toggle" class="btn btn-sm btn-secondary" data-active="false" data-i18n="page.history.favorites_btn">⭐ お気に入り</button>
+                    <input type="text" id="history-filter-tag" class="history-search-input" data-i18n-placeholder="page.history.tag_filter_placeholder" placeholder="🏷️ タグでフィルタ..." style="max-width: 180px;">
                 </div>
                 <div class="page-body">
                     <div id="history-loading" class="loading-box hidden">
                         <div class="spinner"></div>
                     </div>
                     <div id="history-empty" class="empty-state hidden">
-                        <p>履歴がありません</p>
+                        <p data-i18n="page.history.empty">履歴がありません</p>
                     </div>
                     <div id="history-list" class="history-list"></div>
                 </div>
@@ -426,9 +429,9 @@
             <!-- ======================== PRESETS PAGE ======================== -->
             <section id="page-presets" class="page">
                 <div class="page-header">
-                    <h2>Presets</h2>
-                    <p>プリセットの管理</p>
-                    <button id="add-preset-btn" class="btn btn-sm btn-primary">+ 追加</button>
+                    <h2 data-i18n="page.presets.title">Presets</h2>
+                    <p data-i18n="page.presets.subtitle">プリセットの管理</p>
+                    <button id="add-preset-btn" class="btn btn-sm btn-primary" data-i18n="page.presets.add_btn">+ 追加</button>
                 </div>
                 <div class="page-body">
                     <div id="presets-list" class="presets-list"></div>
@@ -437,26 +440,26 @@
                 <!-- Add Preset Modal -->
                 <div id="preset-modal" class="modal hidden">
                     <div class="modal-box">
-                        <h3>新しいプリセット</h3>
+                        <h3 data-i18n="page.presets.modal_title">新しいプリセット</h3>
                         <div class="form-group">
-                            <label>名前 *</label>
-                            <input type="text" id="preset-name" placeholder="My Preset">
+                            <label data-i18n="page.presets.name_label">名前 *</label>
+                            <input type="text" id="preset-name" data-i18n-placeholder="page.presets.name_placeholder" placeholder="My Preset">
                         </div>
                         <div class="form-group">
-                            <label>説明</label>
-                            <input type="text" id="preset-desc" placeholder="プリセットの説明">
+                            <label data-i18n="page.presets.desc_label">説明</label>
+                            <input type="text" id="preset-desc" data-i18n-placeholder="page.presets.desc_placeholder" placeholder="プリセットの説明">
                         </div>
                         <div class="form-group">
-                            <label>Positive Suffix *</label>
-                            <textarea id="preset-pos" rows="3" placeholder="追加するポジティブタグ..."></textarea>
+                            <label data-i18n="page.presets.pos_suffix_label">Positive Suffix *</label>
+                            <textarea id="preset-pos" rows="3" data-i18n-placeholder="page.presets.pos_suffix_placeholder" placeholder="追加するポジティブタグ..."></textarea>
                         </div>
                         <div class="form-group">
-                            <label>Negative Suffix *</label>
-                            <textarea id="preset-neg" rows="3" placeholder="追加するネガティブタグ..."></textarea>
+                            <label data-i18n="page.presets.neg_suffix_label">Negative Suffix *</label>
+                            <textarea id="preset-neg" rows="3" data-i18n-placeholder="page.presets.neg_suffix_placeholder" placeholder="追加するネガティブタグ..."></textarea>
                         </div>
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>スタイル</label>
+                                <label data-i18n="page.presets.style_label">スタイル</label>
                                 <select id="preset-style">
                                     <option value="">-- なし --</option>
                                     <option value="photorealistic">Photorealistic</option>
@@ -465,7 +468,7 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>品質</label>
+                                <label data-i18n="page.presets.quality_label">品質</label>
                                 <select id="preset-quality">
                                     <option value="standard">Standard</option>
                                     <option value="high" selected>High</option>
@@ -474,8 +477,8 @@
                             </div>
                         </div>
                         <div class="modal-actions">
-                            <button id="save-preset-btn" class="btn btn-primary">保存</button>
-                            <button id="cancel-preset-btn" class="btn btn-ghost">キャンセル</button>
+                            <button id="save-preset-btn" class="btn btn-primary" data-i18n="page.presets.save_btn">保存</button>
+                            <button id="cancel-preset-btn" class="btn btn-ghost" data-i18n="page.presets.cancel_btn">キャンセル</button>
                         </div>
                     </div>
                 </div>
@@ -484,8 +487,8 @@
             <!-- ======================== SD GENERATE PAGE ======================== -->
             <section id="page-sd" class="page">
                 <div class="page-header">
-                    <h2>SD Generate</h2>
-                    <p>Stable Diffusion APIで直接生成</p>
+                    <h2 data-i18n="page.sd.title">SD Generate</h2>
+                    <p data-i18n="page.sd.subtitle">Stable Diffusion APIで直接生成</p>
                     <div id="sd-api-badge" class="badge badge-gray">Checking...</div>
                 </div>
                 <div class="page-body two-col">
@@ -493,18 +496,18 @@
                     <div class="col">
                         <!-- Model & LoRA Panel -->
                         <div class="customization-panel">
-                            <h3>🎯 モデル・LoRA設定</h3>
+                            <h3 data-i18n="page.sd.model_lora_title">🎯 モデル・LoRA設定</h3>
                             <div class="form-group">
-                                <label>モデル</label>
+                                <label data-i18n="page.sd.model_label">モデル</label>
                                 <select id="sd-model">
                                     <option value="">-- デフォルト --</option>
                                 </select>
-                                <small>利用可能なチェックポイントを選択</small>
+                                <small data-i18n="page.sd.model_hint">利用可能なチェックポイントを選択</small>
                             </div>
                             <div class="form-group">
-                                <label>LoRA</label>
+                                <label data-i18n="page.sd.lora_label">LoRA</label>
                                 <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
-                                    <input type="text" id="sd-lora-search" placeholder="LoRAを検索..."
+                                    <input type="text" id="sd-lora-search" data-i18n-placeholder="page.sd.lora_search_placeholder" placeholder="LoRAを検索..."
                                            style="flex:1; padding:4px 8px; border-radius:4px; font-size:0.85em;"
                                            oninput="filterLoras('sd', this.value)" />
                                     <span id="sd-lora-count" style="font-size:0.8em; color:#888; white-space:nowrap;"></span>
@@ -514,22 +517,22 @@
                                         <option value="">-- LoRA選択 --</option>
                                     </select>
                                     <input type="number" id="sd-lora-weight" value="1.0" min="0" max="2" step="0.05" title="Weight">
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLora('sd')">追加</button>
-                                    <button type="button" class="btn btn-sm btn-ghost" onclick="loadLoras('sd')" title="LoRA一覧を更新">&#8635;</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLora('sd')" data-i18n="page.sd.lora_add_btn">追加</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="loadLoras('sd')" data-i18n-title="page.sd.lora_refresh_title" title="LoRA一覧を更新">&#8635;</button>
                                 </div>
                                 <input type="text" id="sd-loras" placeholder="&lt;lora:name:1.0&gt; ..." style="margin-top:6px;">
-                                <small>ドロップダウンから選択して追加、または直接入力</small>
+                                <small data-i18n="page.sd.lora_direct_hint">ドロップダウンから選択して追加、または直接入力</small>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label>Positive Prompt</label>
-                            <textarea id="sd-positive" rows="4" placeholder="ポジティブプロンプト..."></textarea>
+                            <textarea id="sd-positive" rows="4" data-i18n-placeholder="page.sd.positive_placeholder" placeholder="ポジティブプロンプト..."></textarea>
                             <span class="token-counter" id="sd-positive-tokens"></span>
                         </div>
                         <div class="form-group">
                             <label>Negative Prompt</label>
-                            <textarea id="sd-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                            <textarea id="sd-negative" rows="3" data-i18n-placeholder="page.sd.negative_placeholder" placeholder="ネガティブプロンプト..."></textarea>
                             <span class="token-counter" id="sd-negative-tokens"></span>
                             <select id="sd-neg-template" class="neg-template-select"></select>
                         </div>
@@ -578,17 +581,17 @@
                         </div>
                         <!-- Upscaling Settings (Hires.fix) -->
                         <div class="customization-panel">
-                            <h3>🔍 アップスケール設定 (Hires.fix)</h3>
+                            <h3 data-i18n="page.sd.upscale_title">🔍 アップスケール設定 (Hires.fix)</h3>
                             <div class="form-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="sd-enable-hr">
-                                    <span>Hires.fix を有効化（高解像度アップスケール）</span>
+                                    <span data-i18n="page.sd.hires_enable">Hires.fix を有効化（高解像度アップスケール）</span>
                                 </label>
                             </div>
                             <div id="sd-hr-settings" class="hr-settings hidden">
                                 <div class="form-grid">
                                     <div class="form-group">
-                                        <label>スケール倍率</label>
+                                        <label data-i18n="page.sd.hr_scale_label">スケール倍率</label>
                                         <select id="sd-hr-scale">
                                             <option value="1.5">1.5x</option>
                                             <option value="2" selected>2x</option>
@@ -598,7 +601,7 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label>アップスケーラー</label>
+                                        <label data-i18n="page.sd.hr_upscaler_label">アップスケーラー</label>
                                         <select id="sd-hr-upscaler">
                                             <option>R-ESRGAN 4x+</option>
                                             <option>R-ESRGAN 4x+ Anime6B</option>
@@ -610,38 +613,38 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label>Hiresステップ数</label>
+                                        <label data-i18n="page.sd.hr_steps_label">Hiresステップ数</label>
                                         <input type="number" id="sd-hr-steps" value="0" min="0" max="150">
-                                        <small>0 = メインと同じステップ数</small>
+                                        <small data-i18n="page.sd.hr_steps_hint">0 = メインと同じステップ数</small>
                                     </div>
                                     <div class="form-group">
-                                        <label>デノイジング強度</label>
+                                        <label data-i18n="page.sd.hr_denoising_label">デノイジング強度</label>
                                         <input type="number" id="sd-hr-denoising" value="0.7" min="0" max="1" step="0.05">
-                                        <small>0=忠実に拡大, 1=大きく変化</small>
+                                        <small data-i18n="page.sd.hr_denoising_hint">0=忠実に拡大, 1=大きく変化</small>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <button id="sd-generate-btn" class="btn btn-accent btn-block">
+                        <button id="sd-generate-btn" class="btn btn-accent btn-block" data-i18n="page.sd.generate_btn">
                             🖼️ 画像生成
                         </button>
 
                         <!-- Multi-model Generation Panel -->
                         <div class="customization-panel" style="margin-top:16px;">
-                            <h3>🔁 マルチモデル生成</h3>
-                            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;">同一プロンプト・設定を複数モデルに順番に適用</p>
+                            <h3 data-i18n="page.sd.multi_model_title">🔁 マルチモデル生成</h3>
+                            <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;" data-i18n="page.sd.multi_model_desc">同一プロンプト・設定を複数モデルに順番に適用</p>
                             <div class="form-group">
                                 <div class="multi-model-actions">
-                                    <button class="btn btn-sm btn-secondary" onclick="selectAllModels(true)">全選択</button>
-                                    <button class="btn btn-sm btn-ghost" onclick="selectAllModels(false)">全解除</button>
+                                    <button class="btn btn-sm btn-secondary" onclick="selectAllModels(true)" data-i18n="page.sd.select_all_btn">全選択</button>
+                                    <button class="btn btn-sm btn-ghost" onclick="selectAllModels(false)" data-i18n="page.sd.deselect_all_btn">全解除</button>
                                     <span id="sd-multi-model-count" class="multi-model-count">0 モデル選択中</span>
                                 </div>
                                 <div id="sd-multi-model-list" class="multi-model-list">
-                                    <p class="multi-model-empty">SD APIに接続するとモデルが表示されます</p>
+                                    <p class="multi-model-empty" data-i18n="page.sd.multi_model_empty">SD APIに接続するとモデルが表示されます</p>
                                 </div>
                             </div>
-                            <button id="sd-multi-generate-btn" class="btn btn-primary btn-block" disabled>
+                            <button id="sd-multi-generate-btn" class="btn btn-primary btn-block" disabled data-i18n="page.sd.multi_generate_btn">
                                 🔁 選択モデルで順次生成
                             </button>
                         </div>
@@ -651,20 +654,20 @@
                     <div class="col">
                         <div id="sd-loading" class="loading-box hidden">
                             <div class="spinner"></div>
-                            <p>生成中... (しばらくお待ちください)</p>
+                            <p data-i18n="page.sd.loading">生成中... (しばらくお待ちください)</p>
                             <div id="sd-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
                         </div>
                         <div id="sd-results" class="sd-results hidden">
-                            <h3>生成された画像</h3>
+                            <h3 data-i18n="page.sd.results_title">生成された画像</h3>
                             <div id="sd-images" class="sd-images"></div>
                         </div>
                         <div id="sd-multi-loading" class="loading-box hidden">
                             <div class="spinner"></div>
-                            <p id="sd-multi-loading-text">マルチモデル生成中...</p>
+                            <p id="sd-multi-loading-text" data-i18n="page.sd.multi_loading">マルチモデル生成中...</p>
                             <div id="sd-multi-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
                         </div>
                         <div id="sd-multi-results" class="hidden">
-                            <h3>マルチモデル生成結果</h3>
+                            <h3 data-i18n="page.sd.multi_results_title">マルチモデル生成結果</h3>
                             <div id="sd-multi-images"></div>
                         </div>
                     </div>
@@ -673,8 +676,8 @@
             <!-- ======================== IMG2IMG PAGE ======================== -->
             <section id="page-img2img" class="page">
                 <div class="page-header">
-                    <h2>Img2Img</h2>
-                    <p>入力画像を元にStable Diffusionで変換生成</p>
+                    <h2 data-i18n="page.img2img.title">Img2Img</h2>
+                    <p data-i18n="page.img2img.subtitle">入力画像を元にStable Diffusionで変換生成</p>
                     <div id="i2i-api-badge" class="badge badge-gray">Checking...</div>
                 </div>
                 <div class="page-body two-col">
@@ -682,19 +685,19 @@
                     <div class="col">
                         <!-- Input Image -->
                         <div class="form-group" style="margin-bottom:12px;">
-                            <label>入力画像</label>
+                            <label data-i18n="page.img2img.input_image_label">入力画像</label>
                             <div class="upload-area" id="i2i-upload-area">
                                 <div class="upload-icon">🖼️</div>
-                                <p>クリックまたはドラッグ&ドロップ</p>
-                                <small>JPG, PNG, WebP, GIF (最大 10MB)</small>
+                                <p data-i18n="page.img2img.upload_text">クリックまたはドラッグ&ドロップ</p>
+                                <small data-i18n="page.img2img.upload_hint">JPG, PNG, WebP, GIF (最大 10MB)</small>
                             </div>
                             <input type="file" id="i2i-image-input" accept="image/*" hidden>
                             <div id="i2i-preview-wrap" class="preview-wrap hidden">
                                 <img id="i2i-preview-image" src="" alt="Preview">
-                                <button id="i2i-clear-btn" class="btn btn-sm btn-ghost">✕ クリア</button>
+                                <button id="i2i-clear-btn" class="btn btn-sm btn-ghost" data-i18n="page.img2img.clear_btn">✕ クリア</button>
                             </div>
                             <input type="file" id="i2i-random-folder-input" webkitdirectory hidden>
-                            <button id="i2i-random-folder-btn" class="btn btn-secondary btn-block random-folder-btn">
+                            <button id="i2i-random-folder-btn" class="btn btn-secondary btn-block random-folder-btn" data-i18n="page.img2img.random_folder_btn">
                                 📁 フォルダからランダム読み込み
                             </button>
                         </div>
@@ -702,37 +705,37 @@
                         <!-- Prompts -->
                         <div class="form-group">
                             <label>Positive Prompt</label>
-                            <textarea id="i2i-positive" rows="4" placeholder="ポジティブプロンプト..."></textarea>
+                            <textarea id="i2i-positive" rows="4" data-i18n-placeholder="page.img2img.positive_placeholder" placeholder="ポジティブプロンプト..."></textarea>
                             <span class="token-counter" id="img2img-positive-tokens"></span>
                         </div>
                         <div class="form-group" style="margin-top:10px;">
                             <label>Negative Prompt</label>
-                            <textarea id="i2i-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                            <textarea id="i2i-negative" rows="3" data-i18n-placeholder="page.img2img.negative_placeholder" placeholder="ネガティブプロンプト..."></textarea>
                             <span class="token-counter" id="img2img-negative-tokens"></span>
                             <select id="img2img-neg-template" class="neg-template-select"></select>
                         </div>
 
                         <!-- Model & LoRA -->
                         <div class="customization-panel">
-                            <h3>🎯 モデル・LoRA設定</h3>
+                            <h3 data-i18n="page.img2img.model_lora_title">🎯 モデル・LoRA設定</h3>
                             <div class="form-group">
-                                <label>モデル</label>
+                                <label data-i18n="page.img2img.model_label">モデル</label>
                                 <select id="i2i-model">
                                     <option value="">-- デフォルト --</option>
                                 </select>
                             </div>
                             <div class="form-group" style="margin-top:10px;">
-                                <label>LoRA</label>
+                                <label data-i18n="page.img2img.lora_label">LoRA</label>
                                 <div class="lora-add-row">
                                     <select id="i2i-lora-select">
                                         <option value="">-- LoRA選択 --</option>
                                     </select>
                                     <input type="number" id="i2i-lora-weight" value="1.0" min="0" max="2" step="0.05" title="Weight">
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLora('i2i')">追加</button>
-                                    <button type="button" class="btn btn-sm btn-ghost" onclick="loadLoras('i2i')" title="LoRA一覧を更新">&#8635;</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLora('i2i')" data-i18n="page.img2img.lora_add_btn">追加</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="loadLoras('i2i')" data-i18n-title="page.img2img.lora_refresh_title" title="LoRA一覧を更新">&#8635;</button>
                                 </div>
                                 <input type="text" id="i2i-loras" placeholder="&lt;lora:name:1.0&gt; ..." style="margin-top:6px;">
-                                <small>ドロップダウンから選択して追加、または直接入力</small>
+                                <small data-i18n="page.img2img.lora_direct_hint">ドロップダウンから選択して追加、または直接入力</small>
                             </div>
                         </div>
 
@@ -741,14 +744,14 @@
                             <div class="form-group">
                                 <label>Denoising Strength</label>
                                 <input type="number" id="i2i-denoising" value="0.75" min="0" max="1" step="0.05">
-                                <small style="color:var(--text-muted);font-size:0.75rem;">0=変化なし 1=完全変換</small>
+                                <small style="color:var(--text-muted);font-size:0.75rem;" data-i18n="page.img2img.denoising_hint">0=変化なし 1=完全変換</small>
                             </div>
                             <div class="form-group">
                                 <label>Resize Mode</label>
                                 <select id="i2i-resize-mode">
-                                    <option value="0">そのままリサイズ</option>
-                                    <option value="1">クロップ&リサイズ</option>
-                                    <option value="2">リサイズ&フィル</option>
+                                    <option value="0" data-i18n="page.img2img.resize_mode_direct">そのままリサイズ</option>
+                                    <option value="1" data-i18n="page.img2img.resize_mode_crop">クロップ&リサイズ</option>
+                                    <option value="2" data-i18n="page.img2img.resize_mode_fill">リサイズ&フィル</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -796,17 +799,17 @@
 
                         <!-- Upscaling Settings (Hires.fix) -->
                         <div class="customization-panel">
-                            <h3>🔍 アップスケール設定 (Hires.fix)</h3>
+                            <h3 data-i18n="page.img2img.upscale_title">🔍 アップスケール設定 (Hires.fix)</h3>
                             <div class="form-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="i2i-enable-hr">
-                                    <span>Hires.fix を有効化（高解像度アップスケール）</span>
+                                    <span data-i18n="page.img2img.hires_enable">Hires.fix を有効化（高解像度アップスケール）</span>
                                 </label>
                             </div>
                             <div id="i2i-hr-settings" class="hr-settings hidden">
                                 <div class="form-grid">
                                     <div class="form-group">
-                                        <label>スケール倍率</label>
+                                        <label data-i18n="page.img2img.hr_scale_label">スケール倍率</label>
                                         <select id="i2i-hr-scale">
                                             <option value="1.5">1.5x</option>
                                             <option value="2" selected>2x</option>
@@ -816,7 +819,7 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label>アップスケーラー</label>
+                                        <label data-i18n="page.img2img.hr_upscaler_label">アップスケーラー</label>
                                         <select id="i2i-hr-upscaler">
                                             <option>R-ESRGAN 4x+</option>
                                             <option>R-ESRGAN 4x+ Anime6B</option>
@@ -828,20 +831,20 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label>Hiresステップ数</label>
+                                        <label data-i18n="page.img2img.hr_steps_label">Hiresステップ数</label>
                                         <input type="number" id="i2i-hr-steps" value="0" min="0" max="150">
-                                        <small>0 = メインと同じステップ数</small>
+                                        <small data-i18n="page.img2img.hr_steps_hint">0 = メインと同じステップ数</small>
                                     </div>
                                     <div class="form-group">
-                                        <label>デノイジング強度</label>
+                                        <label data-i18n="page.img2img.hr_denoising_label">デノイジング強度</label>
                                         <input type="number" id="i2i-hr-denoising" value="0.7" min="0" max="1" step="0.05">
-                                        <small>0=忠実に拡大, 1=大きく変化</small>
+                                        <small data-i18n="page.img2img.hr_denoising_hint">0=忠実に拡大, 1=大きく変化</small>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <button id="i2i-generate-btn" class="btn btn-accent btn-block" disabled>
+                        <button id="i2i-generate-btn" class="btn btn-accent btn-block" disabled data-i18n="page.img2img.generate_btn">
                             🔄 Img2Img 生成
                         </button>
                     </div>
@@ -850,18 +853,18 @@
                     <div class="col">
                         <div id="i2i-loading" class="loading-box hidden">
                             <div class="spinner"></div>
-                            <p>変換生成中... (しばらくお待ちください)</p>
+                            <p data-i18n="page.img2img.loading">変換生成中... (しばらくお待ちください)</p>
                             <div id="i2i-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
                         </div>
                         <div id="i2i-results" class="sd-results hidden">
-                            <h3>生成された画像</h3>
+                            <h3 data-i18n="page.img2img.results_title">生成された画像</h3>
                             <div id="i2i-images" class="sd-images"></div>
                             <div id="img2img-compare" class="image-compare hidden">
                                 <img class="compare-before" src="" alt="Before">
                                 <img class="compare-after" src="" alt="After">
                                 <div class="compare-divider"></div>
-                                <span class="compare-label label-before">Before</span>
-                                <span class="compare-label label-after">After</span>
+                                <span class="compare-label label-before" data-i18n="page.img2img.compare_before">Before</span>
+                                <span class="compare-label label-after" data-i18n="page.img2img.compare_after">After</span>
                             </div>
                         </div>
                     </div>
@@ -870,8 +873,8 @@
             <!-- ======================== INPAINT PAGE ======================== -->
             <section id="page-inpaint" class="page">
                 <div class="page-header">
-                    <h2>Inpainting</h2>
-                    <p>画像の特定領域をマスクで選択してStable Diffusionで修正・変更</p>
+                    <h2 data-i18n="page.inpaint.title">Inpainting</h2>
+                    <p data-i18n="page.inpaint.subtitle">画像の特定領域をマスクで選択してStable Diffusionで修正・変更</p>
                     <div id="inpaint-api-badge" class="badge badge-gray">Checking...</div>
                 </div>
                 <div class="page-body two-col">
@@ -879,11 +882,11 @@
                     <div class="col">
                         <!-- Input Image + Canvas -->
                         <div class="form-group" style="margin-bottom:12px;">
-                            <label>入力画像とマスク描画</label>
+                            <label data-i18n="page.inpaint.input_image_label">入力画像とマスク描画</label>
                             <div class="upload-area" id="inpaint-upload-area">
                                 <div class="upload-icon">🖼️</div>
-                                <p>クリックまたはドラッグ&ドロップ</p>
-                                <small>JPG, PNG, WebP, GIF (最大 10MB)</small>
+                                <p data-i18n="page.inpaint.upload_text">クリックまたはドラッグ&ドロップ</p>
+                                <small data-i18n="page.inpaint.upload_hint">JPG, PNG, WebP, GIF (最大 10MB)</small>
                             </div>
                             <input type="file" id="inpaint-image-input" accept="image/*" hidden>
                             <!-- Canvas editor (shown after image loaded) -->
@@ -894,22 +897,22 @@
                                 </div>
                                 <div class="inpaint-tools">
                                     <div class="inpaint-tool-group">
-                                        <button id="inpaint-tool-draw" class="btn btn-sm btn-primary active-tool" title="ブラシ（白=描き直す）">🖌️ 描画</button>
-                                        <button id="inpaint-tool-erase" class="btn btn-sm btn-secondary" title="消しゴム（黒=保持）">🧹 消去</button>
+                                        <button id="inpaint-tool-draw" class="btn btn-sm btn-primary active-tool" data-i18n="page.inpaint.tool_draw" data-i18n-title="page.inpaint.tool_draw_title" title="ブラシ（白=描き直す）">🖌️ 描画</button>
+                                        <button id="inpaint-tool-erase" class="btn btn-sm btn-secondary" data-i18n="page.inpaint.tool_erase" data-i18n-title="page.inpaint.tool_erase_title" title="消しゴム（黒=保持）">🧹 消去</button>
                                     </div>
                                     <div class="inpaint-tool-group">
-                                        <label class="inpaint-brush-label">ブラシサイズ</label>
+                                        <label class="inpaint-brush-label" data-i18n="page.inpaint.brush_size_label">ブラシサイズ</label>
                                         <input type="range" id="inpaint-brush-size" min="5" max="100" value="30" class="inpaint-brush-slider">
                                         <span id="inpaint-brush-size-val">30</span>px
                                     </div>
                                     <div class="inpaint-tool-group">
-                                        <button id="inpaint-clear-mask-btn" class="btn btn-sm btn-ghost">🗑️ マスククリア</button>
-                                        <button id="inpaint-fill-mask-btn" class="btn btn-sm btn-ghost">⬜ 全選択</button>
-                                        <button id="inpaint-clear-image-btn" class="btn btn-sm btn-ghost">✕ 画像変更</button>
+                                        <button id="inpaint-clear-mask-btn" class="btn btn-sm btn-ghost" data-i18n="page.inpaint.clear_mask_btn">🗑️ マスククリア</button>
+                                        <button id="inpaint-fill-mask-btn" class="btn btn-sm btn-ghost" data-i18n="page.inpaint.fill_mask_btn">⬜ 全選択</button>
+                                        <button id="inpaint-clear-image-btn" class="btn btn-sm btn-ghost" data-i18n="page.inpaint.clear_image_btn">✕ 画像変更</button>
                                     </div>
                                 </div>
                                 <div class="inpaint-opacity-row">
-                                    <label class="inpaint-brush-label">マスク透明度</label>
+                                    <label class="inpaint-brush-label" data-i18n="page.inpaint.mask_opacity_label">マスク透明度</label>
                                     <input type="range" id="inpaint-mask-opacity" min="10" max="90" value="50" class="inpaint-brush-slider">
                                     <span id="inpaint-mask-opacity-val">50</span>%
                                 </div>
@@ -919,34 +922,34 @@
                         <!-- Prompts -->
                         <div class="form-group">
                             <label>Positive Prompt</label>
-                            <textarea id="inpaint-positive" rows="4" placeholder="描き直す領域に生成したい内容..."></textarea>
+                            <textarea id="inpaint-positive" rows="4" data-i18n-placeholder="page.inpaint.positive_placeholder" placeholder="描き直す領域に生成したい内容..."></textarea>
                             <span class="token-counter" id="inpaint-positive-tokens"></span>
                         </div>
                         <div class="form-group" style="margin-top:10px;">
                             <label>Negative Prompt</label>
-                            <textarea id="inpaint-negative" rows="3" placeholder="ネガティブプロンプト..."></textarea>
+                            <textarea id="inpaint-negative" rows="3" data-i18n-placeholder="page.inpaint.negative_placeholder" placeholder="ネガティブプロンプト..."></textarea>
                             <span class="token-counter" id="inpaint-negative-tokens"></span>
                             <select id="inpaint-neg-template" class="neg-template-select"></select>
                         </div>
 
                         <!-- Model & LoRA -->
                         <div class="customization-panel">
-                            <h3>🎯 モデル・LoRA設定</h3>
+                            <h3 data-i18n="page.inpaint.model_lora_title">🎯 モデル・LoRA設定</h3>
                             <div class="form-group">
-                                <label>モデル</label>
+                                <label data-i18n="page.inpaint.model_label">モデル</label>
                                 <select id="inpaint-model">
                                     <option value="">-- デフォルト --</option>
                                 </select>
                             </div>
                             <div class="form-group" style="margin-top:10px;">
-                                <label>LoRA</label>
+                                <label data-i18n="page.inpaint.lora_label">LoRA</label>
                                 <div class="lora-add-row">
                                     <select id="inpaint-lora-select">
                                         <option value="">-- LoRA選択 --</option>
                                     </select>
                                     <input type="number" id="inpaint-lora-weight" value="1.0" min="0" max="2" step="0.05" title="Weight">
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLora('inpaint')">追加</button>
-                                    <button type="button" class="btn btn-sm btn-ghost" onclick="loadLoras('inpaint')" title="LoRA一覧を更新">&#8635;</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLora('inpaint')" data-i18n="page.inpaint.lora_add_btn">追加</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="loadLoras('inpaint')" data-i18n-title="page.inpaint.lora_refresh_title" title="LoRA一覧を更新">&#8635;</button>
                                 </div>
                                 <input type="text" id="inpaint-loras" placeholder="&lt;lora:name:1.0&gt; ..." style="margin-top:6px;">
                             </div>
@@ -957,20 +960,20 @@
                             <div class="form-group">
                                 <label>Denoising Strength</label>
                                 <input type="number" id="inpaint-denoising" value="0.75" min="0" max="1" step="0.05">
-                                <small style="color:var(--text-muted);font-size:0.75rem;">0=変化なし 1=完全変換</small>
+                                <small style="color:var(--text-muted);font-size:0.75rem;" data-i18n="page.inpaint.denoising_hint">0=変化なし 1=完全変換</small>
                             </div>
                             <div class="form-group">
                                 <label>Mask Blur</label>
                                 <input type="number" id="inpaint-mask-blur" value="4" min="0" max="64">
-                                <small style="color:var(--text-muted);font-size:0.75rem;">マスクのぼかし半径</small>
+                                <small style="color:var(--text-muted);font-size:0.75rem;" data-i18n="page.inpaint.mask_blur_hint">マスクのぼかし半径</small>
                             </div>
                             <div class="form-group">
                                 <label>Inpaint Fill</label>
                                 <select id="inpaint-fill-mode">
-                                    <option value="1">元画像</option>
-                                    <option value="0">塗りつぶし</option>
-                                    <option value="2">潜在ノイズ</option>
-                                    <option value="3">潜在ゼロ</option>
+                                    <option value="1" data-i18n="page.inpaint.inpaint_fill_original">元画像</option>
+                                    <option value="0" data-i18n="page.inpaint.inpaint_fill_fill">塗りつぶし</option>
+                                    <option value="2" data-i18n="page.inpaint.inpaint_fill_latent_noise">潜在ノイズ</option>
+                                    <option value="3" data-i18n="page.inpaint.inpaint_fill_latent_zero">潜在ゼロ</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -1018,20 +1021,20 @@
 
                         <!-- Full-res inpainting -->
                         <div class="customization-panel">
-                            <h3>🔍 フル解像度インペイント</h3>
+                            <h3 data-i18n="page.inpaint.fullres_title">🔍 フル解像度インペイント</h3>
                             <div class="form-group">
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="inpaint-full-res" checked>
-                                    <span>マスク領域のみをフル解像度でインペイント</span>
+                                    <span data-i18n="page.inpaint.fullres_enable">マスク領域のみをフル解像度でインペイント</span>
                                 </label>
                             </div>
                             <div class="form-group" style="margin-top:8px;">
-                                <label>パディング (px)</label>
+                                <label data-i18n="page.inpaint.fullres_padding_label">パディング (px)</label>
                                 <input type="number" id="inpaint-full-res-padding" value="32" min="0" max="256">
                             </div>
                         </div>
 
-                        <button id="inpaint-generate-btn" class="btn btn-accent btn-block" disabled>
+                        <button id="inpaint-generate-btn" class="btn btn-accent btn-block" disabled data-i18n="page.inpaint.generate_btn">
                             🖌️ Inpaint 生成
                         </button>
                     </div>
@@ -1040,11 +1043,11 @@
                     <div class="col">
                         <div id="inpaint-loading" class="loading-box hidden">
                             <div class="spinner"></div>
-                            <p>インペイント生成中... (しばらくお待ちください)</p>
+                            <p data-i18n="page.inpaint.loading">インペイント生成中... (しばらくお待ちください)</p>
                             <div id="inpaint-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
                         </div>
                         <div id="inpaint-results" class="sd-results hidden">
-                            <h3>生成された画像</h3>
+                            <h3 data-i18n="page.inpaint.results_title">生成された画像</h3>
                             <div id="inpaint-images" class="sd-images"></div>
                         </div>
                     </div>
@@ -1053,33 +1056,33 @@
             <!-- ======================== GALLERY PAGE ======================== -->
             <section id="page-gallery" class="page">
                 <div class="page-header">
-                    <h2>Gallery</h2>
-                    <p>過去に生成した画像の一覧</p>
+                    <h2 data-i18n="page.gallery.title">Gallery</h2>
+                    <p data-i18n="page.gallery.subtitle">過去に生成した画像の一覧</p>
                     <div class="header-actions">
                         <select id="gallery-filter-mode" class="gallery-filter-select">
-                            <option value="">すべて</option>
+                            <option value="" data-i18n="page.gallery.filter_all">すべて</option>
                             <option value="txt2img">SD Generate</option>
                             <option value="img2img">Img2Img</option>
                             <option value="inpaint">Inpaint</option>
                         </select>
                         <select id="gallery-filter-date" class="gallery-filter-select">
-                            <option value="">全日付</option>
+                            <option value="" data-i18n="page.gallery.filter_all_dates">全日付</option>
                         </select>
-                        <button id="refresh-gallery-btn" class="btn btn-sm btn-secondary">🔄 更新</button>
+                        <button id="refresh-gallery-btn" class="btn btn-sm btn-secondary" data-i18n="page.gallery.refresh_btn">🔄 更新</button>
                     </div>
                 </div>
                 <div class="page-body">
                     <div id="gallery-loading" class="loading-box hidden">
                         <div class="spinner"></div>
-                        <p>読み込み中...</p>
+                        <p data-i18n="page.gallery.loading">読み込み中...</p>
                     </div>
                     <div id="gallery-empty" class="empty-state hidden">
-                        <p>生成済み画像がありません</p>
-                        <small>SD GenerateまたはImg2Imgで画像を生成すると、ここに表示されます</small>
+                        <p data-i18n="page.gallery.empty">生成済み画像がありません</p>
+                        <small data-i18n="page.gallery.empty_hint">SD GenerateまたはImg2Imgで画像を生成すると、ここに表示されます</small>
                     </div>
                     <div id="gallery-grid" class="gallery-grid"></div>
                     <div id="gallery-load-more-wrap" class="hidden" style="text-align:center;margin-top:1rem;">
-                        <button id="gallery-load-more-btn" class="btn btn-secondary">さらに読み込む</button>
+                        <button id="gallery-load-more-btn" class="btn btn-secondary" data-i18n="page.gallery.load_more_btn">さらに読み込む</button>
                     </div>
                 </div>
             </section>
@@ -1087,11 +1090,11 @@
             <!-- Gallery Image Modal -->
             <div id="gallery-modal" class="modal hidden">
                 <div class="modal-box gallery-modal-box">
-                    <button id="gallery-modal-prev" class="gallery-nav-btn gallery-nav-prev" title="前の画像">&#8249;</button>
-                    <button id="gallery-modal-next" class="gallery-nav-btn gallery-nav-next" title="次の画像">&#8250;</button>
+                    <button id="gallery-modal-prev" class="gallery-nav-btn gallery-nav-prev" data-i18n-title="page.gallery.modal_prev_title" title="前の画像">&#8249;</button>
+                    <button id="gallery-modal-next" class="gallery-nav-btn gallery-nav-next" data-i18n-title="page.gallery.modal_next_title" title="次の画像">&#8250;</button>
                     <div class="gallery-modal-header">
-                        <h3 id="gallery-modal-title">画像詳細</h3>
-                        <button id="gallery-modal-close" class="btn btn-sm btn-ghost">✕ 閉じる</button>
+                        <h3 id="gallery-modal-title" data-i18n="page.gallery.modal_title">画像詳細</h3>
+                        <button id="gallery-modal-close" class="btn btn-sm btn-ghost" data-i18n="page.gallery.modal_close_btn">✕ 閉じる</button>
                     </div>
                     <div class="gallery-modal-body">
                         <div class="gallery-modal-image-wrap">
@@ -1100,9 +1103,9 @@
                         <div class="gallery-modal-meta">
                             <div id="gallery-modal-params" class="gallery-params"></div>
                             <div class="gallery-modal-actions">
-                                <a id="gallery-modal-download" href="" download class="btn btn-primary">⬇ ダウンロード</a>
-                                <button id="gallery-modal-copy-btn" class="btn btn-secondary">📋 プロンプトコピー</button>
-                                <button id="gallery-modal-send-sd" class="btn btn-secondary">🖼️ SDへ送る</button>
+                                <a id="gallery-modal-download" href="" download class="btn btn-primary" data-i18n="page.gallery.modal_download_btn">⬇ ダウンロード</a>
+                                <button id="gallery-modal-copy-btn" class="btn btn-secondary" data-i18n="page.gallery.modal_copy_btn">📋 プロンプトコピー</button>
+                                <button id="gallery-modal-send-sd" class="btn btn-secondary" data-i18n="page.gallery.modal_send_sd_btn">🖼️ SDへ送る</button>
                             </div>
                         </div>
                     </div>
@@ -1114,30 +1117,59 @@
     <!-- Model Confirm Modal -->
     <div id="model-confirm-modal" class="modal hidden">
         <div class="modal-box" style="max-width:360px">
-            <h3>🖼️ 生成確認</h3>
-            <p style="margin-bottom:8px;font-size:0.85rem;color:var(--text-muted)">使用モデル</p>
+            <h3 data-i18n="modal.model_confirm_title">🖼️ 生成確認</h3>
+            <p style="margin-bottom:8px;font-size:0.85rem;color:var(--text-muted)" data-i18n="modal.model_confirm_label">使用モデル</p>
             <div id="model-confirm-name" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:0.9rem;word-break:break-all;margin-bottom:18px"></div>
             <div class="modal-actions">
-                <button id="model-confirm-ok" class="btn btn-primary">生成</button>
-                <button id="model-confirm-cancel" class="btn btn-ghost">キャンセル</button>
+                <button id="model-confirm-ok" class="btn btn-primary" data-i18n="modal.model_confirm_ok">生成</button>
+                <button id="model-confirm-cancel" class="btn btn-ghost" data-i18n="modal.model_confirm_cancel">キャンセル</button>
             </div>
         </div>
     </div>
 
     <!-- Mobile Bottom Navigation -->
     <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
-        <button class="mobile-nav-btn active" data-page="generate">📤<span>Generate</span></button>
-        <button class="mobile-nav-btn" data-page="batch">🗂️<span>Batch</span></button>
-        <button class="mobile-nav-btn" data-page="refine">🔧<span>Refine</span></button>
-        <button class="mobile-nav-btn" data-page="history">📋<span>History</span></button>
-        <button class="mobile-nav-btn" data-page="presets">🎨<span>Presets</span></button>
-        <button class="mobile-nav-btn" data-page="sd">🖼️<span>SD</span></button>
-        <button class="mobile-nav-btn" data-page="img2img">🔄<span>Img2Img</span></button>
-        <button class="mobile-nav-btn" data-page="inpaint">🖌️<span>Inpaint</span></button>
-        <button class="mobile-nav-btn" data-page="gallery">🗃️<span>Gallery</span></button>
+        <button class="mobile-nav-btn active" data-page="generate">📤<span data-i18n="mobile_nav.generate">Generate</span></button>
+        <button class="mobile-nav-btn" data-page="batch">🗂️<span data-i18n="mobile_nav.batch">Batch</span></button>
+        <button class="mobile-nav-btn" data-page="refine">🔧<span data-i18n="mobile_nav.refine">Refine</span></button>
+        <button class="mobile-nav-btn" data-page="history">📋<span data-i18n="mobile_nav.history">History</span></button>
+        <button class="mobile-nav-btn" data-page="presets">🎨<span data-i18n="mobile_nav.presets">Presets</span></button>
+        <button class="mobile-nav-btn" data-page="sd">🖼️<span data-i18n="mobile_nav.sd">SD</span></button>
+        <button class="mobile-nav-btn" data-page="img2img">🔄<span data-i18n="mobile_nav.img2img">Img2Img</span></button>
+        <button class="mobile-nav-btn" data-page="inpaint">🖌️<span data-i18n="mobile_nav.inpaint">Inpaint</span></button>
+        <button class="mobile-nav-btn" data-page="gallery">🗃️<span data-i18n="mobile_nav.gallery">Gallery</span></button>
     </nav>
 
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcuts-modal" class="modal hidden">
+        <div class="modal-box shortcuts-modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="modal.shortcuts.title">Keyboard Shortcuts</h3>
+                <button id="shortcuts-modal-close" class="btn btn-sm btn-ghost" data-i18n="common.close">Close</button>
+            </div>
+            <div class="shortcuts-list">
+                <div class="shortcut-group">
+                    <h4 data-i18n="modal.shortcuts.general">General</h4>
+                    <div class="shortcut-item"><kbd>?</kbd><span data-i18n="modal.shortcuts.show_help">Show this help</span></div>
+                    <div class="shortcut-item"><kbd>1</kbd>-<kbd>9</kbd><span data-i18n="modal.shortcuts.navigate_pages">Navigate pages</span></div>
+                    <div class="shortcut-item"><kbd>Esc</kbd><span data-i18n="modal.shortcuts.close_modal">Close modal / dialog</span></div>
+                </div>
+                <div class="shortcut-group">
+                    <h4 data-i18n="modal.shortcuts.generation">Generation</h4>
+                    <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Enter</kbd><span data-i18n="modal.shortcuts.run_generation">Run generation</span></div>
+                    <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>V</kbd><span data-i18n="modal.shortcuts.paste_image">Paste image</span></div>
+                </div>
+                <div class="shortcut-group">
+                    <h4 data-i18n="modal.shortcuts.gallery">Gallery</h4>
+                    <div class="shortcut-item"><kbd>&larr;</kbd><kbd>&rarr;</kbd><span data-i18n="modal.shortcuts.navigate_images">Navigate images</span></div>
+                    <div class="shortcut-item"><kbd>Esc</kbd><span data-i18n="modal.shortcuts.close_viewer">Close viewer</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/weight-editor.js?v=1"></script>
+    <script src="/static/i18n.js?v=1"></script>
     <script src="/static/script.js?v=3"></script>
 </body>
 </html>

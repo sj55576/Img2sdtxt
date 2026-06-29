@@ -161,6 +161,20 @@ function setupThemeToggle() {
    Init
    ===================================================================== */
 document.addEventListener('DOMContentLoaded', () => {
+    // i18n initialization
+    if (typeof I18n !== 'undefined') {
+        I18n.init();
+        const langBtn = document.getElementById('lang-toggle-btn');
+        if (langBtn) {
+            langBtn.textContent = I18n.getLocale() === 'ja' ? '🌐 日本語' : '🌐 English';
+            langBtn.addEventListener('click', () => {
+                const next = I18n.getLocale() === 'ja' ? 'en' : 'ja';
+                I18n.setLocale(next);
+                langBtn.textContent = next === 'ja' ? '🌐 日本語' : '🌐 English';
+            });
+        }
+    }
+
     const _setup = (name, fn) => { try { fn(); } catch(e) { console.error(`[SETUP] ${name} failed:`, e); } };
     _setup('theme', setupThemeToggle);
     _setup('navigation', setupNavigation);
@@ -202,7 +216,66 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (pageId === 'page-refine') {
                 const btn = document.getElementById('refine-btn');
                 if (!btn.disabled) btn.click();
+            } else if (pageId === 'page-sd') {
+                const btn = document.getElementById('sd-generate-btn');
+                if (btn && !btn.disabled) btn.click();
+            } else if (pageId === 'page-img2img') {
+                const btn = document.getElementById('i2i-generate-btn');
+                if (btn && !btn.disabled) btn.click();
+            } else if (pageId === 'page-inpaint') {
+                const btn = document.getElementById('inpaint-generate-btn');
+                if (btn && !btn.disabled) btn.click();
             }
+        }
+    });
+
+    // Keyboard shortcuts system
+    document.addEventListener('keydown', e => {
+        const tag = document.activeElement?.tagName;
+        const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+        // ? key - show shortcuts help (when not in input)
+        if (e.key === '?' && !isInput) {
+            e.preventDefault();
+            const modal = document.getElementById('shortcuts-modal');
+            modal.classList.toggle('hidden');
+            return;
+        }
+
+        // Escape - close any open modal
+        if (e.key === 'Escape') {
+            const modals = ['shortcuts-modal', 'preset-modal', 'model-confirm-modal'];
+            for (const id of modals) {
+                const m = document.getElementById(id);
+                if (m && !m.classList.contains('hidden')) {
+                    m.classList.add('hidden');
+                    e.preventDefault();
+                    return;
+                }
+            }
+            return;
+        }
+
+        // Number keys 1-9 for page navigation (when not in input)
+        if (!isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const pages = ['generate', 'batch', 'refine', 'history', 'presets', 'sd', 'img2img', 'inpaint', 'gallery'];
+            const num = parseInt(e.key);
+            if (num >= 1 && num <= pages.length) {
+                e.preventDefault();
+                const btn = document.querySelector(`.nav-btn[data-page="${pages[num - 1]}"]`);
+                if (btn) btn.click();
+                return;
+            }
+        }
+    });
+
+    // Shortcuts modal close button
+    document.getElementById('shortcuts-modal-close')?.addEventListener('click', () => {
+        document.getElementById('shortcuts-modal').classList.add('hidden');
+    });
+    document.getElementById('shortcuts-modal')?.addEventListener('click', e => {
+        if (e.target === e.currentTarget) {
+            e.currentTarget.classList.add('hidden');
         }
     });
 
