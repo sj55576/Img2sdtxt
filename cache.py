@@ -35,7 +35,16 @@ class LLMCache:
             conn.execute("DELETE FROM cache_entries WHERE ? - created_at >= ?", (time.time(), self.ttl))
             conn.commit()
 
-    def _make_key(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str, provider: str = "", model: str = "") -> str:
+    def _make_key(
+        self,
+        image_bytes: Optional[bytes],
+        text_input: Optional[str],
+        style: str,
+        tone: str,
+        quality: str,
+        provider: str = "",
+        model: str = "",
+    ) -> str:
         h = hashlib.sha256()
         if image_bytes:
             h.update(image_bytes)
@@ -46,14 +55,21 @@ class LLMCache:
         h.update(model.encode("utf-8"))
         return h.hexdigest()
 
-    def get(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str, provider: str = "", model: str = "") -> Optional[Dict]:
+    def get(
+        self,
+        image_bytes: Optional[bytes],
+        text_input: Optional[str],
+        style: str,
+        tone: str,
+        quality: str,
+        provider: str = "",
+        model: str = "",
+    ) -> Optional[Dict]:
         if not self.enabled:
             return None
         key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model)
         with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
-            row = conn.execute(
-                "SELECT value, created_at FROM cache_entries WHERE key = ?", (key,)
-            ).fetchone()
+            row = conn.execute("SELECT value, created_at FROM cache_entries WHERE key = ?", (key,)).fetchone()
             if row is not None:
                 if time.time() - row[1] < self.ttl:
                     conn.execute("UPDATE cache_stats SET hits = hits + 1 WHERE id = 1")
@@ -66,14 +82,24 @@ class LLMCache:
         logger.debug("Cache MISS key=%.16s", key)
         return None
 
-    def set(self, image_bytes: Optional[bytes], text_input: Optional[str], style: str, tone: str, quality: str, result: Dict, provider: str = "", model: str = ""):
+    def set(
+        self,
+        image_bytes: Optional[bytes],
+        text_input: Optional[str],
+        style: str,
+        tone: str,
+        quality: str,
+        result: Dict,
+        provider: str = "",
+        model: str = "",
+    ):
         if not self.enabled:
             return
         key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model)
         with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO cache_entries (key, value, created_at) VALUES (?, ?, ?)",
-                (key, json.dumps(result), time.time())
+                (key, json.dumps(result), time.time()),
             )
             conn.commit()
             size = conn.execute("SELECT COUNT(*) FROM cache_entries").fetchone()[0]

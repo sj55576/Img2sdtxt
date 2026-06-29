@@ -4,7 +4,7 @@ import asyncio
 import base64
 import json
 import logging
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
@@ -22,10 +22,10 @@ router = APIRouter(prefix="/api/sd", tags=["sd"])
 async def sd_status():
     available = await run_in_threadpool(sd_client.is_available)
     model = ""
-    samplers = []
-    models = []
-    upscalers = []
-    loras = []
+    samplers: list[Any] = []
+    models: list[Any] = []
+    upscalers: list[Any] = []
+    loras: list[Any] = []
     if available:
         try:
             model, samplers, models, upscalers, loras = await asyncio.gather(
@@ -202,7 +202,7 @@ async def sd_img2img(
     hr_upscaler: str = Form("R-ESRGAN 4x+"),
     hr_second_pass_steps: int = Form(0),
     hr_denoising_strength: float = Form(0.7),
-    controlnet_args: str = Form("")
+    controlnet_args: str = Form(""),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")
@@ -297,7 +297,7 @@ async def sd_inpaint(
     inpaint_full_res: bool = Form(True),
     inpaint_full_res_padding: int = Form(32),
     model: str = Form(""),
-    loras: str = Form("")
+    loras: str = Form(""),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")
@@ -402,18 +402,22 @@ async def sd_generate_multi_model(request: SDMultiModelRequest):
                 model=model,
                 loras=request.loras,
             )
-            results.append({
-                "model": model,
-                "success": True,
-                "images": images,
-                "count": len(images),
-                "saved_files": saved_files,
-            })
+            results.append(
+                {
+                    "model": model,
+                    "success": True,
+                    "images": images,
+                    "count": len(images),
+                    "saved_files": saved_files,
+                }
+            )
         except Exception as e:
-            results.append({
-                "model": model,
-                "success": False,
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "model": model,
+                    "success": False,
+                    "error": str(e),
+                }
+            )
 
     return {"success": True, "results": results, "total_models": len(request.models)}

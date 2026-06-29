@@ -1,4 +1,5 @@
 """tests/test_history.py — 一時 SQLite DB を使った history モジュールの CRUD テスト"""
+
 import sys
 from pathlib import Path
 
@@ -21,14 +22,10 @@ def temp_db(tmp_path, monkeypatch):
 # 基本 CRUD
 # ------------------------------------------------------------------ #
 
+
 def test_save_and_get():
     rowid = hist.save_history(
-        positive="1girl, cute",
-        negative="blurry",
-        image_name="test.png",
-        style="anime",
-        tone="vibrant",
-        quality="high"
+        positive="1girl, cute", negative="blurry", image_name="test.png", style="anime", tone="vibrant", quality="high"
     )
     assert isinstance(rowid, int)
     items = hist.get_history()
@@ -152,6 +149,7 @@ def test_get_history_count():
 # ------------------------------------------------------------------ #
 # Tags
 # ------------------------------------------------------------------ #
+
 
 def test_add_tags():
     rowid = hist.save_history(positive="tagged", negative="n")

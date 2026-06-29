@@ -130,6 +130,7 @@ class JobQueue:
         async def update_progress(progress: float):
             job.progress = min(max(progress, 0.0), 1.0)
             await self._notify(job)
+
         return update_progress
 
     async def submit(self, job_type: str, params: Dict[str, Any]) -> Job:
@@ -190,8 +191,7 @@ class JobQueue:
 
     def _cleanup_old_jobs(self):
         terminal = [
-            j for j in self._jobs.values()
-            if j.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)
+            j for j in self._jobs.values() if j.status in (JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED)
         ]
         if len(terminal) > self._max_history:
             terminal.sort(key=lambda j: j.completed_at or 0)
@@ -218,6 +218,7 @@ def register_job_handler(job_type: str):
     def decorator(func):
         _JOB_HANDLERS[job_type] = func
         return func
+
     return decorator
 
 

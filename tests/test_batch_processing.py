@@ -31,6 +31,7 @@ from prompt_generator import PromptGenerator
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_png_bytes() -> bytes:
     """Return the raw bytes of a tiny 1×1 red PNG."""
     buf = BytesIO()
@@ -51,11 +52,13 @@ def _stub_generate_prompts(image_bytes, **kwargs):  # noqa: ARG001
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestScanDirectory(unittest.TestCase):
     """scan_directory() returns the right files."""
 
     def test_non_recursive(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.jpg").write_bytes(_make_png_bytes())
@@ -74,6 +77,7 @@ class TestScanDirectory(unittest.TestCase):
 
     def test_recursive(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / "a.jpg").write_bytes(_make_png_bytes())
@@ -133,6 +137,7 @@ class TestProcessSingleImage(unittest.TestCase):
 
     def test_json_output_created(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()
@@ -160,6 +165,7 @@ class TestProcessSingleImage(unittest.TestCase):
 
     def test_txt_output_created(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()
@@ -185,6 +191,7 @@ class TestProcessSingleImage(unittest.TestCase):
 
     def test_skip_existing(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()
@@ -212,6 +219,7 @@ class TestProcessSingleImage(unittest.TestCase):
 
     def test_skip_existing_both_requires_all_outputs(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()
@@ -239,6 +247,7 @@ class TestProcessSingleImage(unittest.TestCase):
 
     def test_skip_existing_both_skips_when_all_outputs_exist(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()
@@ -265,6 +274,7 @@ class TestProcessSingleImage(unittest.TestCase):
 
     def test_error_on_llm_failure(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()
@@ -302,6 +312,7 @@ class TestBatchProcessor(unittest.TestCase):
 
     def test_three_images_produce_three_outputs(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()
@@ -326,6 +337,7 @@ class TestBatchProcessor(unittest.TestCase):
 
     def test_skip_existing_skips_done_images(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()
@@ -354,6 +366,7 @@ class TestBatchProcessor(unittest.TestCase):
 
     def test_both_format_creates_json_and_txt(self):
         import tempfile
+
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "input"
             root.mkdir()

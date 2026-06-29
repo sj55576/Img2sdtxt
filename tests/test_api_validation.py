@@ -1,4 +1,5 @@
 """tests/test_api_validation.py — FastAPI エンドポイントの入力バリデーションテスト"""
+
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -66,6 +67,7 @@ def client():
 # BE-3: 数値パラメータの 422 バリデーション
 # ------------------------------------------------------------------ #
 
+
 def test_sd_generate_bad_width_returns_422(client):
     """/api/sd/generate に不正な width を渡すと 422 を返す"""
     payload = {
@@ -98,6 +100,7 @@ def test_sd_generate_bad_cfg_scale_returns_422(client):
 # BE-3: date パラメータのバリデーション
 # ------------------------------------------------------------------ #
 
+
 def test_outputs_bad_date_returns_422(client):
     """/api/outputs に不正な date を渡すと 422 を返す"""
     response = client.get("/api/outputs", params={"date": "not-a-date"})
@@ -113,6 +116,7 @@ def test_outputs_valid_date_accepted(client):
 # ------------------------------------------------------------------ #
 # BE-3: description 長さ制限
 # ------------------------------------------------------------------ #
+
 
 def test_generate_prompts_text_oversized_description_returns_422(client):
     """/api/generate-prompts-text に 5000 文字超の description を渡すと 422"""
@@ -147,6 +151,7 @@ def test_refine_prompt_exact_limit_accepted(client):
 # BE-2: /api/sd/progress
 # ------------------------------------------------------------------ #
 
+
 def test_sd_progress_unavailable_shape(client):
     """/api/sd/progress は SD 未到達時に available=False の形で返す"""
     response = client.get("/api/sd/progress")
@@ -167,13 +172,12 @@ def test_sd_progress_unavailable_shape(client):
 # Jobs API route ordering
 # ------------------------------------------------------------------ #
 
+
 def test_jobs_queue_stats_static_route_precedes_job_id_route(client):
     """/api/jobs/queue/stats が動的 job_id ルートより先に登録されている"""
     route_paths = [getattr(route, "path", "") for route in client.app.routes]
 
-    assert route_paths.index("/api/jobs/queue/stats") < route_paths.index(
-        "/api/jobs/{job_id}"
-    )
+    assert route_paths.index("/api/jobs/queue/stats") < route_paths.index("/api/jobs/{job_id}")
 
 
 def test_jobs_queue_stats_returns_stats(client):
@@ -189,6 +193,7 @@ def test_jobs_queue_stats_returns_stats(client):
 # ------------------------------------------------------------------ #
 # BE-4: /health の形状確認
 # ------------------------------------------------------------------ #
+
 
 def test_health_shape(client):
     """/health は status, components, uptime_seconds フィールドを含む"""
@@ -207,6 +212,7 @@ def test_health_shape(client):
 # ------------------------------------------------------------------ #
 # Tags API
 # ------------------------------------------------------------------ #
+
 
 def test_add_tags_to_history(client):
     """POST /api/history/{id}/tags adds tags"""

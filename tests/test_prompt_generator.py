@@ -1,4 +1,5 @@
 """tests/test_prompt_generator.py — PromptGenerator の JSON 抽出・パースロジックのテスト"""
+
 import json
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ def _make_generator(response_text: str) -> PromptGenerator:
 # ------------------------------------------------------------------ #
 # _parse_json_response
 # ------------------------------------------------------------------ #
+
 
 class TestParseJsonResponse:
     def test_plain_json(self):
@@ -45,6 +47,7 @@ class TestParseJsonResponse:
     def test_malformed_json_raises(self):
         gen = _make_generator("")
         import pytest
+
         with pytest.raises(json.JSONDecodeError):
             gen._parse_json_response("not json at all")
 
@@ -52,6 +55,7 @@ class TestParseJsonResponse:
 # ------------------------------------------------------------------ #
 # generate_prompts_text_only（モック LLM を使用）
 # ------------------------------------------------------------------ #
+
 
 class TestGeneratePromptsTextOnly:
     def test_success(self):
@@ -71,9 +75,7 @@ class TestGeneratePromptsTextOnly:
         response = '{"positive": "cat", "negative": "bad"}'
         gen = _make_generator(response)
         result = gen.generate_prompts_text_only(
-            "a cat",
-            preset_suffix_positive="anime style",
-            preset_suffix_negative="3d render"
+            "a cat", preset_suffix_positive="anime style", preset_suffix_negative="3d render"
         )
         assert "anime style" in result["positive"]
         assert "3d render" in result["negative"]
@@ -83,11 +85,13 @@ class TestGeneratePromptsTextOnly:
 # generate_prompts（画像バイト使用、ビジョンモデル）
 # ------------------------------------------------------------------ #
 
+
 class TestGeneratePromptsFromImage:
     def _make_png_bytes(self) -> bytes:
         from io import BytesIO
 
         from PIL import Image
+
         buf = BytesIO()
         Image.new("RGB", (1, 1), color=(0, 0, 0)).save(buf, format="PNG")
         return buf.getvalue()
@@ -110,6 +114,7 @@ class TestGeneratePromptsFromImage:
 # ------------------------------------------------------------------ #
 # refine_prompt
 # ------------------------------------------------------------------ #
+
 
 class TestRefinePrompt:
     def test_success(self):

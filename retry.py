@@ -25,6 +25,7 @@ def retry_with_backoff(
 ):
     def decorator(func):
         if asyncio.iscoroutinefunction(func):
+
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 for attempt in range(max_retries + 1):
@@ -33,14 +34,20 @@ def retry_with_backoff(
                     except retryable_exceptions as e:
                         if attempt == max_retries:
                             raise
-                        delay = min(base_delay * (2 ** attempt) + random.uniform(0, 1), max_delay)
+                        delay = min(base_delay * (2**attempt) + random.uniform(0, 1), max_delay)
                         logger.warning(
                             "Retry %d/%d for %s after %.2fs (reason: %s)",
-                            attempt + 1, max_retries, func.__qualname__, delay, e,
+                            attempt + 1,
+                            max_retries,
+                            func.__qualname__,
+                            delay,
+                            e,
                         )
                         await asyncio.sleep(delay)
+
             return async_wrapper
         else:
+
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 for attempt in range(max_retries + 1):
@@ -49,12 +56,17 @@ def retry_with_backoff(
                     except retryable_exceptions as e:
                         if attempt == max_retries:
                             raise
-                        delay = min(base_delay * (2 ** attempt) + random.uniform(0, 1), max_delay)
+                        delay = min(base_delay * (2**attempt) + random.uniform(0, 1), max_delay)
                         logger.warning(
                             "Retry %d/%d for %s after %.2fs (reason: %s)",
-                            attempt + 1, max_retries, func.__qualname__, delay, e,
+                            attempt + 1,
+                            max_retries,
+                            func.__qualname__,
+                            delay,
+                            e,
                         )
                         time.sleep(delay)
+
             return sync_wrapper
 
     return decorator

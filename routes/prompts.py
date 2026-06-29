@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api", tags=["prompts"])
 # Prompt Generation (single image)
 # ------------------------------------------------------------------ #
 
+
 @router.post("/generate-prompts")
 async def generate_prompts(
     file: UploadFile = File(...),
@@ -26,7 +27,7 @@ async def generate_prompts(
     tone: str = Form(""),
     quality: str = Form("high"),
     preset_id: str = Form(""),
-    save_history: bool = Form(True)
+    save_history: bool = Form(True),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")
@@ -58,7 +59,7 @@ async def generate_prompts(
             tone=eff_tone,
             quality=eff_quality,
             preset_suffix_positive=suffix_pos,
-            preset_suffix_negative=suffix_neg
+            preset_suffix_negative=suffix_neg,
         )
         if result.get("status") == "success":
             deps.llm_cache.set(contents, None, eff_style, eff_tone, eff_quality, result, provider=_prov, model=_mdl)
@@ -71,7 +72,9 @@ async def generate_prompts(
             positive=result["positive"],
             negative=result["negative"],
             image_name=file.filename or "",
-            style=style, tone=tone, quality=quality
+            style=style,
+            tone=tone,
+            quality=quality,
         )
 
     return {"success": True, "data": {"positive": result["positive"], "negative": result["negative"]}}
@@ -81,13 +84,14 @@ async def generate_prompts(
 # Prompt Generation (batch)
 # ------------------------------------------------------------------ #
 
+
 @router.post("/generate-prompts-batch")
 async def generate_prompts_batch(
     files: List[UploadFile] = File(...),
     style: str = Form(""),
     tone: str = Form(""),
     quality: str = Form("high"),
-    preset_id: str = Form("")
+    preset_id: str = Form(""),
 ):
     if len(files) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 images per batch.")
@@ -119,22 +123,25 @@ async def generate_prompts_batch(
         r = await run_in_threadpool(
             deps.prompt_generator.generate_prompts,
             contents,
-            style=eff_style, tone=eff_tone, quality=eff_quality,
-            preset_suffix_positive=suffix_pos, preset_suffix_negative=suffix_neg
+            style=eff_style,
+            tone=eff_tone,
+            quality=eff_quality,
+            preset_suffix_positive=suffix_pos,
+            preset_suffix_negative=suffix_neg,
         )
 
         if r.get("status") == "success":
             hist.save_history(
-                positive=r["positive"], negative=r["negative"],
+                positive=r["positive"],
+                negative=r["negative"],
                 image_name=f.filename or "",
-                style=eff_style, tone=eff_tone, quality=eff_quality
+                style=eff_style,
+                tone=eff_tone,
+                quality=eff_quality,
             )
-            results.append({
-                "filename": f.filename,
-                "success": True,
-                "positive": r["positive"],
-                "negative": r["negative"]
-            })
+            results.append(
+                {"filename": f.filename, "success": True, "positive": r["positive"], "negative": r["negative"]}
+            )
         else:
             results.append({"filename": f.filename, "success": False, "error": r.get("error")})
 
@@ -144,6 +151,7 @@ async def generate_prompts_batch(
 # ------------------------------------------------------------------ #
 # Prompt Generation (text)
 # ------------------------------------------------------------------ #
+
 
 @router.post("/generate-prompts-text")
 def generate_prompts_text(request: TextPromptRequest):
@@ -174,7 +182,7 @@ def generate_prompts_text(request: TextPromptRequest):
             tone=eff_tone,
             quality=eff_quality,
             preset_suffix_positive=suffix_pos,
-            preset_suffix_negative=suffix_neg
+            preset_suffix_negative=suffix_neg,
         )
         if result.get("status") == "success":
             deps.llm_cache.set(None, description, eff_style, eff_tone, eff_quality, result, provider=_prov, model=_mdl)
@@ -184,8 +192,12 @@ def generate_prompts_text(request: TextPromptRequest):
 
     if save:
         hist.save_history(
-            positive=result["positive"], negative=result["negative"],
-            image_name="[text input]", style=style, tone=tone, quality=quality
+            positive=result["positive"],
+            negative=result["negative"],
+            image_name="[text input]",
+            style=style,
+            tone=tone,
+            quality=quality,
         )
 
     return {"success": True, "data": {"positive": result["positive"], "negative": result["negative"]}}
@@ -195,6 +207,7 @@ def generate_prompts_text(request: TextPromptRequest):
 # Prompt Refinement
 # ------------------------------------------------------------------ #
 
+
 @router.post("/refine-prompt")
 def refine_prompt(request: RefinePromptRequest):
     result = deps.prompt_generator.refine_prompt(
@@ -203,7 +216,7 @@ def refine_prompt(request: RefinePromptRequest):
         instruction=request.instruction.strip(),
         style=request.style,
         tone=request.tone,
-        quality=request.quality
+        quality=request.quality,
     )
 
     if result.get("status") == "error":
@@ -215,14 +228,10 @@ def refine_prompt(request: RefinePromptRequest):
         image_name="[refine]",
         style=request.style,
         tone=request.tone,
-        quality=request.quality
+        quality=request.quality,
     )
 
     return {
         "success": True,
-        "data": {
-            "positive": result["positive"],
-            "negative": result["negative"],
-            "changes": result.get("changes", "")
-        }
+        "data": {"positive": result["positive"], "negative": result["negative"], "changes": result.get("changes", "")},
     }
