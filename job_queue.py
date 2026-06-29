@@ -33,7 +33,7 @@ class Job:
     completed_at: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        d = {
+        d: Dict[str, Any] = {
             "id": self.id,
             "job_type": self.job_type,
             "status": self.status.value,
@@ -81,7 +81,9 @@ class JobQueue:
                 self._running_count += 1
 
             try:
-                self._job_tasks[job.id] = asyncio.current_task()
+                task = asyncio.current_task()
+                if task is not None:
+                    self._job_tasks[job.id] = task
                 await self._execute_job(job)
             finally:
                 self._job_tasks.pop(job.id, None)
@@ -198,7 +200,7 @@ class JobQueue:
                 self._subscribers.pop(j.id, None)
 
     def stats(self) -> Dict:
-        statuses = {}
+        statuses: Dict[str, int] = {}
         for j in self._jobs.values():
             statuses[j.status.value] = statuses.get(j.status.value, 0) + 1
         return {

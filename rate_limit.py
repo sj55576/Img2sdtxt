@@ -8,10 +8,10 @@ Two tiers:
   - other:      static files, non-API paths             → no limit
 """
 
-import time
+import logging
 import sqlite3
 import threading
-import logging
+import time
 from pathlib import Path
 from typing import Optional
 

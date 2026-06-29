@@ -3,9 +3,10 @@
 import base64
 import logging
 import time
-from typing import Optional
+from typing import Literal, Optional, Union
 
 import anthropic
+from anthropic.types import ImageBlockParam, TextBlock, TextBlockParam
 
 from llm_provider import LLMProvider
 from retry import retry_with_backoff
@@ -22,7 +23,10 @@ _WEBP_MAGIC_RIFF = b"RIFF"
 _WEBP_MAGIC_WEBP = b"WEBP"
 
 
-def _detect_media_type(image_bytes: bytes) -> str:
+MediaType = Literal["image/jpeg", "image/png", "image/gif", "image/webp"]
+
+
+def _detect_media_type(image_bytes: bytes) -> MediaType:
     """Detect image MIME type from magic bytes."""
     if image_bytes[:4] == _PNG_MAGIC:
         return "image/png"
@@ -90,7 +94,10 @@ class AnthropicProvider(LLMProvider):
             )
             elapsed = (time.time() - t0) * 1000
             logger.info("Anthropic call succeeded model=%s %.0fms", self._model, elapsed)
-            return response.content[0].text
+            block = response.content[0]
+            if not isinstance(block, TextBlock):
+                return None
+            return block.text
         except anthropic.APIConnectionError:
             logger.error("Cannot connect to Anthropic API")
             raise ConnectionError("Cannot connect to Anthropic API")
@@ -116,16 +123,16 @@ class AnthropicProvider(LLMProvider):
             media_type = _detect_media_type(image_bytes)
             base64_data = base64.b64encode(image_bytes).decode("utf-8")
 
-            content = [
-                {
-                    "type": "image",
-                    "source": {
+            content: list[Union[ImageBlockParam, TextBlockParam]] = [
+                ImageBlockParam(
+                    type="image",
+                    source={
                         "type": "base64",
                         "media_type": media_type,
                         "data": base64_data,
                     },
-                },
-                {"type": "text", "text": prompt},
+                ),
+                TextBlockParam(type="text", text=prompt),
             ]
 
             response = self.client.messages.create(
@@ -141,7 +148,10 @@ class AnthropicProvider(LLMProvider):
             logger.info(
                 "Anthropic vision call succeeded model=%s %.0fms", self._model, elapsed
             )
-            return response.content[0].text
+            block = response.content[0]
+            if not isinstance(block, TextBlock):
+                return None
+            return block.text
         except anthropic.APIConnectionError:
             logger.error("Cannot connect to Anthropic API")
             raise ConnectionError("Cannot connect to Anthropic API")

@@ -1,9 +1,9 @@
-import base64
 import json
 import logging
-from llm_provider import LLMProvider
 from typing import Dict
+
 from config import QUALITY_LEVELS
+from llm_provider import LLMProvider
 
 logger = logging.getLogger("img2sdtxt.prompt")
 

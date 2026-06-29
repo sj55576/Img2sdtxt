@@ -86,6 +86,7 @@ class TestGeneratePromptsTextOnly:
 class TestGeneratePromptsFromImage:
     def _make_png_bytes(self) -> bytes:
         from io import BytesIO
+
         from PIL import Image
         buf = BytesIO()
         Image.new("RGB", (1, 1), color=(0, 0, 0)).save(buf, format="PNG")

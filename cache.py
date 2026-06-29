@@ -1,10 +1,10 @@
 import hashlib
 import json
+import logging
 import sqlite3
 import time
-import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Dict, Optional
 
 logger = logging.getLogger("img2sdtxt.cache")
 

@@ -4,12 +4,13 @@ import asyncio
 import base64
 import json
 import logging
-from typing import Optional, List
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, WebSocket, WebSocketDisconnect
+from typing import List, Optional
+
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
-from deps import sd_client, _validate_image_bytes
+from deps import _validate_image_bytes, sd_client
 from models import SDGenerateRequest, SDMultiModelRequest
 
 logger = logging.getLogger("img2sdtxt.sd")

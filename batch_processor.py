@@ -13,7 +13,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from tqdm import tqdm
 
@@ -355,7 +355,7 @@ class BatchProcessor:
             skip_existing: Skip images that already have output files.
         """
         try:
-            from watchdog.events import FileSystemEventHandler, FileCreatedEvent
+            from watchdog.events import DirCreatedEvent, FileCreatedEvent, FileSystemEventHandler
             from watchdog.observers import Observer
         except ImportError as exc:
             raise ImportError(
@@ -368,10 +368,10 @@ class BatchProcessor:
         _pending: Dict[str, float] = {}  # path → last-seen mtime
 
         class _Handler(FileSystemEventHandler):
-            def on_created(self, event: FileCreatedEvent) -> None:
+            def on_created(self, event: FileCreatedEvent | DirCreatedEvent) -> None:  # type: ignore[override]
                 if event.is_directory:
                     return
-                path = Path(event.src_path)
+                path = Path(str(event.src_path))
                 if not _is_image(path):
                     return
                 with _pending_lock:

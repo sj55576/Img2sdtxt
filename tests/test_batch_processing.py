@@ -9,25 +9,23 @@ import sys
 import unittest
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 # Ensure the project root is on the path when running from the tests/ directory
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from PIL import Image
 
-import batch_processor
 from batch_processor import (
     BatchProcessor,
-    _output_stem,
     _output_paths_for_format,
+    _output_stem,
     _validate_output_format,
     process_single_image,
     scan_directory,
 )
 from llm_client import LLMClient
 from prompt_generator import PromptGenerator
-
 
 # ---------------------------------------------------------------------------
 # Helpers

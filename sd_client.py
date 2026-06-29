@@ -1,15 +1,17 @@
 """
 Stable Diffusion Web UI (AUTOMATIC1111) API クライアント
 """
-import requests
 import base64
 import json
 import logging
-from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import requests
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
+
 from config import SD_API_URL, SD_OUTPUT_DIR
 from retry import retry_with_backoff
 
@@ -600,14 +602,15 @@ class SDClient:
                         }
                         if key in mapping:
                             out_key = mapping[key]
+                            parsed: Any = value
                             if out_key in ("steps", "seed"):
                                 try:
-                                    value = int(value)
+                                    parsed = int(value)
                                 except ValueError:
                                     pass
                             elif out_key in ("cfg_scale", "denoising_strength"):
                                 try:
-                                    value = float(value)
+                                    parsed = float(value)
                                 except ValueError:
                                     pass
                             elif out_key == "size":
@@ -619,7 +622,7 @@ class SDClient:
                                     except ValueError:
                                         pass
                                 continue
-                            result[out_key] = value
+                            result[out_key] = parsed
 
             result["raw"] = raw
             return result

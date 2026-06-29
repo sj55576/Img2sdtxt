@@ -1,8 +1,8 @@
-import sqlite3
 import logging
+import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger("img2sdtxt.history")
 
@@ -62,7 +62,7 @@ def save_history(
              datetime.now().isoformat())
         )
         conn.commit()
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
 
 
 def get_history(
