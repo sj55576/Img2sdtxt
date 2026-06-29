@@ -174,6 +174,9 @@ class JobQueue:
         if job_id not in self._subscribers:
             self._subscribers[job_id] = []
         self._subscribers[job_id].append(q)
+        job = self._jobs.get(job_id)
+        if job is not None:
+            q.put_nowait(job.to_dict())
         return q
 
     def unsubscribe(self, job_id: str, q: asyncio.Queue):
