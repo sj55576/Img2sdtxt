@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from job_queue import JobQueue, JobStatus, register_job_handler, _JOB_HANDLERS
+from job_queue import _JOB_HANDLERS, JobQueue, JobStatus
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ async def test_cancel_pending_job(queue):
 
     _JOB_HANDLERS["test_slow"] = _slow
 
-    j1 = await queue.submit("test_slow", {})
+    await queue.submit("test_slow", {})
     j2 = await queue.submit("test_slow", {})
 
     await asyncio.sleep(0.1)

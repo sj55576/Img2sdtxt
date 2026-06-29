@@ -1,7 +1,8 @@
 """Pydantic request models for API endpoints."""
 
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
-from typing import Optional, List
 
 
 class SDGenerateRequest(BaseModel):

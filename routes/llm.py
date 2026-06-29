@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 
 import deps
-from deps import switch_provider, get_available_providers
+from deps import get_available_providers, switch_provider
 from models import SwitchProviderRequest
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])

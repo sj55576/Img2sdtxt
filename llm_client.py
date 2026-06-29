@@ -1,14 +1,15 @@
-import requests
-import json
 import base64
 import logging
 import time
 from io import BytesIO
+from typing import Optional
+
+import requests
 from PIL import Image
-from config import LLM_SERVER_URL, LLM_MODEL
-from typing import Optional, List, Dict, Any
-from retry import retry_with_backoff
+
+from config import LLM_MODEL, LLM_SERVER_URL
 from llm_provider import LLMProvider
+from retry import retry_with_backoff
 
 logger = logging.getLogger("img2sdtxt.llm")
 
@@ -105,7 +106,7 @@ class LLMClient(LLMProvider):
             raise ConnectionError(f"Cannot connect to LLM server at {self.base_url}")
         except requests.exceptions.Timeout:
             logger.error("LLM server request timed out url=%s", self.endpoint)
-            raise TimeoutError(f"LLM server request timed out")
+            raise TimeoutError("LLM server request timed out")
         except Exception as e:
             logger.error("LLM server error: %s", str(e))
             raise Exception(f"LLM server error: {str(e)}")
@@ -157,7 +158,7 @@ class LLMClient(LLMProvider):
             raise ConnectionError(f"Cannot connect to LLM server at {self.base_url}")
         except requests.exceptions.Timeout:
             logger.error("LLM vision request timed out url=%s", self.endpoint)
-            raise TimeoutError(f"LLM server request timed out (vision model analysis may take longer)")
+            raise TimeoutError("LLM server request timed out (vision model analysis may take longer)")
         except Exception as e:
             logger.error("LLM server error: %s", str(e))
             raise Exception(f"LLM server error: {str(e)}")

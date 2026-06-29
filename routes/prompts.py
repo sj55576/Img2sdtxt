@@ -1,15 +1,16 @@
 """Prompt generation endpoints."""
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from fastapi.concurrency import run_in_threadpool
 from typing import List
 
-import presets as preset_mgr
-import history as hist
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
+
 import deps
+import history as hist
+import presets as preset_mgr
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import _validate_image_bytes
-from models import TextPromptRequest, RefinePromptRequest
+from models import RefinePromptRequest, TextPromptRequest
 
 router = APIRouter(prefix="/api", tags=["prompts"])
 

@@ -116,7 +116,7 @@ def list_outputs(
 
     target_dates = [date] if date else dates
 
-    all_images = []
+    all_images: list[dict] = []
     for date_str in target_dates:
         date_dir = _OUTPUTS_DIR / date_str
         if not date_dir.is_dir():

@@ -7,10 +7,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from llm_provider import LLMProvider
-from llm_client import LLMClient
-from cache import LLMCache
 import cache as _cache_module
+from cache import LLMCache
+from llm_client import LLMClient
+from llm_provider import LLMProvider
 from models import SwitchProviderRequest
 
 
@@ -96,8 +96,8 @@ class TestAnthropicProvider:
             mock_cls.return_value = mock_client
 
             # Set up a realistic response shape
-            mock_content = MagicMock()
-            mock_content.text = "generated text"
+            from anthropic.types import TextBlock
+            mock_content = TextBlock(type="text", text="generated text")
             mock_client.messages.create.return_value = MagicMock(content=[mock_content])
 
             from providers.anthropic_provider import AnthropicProvider
@@ -112,6 +112,7 @@ class TestAnthropicProvider:
 
     def test_generate_response_with_image_calls_sdk_with_image_content(self):
         from io import BytesIO
+
         from PIL import Image
 
         # Build a small valid PNG
@@ -123,8 +124,8 @@ class TestAnthropicProvider:
             mock_client = MagicMock()
             mock_cls.return_value = mock_client
 
-            mock_content = MagicMock()
-            mock_content.text = "image description"
+            from anthropic.types import TextBlock
+            mock_content = TextBlock(type="text", text="image description")
             mock_client.messages.create.return_value = MagicMock(content=[mock_content])
 
             from providers.anthropic_provider import AnthropicProvider
@@ -177,7 +178,7 @@ class TestGeminiProvider:
     def test_generate_response_calls_sdk_and_returns_text(self):
         with patch("google.generativeai.configure"), \
              patch("google.generativeai.GenerativeModel") as mock_model_cls, \
-             patch("google.generativeai.types.GenerationConfig") as mock_gen_cfg:
+             patch("google.generativeai.types.GenerationConfig"):
             mock_model_instance = MagicMock()
             mock_model_cls.return_value = mock_model_instance
 
@@ -197,6 +198,7 @@ class TestGeminiProvider:
 
     def test_generate_response_with_image_calls_sdk_with_image_content(self):
         from io import BytesIO
+
         from PIL import Image as PILImage
 
         buf = BytesIO()

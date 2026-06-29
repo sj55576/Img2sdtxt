@@ -1,14 +1,13 @@
 """Job queue endpoints for async generation."""
 
 import asyncio
-import json
 import logging
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
-from job_queue import job_queue, register_job_handler, JobStatus
 from deps import sd_client
+from job_queue import JobStatus, job_queue, register_job_handler
 
 logger = logging.getLogger("img2sdtxt.jobs")
 

@@ -1,28 +1,24 @@
-from fastapi import FastAPI, Request
-from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from pathlib import Path
 import logging
 import time as _time
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 import config
-from rate_limit import RateLimitMiddleware
-from config import (
-    API_HOST, API_PORT, DEBUG,
-    HTTPS_ENABLED, SSL_CERTFILE, SSL_KEYFILE,
-    STYLES, TONES, QUALITY_LEVELS
-)
 import deps
-
-from routes.prompts import router as prompts_router
-from routes.history import router as history_router
-from routes.sd import router as sd_router
-from routes.presets import router as presets_router
+from config import API_HOST, API_PORT, DEBUG, HTTPS_ENABLED, QUALITY_LEVELS, SSL_CERTFILE, SSL_KEYFILE, STYLES, TONES
+from rate_limit import RateLimitMiddleware
 from routes.gallery import router as gallery_router
+from routes.history import router as history_router
 from routes.jobs import router as jobs_router
 from routes.llm import router as llm_router
+from routes.presets import router as presets_router
+from routes.prompts import router as prompts_router
+from routes.sd import router as sd_router
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
@@ -117,7 +113,8 @@ async def health():
 @app.get("/api/config")
 def get_config():
     from config import LLM_SERVER_URL, SD_API_URL
-    from deps import llm_client as current_provider, get_available_providers
+    from deps import get_available_providers
+    from deps import llm_client as current_provider
     return {
         "llm_server": LLM_SERVER_URL,
         "model": current_provider.model,
@@ -137,6 +134,7 @@ def get_config():
 def _run_batch_cli() -> None:
     """Parse CLI arguments and run batch or watch mode when --input-dir is given."""
     import argparse
+
     from batch_processor import BatchProcessor
 
     parser = argparse.ArgumentParser(
@@ -208,8 +206,8 @@ def _run_batch_cli() -> None:
 
             if not (Path(certfile).exists() and Path(keyfile).exists()):
                 # Auto-generate a self-signed certificate with openssl
-                import subprocess
                 import shutil
+                import subprocess
 
                 if shutil.which("openssl") is None:
                     print(
@@ -276,7 +274,7 @@ def _run_batch_cli() -> None:
 
     output_path = Path(args.output_dir)
 
-    processor = BatchProcessor(llm_client, concurrency=args.concurrency)
+    processor = BatchProcessor(deps.llm_client, concurrency=args.concurrency)
 
     if args.watch:
         processor.watch(

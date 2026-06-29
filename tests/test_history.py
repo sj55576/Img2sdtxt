@@ -1,7 +1,6 @@
 """tests/test_history.py — 一時 SQLite DB を使った history モジュールの CRUD テスト"""
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -202,7 +201,7 @@ def test_get_all_tags():
 
 def test_history_filter_by_tag():
     r1 = hist.save_history(positive="p1", negative="n")
-    r2 = hist.save_history(positive="p2", negative="n")
+    hist.save_history(positive="p2", negative="n")
     hist.add_tags(r1, ["portrait"])
     items = hist.get_history(tag="portrait")
     assert len(items) == 1
@@ -211,7 +210,7 @@ def test_history_filter_by_tag():
 
 def test_history_count_with_tag():
     r1 = hist.save_history(positive="p1", negative="n")
-    r2 = hist.save_history(positive="p2", negative="n")
+    hist.save_history(positive="p2", negative="n")
     hist.add_tags(r1, ["portrait"])
     assert hist.get_history_count(tag="portrait") == 1
     assert hist.get_history_count() == 2
