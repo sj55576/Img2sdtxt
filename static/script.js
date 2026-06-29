@@ -8,6 +8,8 @@ let presetsCache = [];
 let inpaintSelectedImage = null;
 let _galleryCache = {};   // key: "mode|date|offset" → API response
 let _galleryOffset = 0;   // 現在の Load More オフセット
+let _gallerySelectionMode = false;
+let _gallerySelectedPaths = new Set();
 
 // Gallery modal navigation
 let _galleryImages = [];
@@ -328,7 +330,7 @@ function setupNavigation() {
         if (page === 'sd') checkSDStatus();
         if (page === 'img2img') checkImg2ImgStatus();
         if (page === 'inpaint') checkInpaintStatus();
-        if (page === 'gallery') loadGallery();
+        if (page === 'gallery') { loadGallery(); loadGalleryFilters(); }
     }
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -2674,9 +2676,29 @@ function setupGalleryPage() {
         _galleryCache = {};
         _galleryOffset = 0;
         loadGallery(0, true);
+        loadGalleryFilters();
     });
     document.getElementById('gallery-filter-mode').addEventListener('change', debouncedLoad);
     document.getElementById('gallery-filter-date').addEventListener('change', debouncedLoad);
+
+    // Metadata search & filters
+    const searchInput = document.getElementById('gallery-search');
+    if (searchInput) searchInput.addEventListener('input', debouncedLoad);
+    const modelFilter = document.getElementById('gallery-filter-model');
+    if (modelFilter) modelFilter.addEventListener('change', debouncedLoad);
+    const samplerFilter = document.getElementById('gallery-filter-sampler');
+    if (samplerFilter) samplerFilter.addEventListener('change', debouncedLoad);
+
+    // Selection mode
+    const selectModeBtn = document.getElementById('gallery-select-mode-btn');
+    if (selectModeBtn) selectModeBtn.addEventListener('click', toggleGallerySelectionMode);
+    const selectAllBtn = document.getElementById('gallery-select-all-btn');
+    if (selectAllBtn) selectAllBtn.addEventListener('click', gallerySelectAll);
+    const deselectAllBtn = document.getElementById('gallery-deselect-all-btn');
+    if (deselectAllBtn) deselectAllBtn.addEventListener('click', galleryDeselectAll);
+    const downloadZipBtn = document.getElementById('gallery-download-zip-btn');
+    if (downloadZipBtn) downloadZipBtn.addEventListener('click', downloadSelectedAsZip);
+
     document.getElementById('gallery-load-more-btn').addEventListener('click', () => {
         loadGallery(_galleryOffset);
     });
@@ -2707,7 +2729,10 @@ async function loadGallery(offset = 0, forceRefresh = false) {
     if (offset === 0) grid.innerHTML = '';
 
     try {
-        const cacheKey = `${modeFilter}|${dateFilter}|${offset}`;
+        const searchText_ck = (document.getElementById('gallery-search') || {}).value || '';
+        const modelFilter_ck = (document.getElementById('gallery-filter-model') || {}).value || '';
+        const samplerFilter_ck = (document.getElementById('gallery-filter-sampler') || {}).value || '';
+        const cacheKey = `${modeFilter}|${dateFilter}|${searchText_ck}|${modelFilter_ck}|${samplerFilter_ck}|${offset}`;
         let d;
         if (!forceRefresh && _galleryCache[cacheKey]) {
             d = _galleryCache[cacheKey];
@@ -2715,6 +2740,12 @@ async function loadGallery(offset = 0, forceRefresh = false) {
             const params = new URLSearchParams();
             if (modeFilter) params.set('mode', modeFilter);
             if (dateFilter) params.set('date', dateFilter);
+            const searchText = (document.getElementById('gallery-search') || {}).value || '';
+            const modelFilterVal = (document.getElementById('gallery-filter-model') || {}).value || '';
+            const samplerFilterVal = (document.getElementById('gallery-filter-sampler') || {}).value || '';
+            if (searchText) params.set('search', searchText);
+            if (modelFilterVal) params.set('model', modelFilterVal);
+            if (samplerFilterVal) params.set('sampler', samplerFilterVal);
             params.set('offset', offset);
             params.set('limit', 24);
 
@@ -2753,7 +2784,22 @@ async function loadGallery(offset = 0, forceRefresh = false) {
             const shortPrompt = prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt;
             const div = document.createElement('div');
             div.className = 'gallery-item';
-            div.addEventListener('click', () => openGalleryModal(JSON.stringify(img)));
+            if (_gallerySelectionMode && _gallerySelectedPaths.has(img.url)) {
+                div.classList.add('selected');
+            }
+            div.addEventListener('click', () => {
+                if (_gallerySelectionMode) {
+                    div.classList.toggle('selected');
+                    if (div.classList.contains('selected')) {
+                        _gallerySelectedPaths.add(img.url);
+                    } else {
+                        _gallerySelectedPaths.delete(img.url);
+                    }
+                    updateGallerySelectedCount();
+                } else {
+                    openGalleryModal(JSON.stringify(img));
+                }
+            });
             div.innerHTML = `
                 <div class="gallery-thumb-wrap">
                     <img class="gallery-thumb" src="${escHtml(img.thumb_url || img.url)}" alt="${escHtml(img.filename)}" loading="lazy">
@@ -2889,6 +2935,113 @@ function galleryNavigate(direction) {
     const newIndex = _galleryCurrentIndex + direction;
     if (newIndex < 0 || newIndex >= _galleryImages.length) return;
     openGalleryModal(JSON.stringify(_galleryImages[newIndex]));
+}
+
+function toggleGallerySelectionMode() {
+    _gallerySelectionMode = !_gallerySelectionMode;
+    const grid = document.getElementById('gallery-grid');
+    const actions = document.getElementById('gallery-select-actions');
+    const btn = document.getElementById('gallery-select-mode-btn');
+
+    if (_gallerySelectionMode) {
+        grid.classList.add('selection-mode');
+        if (actions) actions.classList.remove('hidden');
+        if (btn) btn.classList.add('active');
+        toast(I18n.t('page.gallery.select_mode_on') || '選択モードON', 'info');
+    } else {
+        grid.classList.remove('selection-mode');
+        if (actions) actions.classList.add('hidden');
+        if (btn) btn.classList.remove('active');
+        _gallerySelectedPaths.clear();
+        grid.querySelectorAll('.gallery-item.selected').forEach(el => el.classList.remove('selected'));
+        updateGallerySelectedCount();
+    }
+}
+
+function gallerySelectAll() {
+    const grid = document.getElementById('gallery-grid');
+    grid.querySelectorAll('.gallery-item').forEach(el => {
+        el.classList.add('selected');
+    });
+    _gallerySelectedPaths.clear();
+    _galleryImages.forEach(img => _gallerySelectedPaths.add(img.url));
+    updateGallerySelectedCount();
+}
+
+function galleryDeselectAll() {
+    const grid = document.getElementById('gallery-grid');
+    grid.querySelectorAll('.gallery-item.selected').forEach(el => el.classList.remove('selected'));
+    _gallerySelectedPaths.clear();
+    updateGallerySelectedCount();
+}
+
+function updateGallerySelectedCount() {
+    const countEl = document.getElementById('gallery-selected-count');
+    if (countEl) {
+        const count = _gallerySelectedPaths.size;
+        countEl.textContent = (I18n.t('page.gallery.selected_count') || '{count}枚選択中').replace('{count}', count);
+    }
+}
+
+async function downloadSelectedAsZip() {
+    if (_gallerySelectedPaths.size === 0) {
+        toast(I18n.t('toast.no_images_selected') || 'ダウンロードする画像を選択してください', 'error');
+        return;
+    }
+    try {
+        const resp = await fetch('/api/outputs/download-zip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: Array.from(_gallerySelectedPaths) }),
+        });
+        if (!resp.ok) throw new Error('ZIP download failed');
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'gallery_images.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast(I18n.t('toast.zip_download_started') || 'ZIPダウンロードを開始しました', 'success');
+    } catch (e) {
+        toast(I18n.t('toast.zip_download_failed') || 'ZIPダウンロードに失敗しました', 'error');
+    }
+}
+
+async function loadGalleryFilters() {
+    try {
+        const resp = await fetch('/api/outputs/filters');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const modelSelect = document.getElementById('gallery-filter-model');
+        const samplerSelect = document.getElementById('gallery-filter-sampler');
+        if (modelSelect && data.models) {
+            const current = modelSelect.value;
+            modelSelect.innerHTML = '<option value="">' + (I18n.t('page.gallery.filter_all_models') || '全モデル') + '</option>';
+            data.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                if (m === current) opt.selected = true;
+                modelSelect.appendChild(opt);
+            });
+        }
+        if (samplerSelect && data.samplers) {
+            const current = samplerSelect.value;
+            samplerSelect.innerHTML = '<option value="">' + (I18n.t('page.gallery.filter_all_samplers') || '全サンプラー') + '</option>';
+            data.samplers.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.textContent = s;
+                if (s === current) opt.selected = true;
+                samplerSelect.appendChild(opt);
+            });
+        }
+    } catch (e) {
+        // Silently fail - filters will just show default options
+    }
 }
 
 function closeGalleryModal() {

@@ -1068,7 +1068,27 @@
                         <select id="gallery-filter-date" class="gallery-filter-select">
                             <option value="" data-i18n="page.gallery.filter_all_dates">全日付</option>
                         </select>
+                        <select id="gallery-filter-model" class="gallery-filter-select">
+                            <option value="" data-i18n="page.gallery.filter_all_models">全モデル</option>
+                        </select>
+                        <select id="gallery-filter-sampler" class="gallery-filter-select">
+                            <option value="" data-i18n="page.gallery.filter_all_samplers">全サンプラー</option>
+                        </select>
                         <button id="refresh-gallery-btn" class="btn btn-sm btn-secondary" data-i18n="page.gallery.refresh_btn">🔄 更新</button>
+                    </div>
+                </div>
+                <div class="gallery-toolbar">
+                    <div class="gallery-search-wrap">
+                        <input type="text" id="gallery-search" class="gallery-search-input" data-i18n-placeholder="page.gallery.search_placeholder" placeholder="🔍 プロンプト検索...">
+                    </div>
+                    <div class="gallery-select-controls">
+                        <button id="gallery-select-mode-btn" class="btn btn-sm btn-secondary" data-i18n="page.gallery.select_mode_btn">☑ 選択モード</button>
+                        <span id="gallery-select-actions" class="hidden">
+                            <button id="gallery-select-all-btn" class="btn btn-sm btn-ghost" data-i18n="page.gallery.select_all_btn">全選択</button>
+                            <button id="gallery-deselect-all-btn" class="btn btn-sm btn-ghost" data-i18n="page.gallery.deselect_all_btn">全解除</button>
+                            <span id="gallery-selected-count" class="gallery-selected-count">0枚選択中</span>
+                            <button id="gallery-download-zip-btn" class="btn btn-sm btn-primary" data-i18n="page.gallery.download_zip_btn">📦 ZIPダウンロード</button>
+                        </span>
                     </div>
                 </div>
                 <div class="page-body">

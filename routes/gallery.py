@@ -1,15 +1,19 @@
 """Gallery/outputs, last-params, and LLM cache endpoints."""
 
+import io
 import json
 import os
 import re
 import tempfile
 import threading
 import time
+import zipfile
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import Response
 from PIL import Image
 
 from deps import llm_cache
@@ -92,12 +96,79 @@ def _scan_date_dir(date_dir: Path, date_str: str) -> list:
 _OUTPUTS_DIR = Path(__file__).parent.parent / "outputs"
 
 
+@router.get("/outputs/filters")
+def get_gallery_filters():
+    """Return distinct model names and sampler names from gallery metadata."""
+    models: set[str] = set()
+    samplers: set[str] = set()
+
+    with _gallery_cache_lock:
+        cache_values = list(_gallery_cache.values())
+
+    for _mtime, _ts, date_images in cache_values:
+        for img in date_images:
+            params = img.get("parameters", {})
+            model_val = params.get("model") or ""
+            if model_val:
+                models.add(model_val)
+            sampler_val = params.get("sampler") or ""
+            if sampler_val:
+                samplers.add(sampler_val)
+
+    return {
+        "success": True,
+        "models": sorted(models),
+        "samplers": sorted(samplers),
+    }
+
+
+@router.post("/outputs/download-zip")
+async def download_zip(request_data: dict):
+    """Create and return a ZIP archive of the requested output image files."""
+    paths = request_data.get("paths", [])
+    if not isinstance(paths, list):
+        raise HTTPException(status_code=422, detail="paths must be a list.")
+    if len(paths) > 100:
+        raise HTTPException(status_code=400, detail="Cannot download more than 100 files at once.")
+
+    outputs_resolved = _OUTPUTS_DIR.resolve()
+
+    def _build_zip() -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for raw_path in paths:
+                # Strip leading slash so Path() doesn't treat it as absolute
+                relative = raw_path.lstrip("/")
+                # The paths are expected to start with "outputs/..."
+                # Resolve against the parent of _OUTPUTS_DIR for safety
+                candidate = (_OUTPUTS_DIR.parent / relative).resolve()
+                if not str(candidate).startswith(str(outputs_resolved)):
+                    continue  # path traversal attempt – skip silently
+                if not candidate.is_file():
+                    continue  # missing file – skip silently
+                # Use the path relative to outputs dir as the name inside the ZIP
+                arc_name = candidate.relative_to(outputs_resolved)
+                zf.write(candidate, arcname=arc_name)
+        return buf.getvalue()
+
+    zip_bytes = await run_in_threadpool(_build_zip)
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="images.zip"'},
+    )
+
+
 @router.get("/outputs")
 def list_outputs(
     date: Optional[str] = None,
     mode: Optional[str] = None,
     limit: int = 24,
     offset: int = 0,
+    search: Optional[str] = None,
+    model: Optional[str] = None,
+    sampler: Optional[str] = None,
 ):
     """Return a paginated list of generated images from the outputs folder."""
     if limit <= 0:
@@ -139,6 +210,29 @@ def list_outputs(
             all_images.extend(img for img in date_images if img["mode"] == mode)
         else:
             all_images.extend(date_images)
+
+    if search:
+        search_lower = search.lower()
+        all_images = [
+            img
+            for img in all_images
+            if search_lower
+            in (
+                img.get("parameters", {}).get("positive_prompt", "")
+                + " "
+                + img.get("parameters", {}).get("negative_prompt", "")
+            ).lower()
+        ]
+    if model:
+        model_lower = model.lower()
+        all_images = [
+            img for img in all_images if model_lower in (img.get("parameters", {}).get("model", "") or "").lower()
+        ]
+    if sampler:
+        sampler_lower = sampler.lower()
+        all_images = [
+            img for img in all_images if (img.get("parameters", {}).get("sampler", "") or "").lower() == sampler_lower
+        ]
 
     total = len(all_images)
     page_images = all_images[offset : offset + limit]
