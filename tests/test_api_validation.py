@@ -39,6 +39,8 @@ def client():
 
     mock_llm = MagicMock()
     mock_llm.is_available.return_value = False
+    mock_llm.provider_name = "mock"
+    mock_llm.model = "mock-model"
 
     mock_pg = MagicMock()
     mock_pg.generate_prompts.return_value = {

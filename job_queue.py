@@ -71,7 +71,10 @@ class JobQueue:
 
     async def _worker_loop(self):
         while True:
-            job_id = await self._queue.get()
+            try:
+                job_id = await self._queue.get()
+            except (asyncio.CancelledError, RuntimeError):
+                return
             job = self._jobs.get(job_id)
             if job is None or job.status == JobStatus.CANCELLED:
                 self._queue.task_done()
