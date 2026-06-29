@@ -66,4 +66,3 @@ class SwitchProviderRequest(BaseModel):
     provider: str
     model: str = ""
     api_key: str = ""
-

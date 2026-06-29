@@ -44,12 +44,7 @@ def init_db():
 
 
 def save_history(
-    positive: str,
-    negative: str,
-    image_name: str = "",
-    style: str = "",
-    tone: str = "",
-    quality: str = ""
+    positive: str, negative: str, image_name: str = "", style: str = "", tone: str = "", quality: str = ""
 ) -> int:
     logger.debug("save_history image_name=%s style=%s", image_name, style)
     init_db()
@@ -58,8 +53,7 @@ def save_history(
             """INSERT INTO prompt_history
                (image_name, positive, negative, style, tone, quality, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (image_name, positive, negative, style, tone, quality,
-             datetime.now().isoformat())
+            (image_name, positive, negative, style, tone, quality, datetime.now().isoformat()),
         )
         conn.commit()
         return cursor.lastrowid or 0
@@ -72,7 +66,7 @@ def get_history(
     style: str = "",
     quality: str = "",
     favorites_only: bool = False,
-    tag: str = ""
+    tag: str = "",
 ) -> List[Dict]:
     logger.debug("get_history limit=%s offset=%d search=%s", limit, offset, search)
     init_db()
@@ -119,19 +113,14 @@ def get_history(
         # Attach tags to each item
         for item in items:
             tag_rows = conn.execute(
-                "SELECT tag FROM prompt_tags WHERE history_id = ? ORDER BY tag",
-                (item["id"],)
+                "SELECT tag FROM prompt_tags WHERE history_id = ? ORDER BY tag", (item["id"],)
             ).fetchall()
             item["tags"] = [r[0] for r in tag_rows]
         return items
 
 
 def get_history_count(
-    search: str = "",
-    style: str = "",
-    quality: str = "",
-    favorites_only: bool = False,
-    tag: str = ""
+    search: str = "", style: str = "", quality: str = "", favorites_only: bool = False, tag: str = ""
 ) -> int:
     init_db()
     conditions = []
@@ -163,9 +152,7 @@ def get_history_count(
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
-        return conn.execute(
-            f"SELECT COUNT(*) FROM prompt_history {join_clause} {where}", params
-        ).fetchone()[0]
+        return conn.execute(f"SELECT COUNT(*) FROM prompt_history {join_clause} {where}", params).fetchone()[0]
 
 
 def add_tags(history_id: int, tags: List[str]) -> List[str]:
@@ -177,10 +164,7 @@ def add_tags(history_id: int, tags: List[str]) -> List[str]:
             tag = tag.strip().lower()
             if tag:
                 try:
-                    conn.execute(
-                        "INSERT OR IGNORE INTO prompt_tags (history_id, tag) VALUES (?, ?)",
-                        (history_id, tag)
-                    )
+                    conn.execute("INSERT OR IGNORE INTO prompt_tags (history_id, tag) VALUES (?, ?)", (history_id, tag))
                 except sqlite3.IntegrityError:
                     pass
         conn.commit()
@@ -192,10 +176,7 @@ def remove_tag(history_id: int, tag: str) -> List[str]:
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute(
-            "DELETE FROM prompt_tags WHERE history_id = ? AND tag = ?",
-            (history_id, tag.strip().lower())
-        )
+        conn.execute("DELETE FROM prompt_tags WHERE history_id = ? AND tag = ?", (history_id, tag.strip().lower()))
         conn.commit()
     return get_tags(history_id)
 
@@ -204,10 +185,7 @@ def get_tags(history_id: int) -> List[str]:
     """Get all tags for a history item."""
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
-        rows = conn.execute(
-            "SELECT tag FROM prompt_tags WHERE history_id = ? ORDER BY tag",
-            (history_id,)
-        ).fetchall()
+        rows = conn.execute("SELECT tag FROM prompt_tags WHERE history_id = ? ORDER BY tag", (history_id,)).fetchall()
         return [r[0] for r in rows]
 
 
@@ -225,9 +203,7 @@ def get_history_item(item_id: int) -> Optional[Dict]:
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM prompt_history WHERE id = ?", (item_id,)
-        ).fetchone()
+        row = conn.execute("SELECT * FROM prompt_history WHERE id = ?", (item_id,)).fetchone()
         return dict(row) if row else None
 
 
@@ -235,9 +211,7 @@ def delete_history_item(item_id: int) -> bool:
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
-        result = conn.execute(
-            "DELETE FROM prompt_history WHERE id = ?", (item_id,)
-        )
+        result = conn.execute("DELETE FROM prompt_history WHERE id = ?", (item_id,))
         conn.commit()
         return result.rowcount > 0
 
@@ -292,17 +266,11 @@ def toggle_favorite(item_id: int) -> Optional[Dict]:
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT id, is_favorite FROM prompt_history WHERE id = ?", (item_id,)
-        ).fetchone()
+        row = conn.execute("SELECT id, is_favorite FROM prompt_history WHERE id = ?", (item_id,)).fetchone()
         if not row:
             return None
         new_state = 0 if row["is_favorite"] else 1
-        conn.execute(
-            "UPDATE prompt_history SET is_favorite = ? WHERE id = ?", (new_state, item_id)
-        )
+        conn.execute("UPDATE prompt_history SET is_favorite = ? WHERE id = ?", (new_state, item_id))
         conn.commit()
-        updated = conn.execute(
-            "SELECT * FROM prompt_history WHERE id = ?", (item_id,)
-        ).fetchone()
+        updated = conn.execute("SELECT * FROM prompt_history WHERE id = ?", (item_id,)).fetchone()
         return dict(updated) if updated else None

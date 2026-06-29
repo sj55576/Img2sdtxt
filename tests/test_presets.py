@@ -1,4 +1,5 @@
 """tests/test_presets.py — 一時ファイルを使った presets モジュールのテスト"""
+
 import json
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ def temp_presets(tmp_path, monkeypatch):
 # デフォルトプリセット
 # ------------------------------------------------------------------ #
 
+
 def test_load_defaults_when_no_file():
     """ファイルが存在しない場合はデフォルトプリセットを返す"""
     presets = preset_mgr.get_all_presets()
@@ -40,6 +42,7 @@ def test_default_presets_have_is_default_flag():
 # ------------------------------------------------------------------ #
 # プリセットの追加
 # ------------------------------------------------------------------ #
+
 
 def test_add_preset():
     new_p = {
@@ -118,6 +121,7 @@ def test_add_preset_saves_to_file(temp_presets):
 # プリセットの削除
 # ------------------------------------------------------------------ #
 
+
 def test_delete_user_preset():
     new_p = {
         "name": "To Delete",
@@ -150,6 +154,7 @@ def test_delete_nonexistent_preset():
 # ------------------------------------------------------------------ #
 # get_preset
 # ------------------------------------------------------------------ #
+
 
 def test_get_preset_by_id():
     p = preset_mgr.get_preset("anime")

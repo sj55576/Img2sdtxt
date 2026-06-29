@@ -65,7 +65,7 @@ class PromptGenerator:
         tone: str = "",
         quality: str = "high",
         preset_suffix_positive: str = "",
-        preset_suffix_negative: str = ""
+        preset_suffix_negative: str = "",
     ) -> Dict[str, str]:
         """画像からポジティブ・ネガティブプロンプトを生成"""
         logger.info("generate_prompts start style=%s tone=%s quality=%s", style, tone, quality)
@@ -116,7 +116,7 @@ JSON形式のみで返してください：
         instruction: str = "",
         style: str = "",
         tone: str = "",
-        quality: str = "high"
+        quality: str = "high",
     ) -> Dict[str, str]:
         """既存のプロンプトをLLMで改善・強化する"""
         try:
@@ -153,7 +153,7 @@ JSON形式のみで返してください：
                 "positive": result.get("positive", positive),
                 "negative": result.get("negative", negative),
                 "changes": result.get("changes", ""),
-                "status": "success"
+                "status": "success",
             }
         except Exception as e:
             return {"positive": positive, "negative": negative, "changes": "", "error": str(e), "status": "error"}
@@ -165,7 +165,7 @@ JSON形式のみで返してください：
         tone: str = "",
         quality: str = "high",
         preset_suffix_positive: str = "",
-        preset_suffix_negative: str = ""
+        preset_suffix_negative: str = "",
     ) -> Dict[str, str]:
         """テキスト説明からプロンプトを生成"""
         logger.info("generate_prompts_text_only start style=%s tone=%s quality=%s", style, tone, quality)

@@ -17,6 +17,7 @@ router = APIRouter(prefix="/api", tags=["history"])
 # History
 # ------------------------------------------------------------------ #
 
+
 @router.get("/history")
 def get_history(
     limit: int = 50,
@@ -25,17 +26,12 @@ def get_history(
     style: str = "",
     quality: str = "",
     favorites_only: bool = False,
-    tag: str = ""
+    tag: str = "",
 ):
     items = hist.get_history(
-        limit=limit, offset=offset,
-        search=search, style=style, quality=quality,
-        favorites_only=favorites_only, tag=tag
+        limit=limit, offset=offset, search=search, style=style, quality=quality, favorites_only=favorites_only, tag=tag
     )
-    total = hist.get_history_count(
-        search=search, style=style, quality=quality,
-        favorites_only=favorites_only, tag=tag
-    )
+    total = hist.get_history_count(search=search, style=style, quality=quality, favorites_only=favorites_only, tag=tag)
     return {"success": True, "items": items, "total": total}
 
 
@@ -54,13 +50,13 @@ async def export_history(format: str = "json"):
         return Response(
             content=output.getvalue(),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=\"prompt_history.csv\""},
+            headers={"Content-Disposition": 'attachment; filename="prompt_history.csv"'},
         )
     else:
         return Response(
             content=json.dumps(items, ensure_ascii=False, indent=2),
             media_type="application/json",
-            headers={"Content-Disposition": "attachment; filename=\"prompt_history.json\""},
+            headers={"Content-Disposition": 'attachment; filename="prompt_history.json"'},
         )
 
 
@@ -89,6 +85,7 @@ def clear_history():
 # ------------------------------------------------------------------ #
 # History Tags
 # ------------------------------------------------------------------ #
+
 
 @router.get("/tags")
 def list_all_tags():

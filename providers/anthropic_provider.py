@@ -109,9 +109,7 @@ class AnthropicProvider(LLMProvider):
             raise Exception(f"Anthropic API error: {str(e)}")
 
     @retry_with_backoff(max_retries=2, base_delay=1.0)
-    def generate_response_with_image(
-        self, prompt: str, image_bytes: bytes, max_tokens: int = 500
-    ) -> Optional[str]:
+    def generate_response_with_image(self, prompt: str, image_bytes: bytes, max_tokens: int = 500) -> Optional[str]:
         """Send an image + text prompt and return the generated response."""
         logger.debug(
             "generate_response_with_image model=%s image_bytes=%d",
@@ -145,9 +143,7 @@ class AnthropicProvider(LLMProvider):
                 timeout=60,
             )
             elapsed = (time.time() - t0) * 1000
-            logger.info(
-                "Anthropic vision call succeeded model=%s %.0fms", self._model, elapsed
-            )
+            logger.info("Anthropic vision call succeeded model=%s %.0fms", self._model, elapsed)
             block = response.content[0]
             if not isinstance(block, TextBlock):
                 return None
@@ -156,12 +152,8 @@ class AnthropicProvider(LLMProvider):
             logger.error("Cannot connect to Anthropic API")
             raise ConnectionError("Cannot connect to Anthropic API")
         except anthropic.APITimeoutError:
-            logger.error(
-                "Anthropic API vision request timed out model=%s", self._model
-            )
-            raise TimeoutError(
-                "Anthropic API request timed out (vision analysis may take longer)"
-            )
+            logger.error("Anthropic API vision request timed out model=%s", self._model)
+            raise TimeoutError("Anthropic API request timed out (vision analysis may take longer)")
         except Exception as e:
             logger.error("Anthropic API error: %s", str(e))
             raise Exception(f"Anthropic API error: {str(e)}")

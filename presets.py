@@ -1,6 +1,7 @@
 """
 プリセットプロンプトテンプレートの管理
 """
+
 import json
 import os
 import tempfile
@@ -25,7 +26,7 @@ DEFAULT_PRESETS = [
         "style": "anime",
         "tone": "vibrant",
         "quality": "high",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "photorealistic",
@@ -36,7 +37,7 @@ DEFAULT_PRESETS = [
         "style": "photorealistic",
         "tone": "natural",
         "quality": "ultra",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "oil_painting",
@@ -47,7 +48,7 @@ DEFAULT_PRESETS = [
         "style": "painting",
         "tone": "warm",
         "quality": "high",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "watercolor",
@@ -58,7 +59,7 @@ DEFAULT_PRESETS = [
         "style": "painting",
         "tone": "soft",
         "quality": "high",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "fantasy",
@@ -69,7 +70,7 @@ DEFAULT_PRESETS = [
         "style": "concept_art",
         "tone": "dramatic",
         "quality": "high",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "portrait",
@@ -80,7 +81,7 @@ DEFAULT_PRESETS = [
         "style": "photorealistic",
         "tone": "natural",
         "quality": "ultra",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "realistic_portrait",
@@ -91,7 +92,7 @@ DEFAULT_PRESETS = [
         "style": "photorealistic",
         "tone": "natural",
         "quality": "ultra",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "fashion_photo",
@@ -102,7 +103,7 @@ DEFAULT_PRESETS = [
         "style": "photorealistic",
         "tone": "vibrant",
         "quality": "ultra",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "cinematic_portrait",
@@ -113,7 +114,7 @@ DEFAULT_PRESETS = [
         "style": "photorealistic",
         "tone": "cinematic",
         "quality": "ultra",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "street_snap",
@@ -124,7 +125,7 @@ DEFAULT_PRESETS = [
         "style": "photorealistic",
         "tone": "natural",
         "quality": "high",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "studio_portrait",
@@ -135,7 +136,7 @@ DEFAULT_PRESETS = [
         "style": "photorealistic",
         "tone": "natural",
         "quality": "ultra",
-        "is_default": True
+        "is_default": True,
     },
     {
         "id": "natural_light_portrait",
@@ -146,8 +147,8 @@ DEFAULT_PRESETS = [
         "style": "photorealistic",
         "tone": "warm",
         "quality": "ultra",
-        "is_default": True
-    }
+        "is_default": True,
+    },
 ]
 
 
@@ -215,8 +216,7 @@ def add_preset(preset: Dict) -> Dict:
         if requested_id:
             if not _is_valid_preset_id(requested_id):
                 raise ValueError(
-                    "Preset id must be 1-64 characters and contain only letters, "
-                    "numbers, hyphens, or underscores."
+                    "Preset id must be 1-64 characters and contain only letters, numbers, hyphens, or underscores."
                 )
             if requested_id in existing_ids:
                 raise ValueError(f"Preset id already exists: {requested_id}")

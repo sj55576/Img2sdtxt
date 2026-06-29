@@ -71,15 +71,17 @@ def _scan_date_dir(date_dir: Path, date_str: str) -> list:
                 print(f"Warning: on-demand thumbnail generation failed for {fname}: {e}")
                 thumb_url = None
 
-        date_images.append({
-            "date": date_str,
-            "filename": fname,
-            "url": f"/outputs/{date_str}/{fname}",
-            "thumb_url": thumb_url,
-            "mode": file_mode,
-            "timestamp": timestamp,
-            "parameters": meta.get("parameters", {}),
-        })
+        date_images.append(
+            {
+                "date": date_str,
+                "filename": fname,
+                "url": f"/outputs/{date_str}/{fname}",
+                "thumb_url": thumb_url,
+                "mode": file_mode,
+                "timestamp": timestamp,
+                "parameters": meta.get("parameters", {}),
+            }
+        )
     return date_images
 
 
@@ -109,10 +111,7 @@ def list_outputs(
     if not _OUTPUTS_DIR.exists():
         return {"success": True, "images": [], "dates": [], "total": 0}
 
-    dates = sorted(
-        [d.name for d in _OUTPUTS_DIR.iterdir() if d.is_dir() and d.name != "thumbs"],
-        reverse=True
-    )
+    dates = sorted([d.name for d in _OUTPUTS_DIR.iterdir() if d.is_dir() and d.name != "thumbs"], reverse=True)
 
     target_dates = [date] if date else dates
 
@@ -142,7 +141,7 @@ def list_outputs(
             all_images.extend(date_images)
 
     total = len(all_images)
-    page_images = all_images[offset: offset + limit]
+    page_images = all_images[offset : offset + limit]
 
     return {"success": True, "images": page_images, "dates": dates, "total": total}
 
@@ -207,6 +206,7 @@ def save_last_params(feature: str, request_data: dict):
 # ------------------------------------------------------------------ #
 # LLM cache stats/clear
 # ------------------------------------------------------------------ #
+
 
 @router.get("/cache/stats")
 async def cache_stats():

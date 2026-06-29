@@ -118,10 +118,7 @@ def _as_int(data: dict, key: str, default: int) -> int:
     try:
         return int(val)
     except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Parameter '{key}' must be an integer, got: {val!r}"
-        )
+        raise HTTPException(status_code=422, detail=f"Parameter '{key}' must be an integer, got: {val!r}")
 
 
 def _as_float(data: dict, key: str, default: float) -> float:
@@ -130,10 +127,7 @@ def _as_float(data: dict, key: str, default: float) -> float:
     try:
         return float(val)
     except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Parameter '{key}' must be a number, got: {val!r}"
-        )
+        raise HTTPException(status_code=422, detail=f"Parameter '{key}' must be a number, got: {val!r}")
 
 
 def _validate_image_bytes(data: bytes) -> str:

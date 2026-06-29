@@ -26,9 +26,7 @@ def temp_rate_limit_db(tmp_path, monkeypatch):
                 timestamp REAL NOT NULL
             )
         """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_ip_tier ON rate_limit_entries (ip, tier)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_ip_tier ON rate_limit_entries (ip, tier)")
         conn.commit()
     yield db_file
 
@@ -39,6 +37,7 @@ def client(temp_rate_limit_db):
     config.RATE_LIMIT_GENERATION = 3
     config.RATE_LIMIT_API = 5
     from main import app
+
     return TestClient(app)
 
 
@@ -66,6 +65,7 @@ def test_static_not_rate_limited(client):
 def test_rate_limit_disabled():
     config.RATE_LIMIT_ENABLED = False
     from main import app
+
     c = TestClient(app)
     for _ in range(100):
         r = c.get("/api/config")

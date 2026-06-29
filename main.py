@@ -31,7 +31,7 @@ APP_START_TIME = _time.time()
 app = FastAPI(
     title="Image to Stable Diffusion Prompt",
     description="Convert images to SD prompts using local LLM",
-    version="2.0.0"
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -75,6 +75,7 @@ app.include_router(llm_router)
 # Pages
 # ------------------------------------------------------------------ #
 
+
 @app.get("/")
 async def root():
     return FileResponse("static/index.html")
@@ -83,6 +84,7 @@ async def root():
 # ------------------------------------------------------------------ #
 # Health / Config
 # ------------------------------------------------------------------ #
+
 
 @app.get("/health")
 async def health():
@@ -115,6 +117,7 @@ def get_config():
     from config import LLM_SERVER_URL, SD_API_URL
     from deps import get_available_providers
     from deps import llm_client as current_provider
+
     return {
         "llm_server": LLM_SERVER_URL,
         "model": current_provider.model,
@@ -123,13 +126,14 @@ def get_config():
         "sd_api": SD_API_URL,
         "styles": STYLES,
         "tones": TONES,
-        "quality_levels": list(QUALITY_LEVELS.keys())
+        "quality_levels": list(QUALITY_LEVELS.keys()),
     }
 
 
 # ------------------------------------------------------------------ #
 # CLI / batch mode
 # ------------------------------------------------------------------ #
+
 
 def _run_batch_cli() -> None:
     """Parse CLI arguments and run batch or watch mode when --input-dir is given."""
@@ -140,8 +144,7 @@ def _run_batch_cli() -> None:
     parser = argparse.ArgumentParser(
         prog="main.py",
         description=(
-            "Img2sdtxt — Image to Stable Diffusion Prompt Generator.\n"
-            "Run without --input-dir to start the web server."
+            "Img2sdtxt — Image to Stable Diffusion Prompt Generator.\nRun without --input-dir to start the web server."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -226,13 +229,20 @@ def _run_batch_cli() -> None:
                 try:
                     subprocess.run(
                         [
-                            "openssl", "req", "-x509",
-                            "-newkey", "rsa:4096",
-                            "-keyout", str(ssl_dir / "key.pem"),
-                            "-out", str(ssl_dir / "cert.pem"),
-                            "-days", "365",
+                            "openssl",
+                            "req",
+                            "-x509",
+                            "-newkey",
+                            "rsa:4096",
+                            "-keyout",
+                            str(ssl_dir / "key.pem"),
+                            "-out",
+                            str(ssl_dir / "cert.pem"),
+                            "-days",
+                            "365",
                             "-nodes",
-                            "-subj", "/CN=localhost",
+                            "-subj",
+                            "/CN=localhost",
                         ],
                         check=True,
                     )

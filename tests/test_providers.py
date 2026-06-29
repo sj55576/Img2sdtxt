@@ -1,4 +1,5 @@
 """tests/test_providers.py — LLM provider interface and factory tests."""
+
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -26,6 +27,7 @@ def temp_cache_db(tmp_path, monkeypatch):
 # LLMProvider ABC
 # ------------------------------------------------------------------ #
 
+
 class TestLLMProviderABC:
     def test_cannot_instantiate_directly(self):
         """LLMProvider is abstract and must not be instantiable."""
@@ -36,6 +38,7 @@ class TestLLMProviderABC:
 # ------------------------------------------------------------------ #
 # LLMClient inherits LLMProvider
 # ------------------------------------------------------------------ #
+
 
 class TestLLMClientInterface:
     def _make_client(self) -> LLMClient:
@@ -61,18 +64,21 @@ class TestLLMClientInterface:
 # AnthropicProvider
 # ------------------------------------------------------------------ #
 
+
 class TestAnthropicProvider:
     """Tests for AnthropicProvider that mock the anthropic SDK."""
 
     def _make_provider(self, mock_anthropic_cls):
         """Create an AnthropicProvider with a mocked Anthropic client."""
         from providers.anthropic_provider import AnthropicProvider
+
         return AnthropicProvider(api_key="test-key", model="claude-test-model")
 
     def test_provider_name(self):
         with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value = MagicMock()
             from providers.anthropic_provider import AnthropicProvider
+
             provider = AnthropicProvider(api_key="test-key", model="claude-test-model")
             assert provider.provider_name == "anthropic"
 
@@ -80,6 +86,7 @@ class TestAnthropicProvider:
         with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value = MagicMock()
             from providers.anthropic_provider import AnthropicProvider
+
             provider = AnthropicProvider(api_key="test-key", model="claude-test-model")
             assert provider.model == "claude-test-model"
 
@@ -87,6 +94,7 @@ class TestAnthropicProvider:
         with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value = MagicMock()
             from providers.anthropic_provider import AnthropicProvider
+
             provider = AnthropicProvider(api_key="test-key", model="claude-test-model")
             assert provider.supports_vision() is True
 
@@ -97,10 +105,12 @@ class TestAnthropicProvider:
 
             # Set up a realistic response shape
             from anthropic.types import TextBlock
+
             mock_content = TextBlock(type="text", text="generated text")
             mock_client.messages.create.return_value = MagicMock(content=[mock_content])
 
             from providers.anthropic_provider import AnthropicProvider
+
             provider = AnthropicProvider(api_key="test-key", model="claude-test-model")
             result = provider.generate_response("test prompt", max_tokens=100)
 
@@ -125,10 +135,12 @@ class TestAnthropicProvider:
             mock_cls.return_value = mock_client
 
             from anthropic.types import TextBlock
+
             mock_content = TextBlock(type="text", text="image description")
             mock_client.messages.create.return_value = MagicMock(content=[mock_content])
 
             from providers.anthropic_provider import AnthropicProvider
+
             provider = AnthropicProvider(api_key="test-key", model="claude-test-model")
             result = provider.generate_response_with_image("describe this", image_bytes, max_tokens=200)
 
@@ -148,37 +160,40 @@ class TestAnthropicProvider:
 # GeminiProvider
 # ------------------------------------------------------------------ #
 
+
 class TestGeminiProvider:
     """Tests for GeminiProvider that mock the google.generativeai SDK."""
 
     def test_provider_name(self):
-        with patch("google.generativeai.configure"), \
-             patch("google.generativeai.GenerativeModel") as mock_model_cls:
+        with patch("google.generativeai.configure"), patch("google.generativeai.GenerativeModel") as mock_model_cls:
             mock_model_cls.return_value = MagicMock()
             from providers.gemini_provider import GeminiProvider
+
             provider = GeminiProvider(api_key="test-key", model="gemini-test-model")
             assert provider.provider_name == "gemini"
 
     def test_model_returns_configured_model(self):
-        with patch("google.generativeai.configure"), \
-             patch("google.generativeai.GenerativeModel") as mock_model_cls:
+        with patch("google.generativeai.configure"), patch("google.generativeai.GenerativeModel") as mock_model_cls:
             mock_model_cls.return_value = MagicMock()
             from providers.gemini_provider import GeminiProvider
+
             provider = GeminiProvider(api_key="test-key", model="gemini-test-model")
             assert provider.model == "gemini-test-model"
 
     def test_supports_vision_returns_true(self):
-        with patch("google.generativeai.configure"), \
-             patch("google.generativeai.GenerativeModel") as mock_model_cls:
+        with patch("google.generativeai.configure"), patch("google.generativeai.GenerativeModel") as mock_model_cls:
             mock_model_cls.return_value = MagicMock()
             from providers.gemini_provider import GeminiProvider
+
             provider = GeminiProvider(api_key="test-key", model="gemini-test-model")
             assert provider.supports_vision() is True
 
     def test_generate_response_calls_sdk_and_returns_text(self):
-        with patch("google.generativeai.configure"), \
-             patch("google.generativeai.GenerativeModel") as mock_model_cls, \
-             patch("google.generativeai.types.GenerationConfig"):
+        with (
+            patch("google.generativeai.configure"),
+            patch("google.generativeai.GenerativeModel") as mock_model_cls,
+            patch("google.generativeai.types.GenerationConfig"),
+        ):
             mock_model_instance = MagicMock()
             mock_model_cls.return_value = mock_model_instance
 
@@ -187,6 +202,7 @@ class TestGeminiProvider:
             mock_model_instance.generate_content.return_value = mock_response
 
             from providers.gemini_provider import GeminiProvider
+
             provider = GeminiProvider(api_key="test-key", model="gemini-test-model")
             result = provider.generate_response("test prompt", max_tokens=100)
 
@@ -205,9 +221,11 @@ class TestGeminiProvider:
         PILImage.new("RGB", (1, 1), color=(0, 255, 0)).save(buf, format="PNG")
         image_bytes = buf.getvalue()
 
-        with patch("google.generativeai.configure"), \
-             patch("google.generativeai.GenerativeModel") as mock_model_cls, \
-             patch("google.generativeai.types.GenerationConfig"):
+        with (
+            patch("google.generativeai.configure"),
+            patch("google.generativeai.GenerativeModel") as mock_model_cls,
+            patch("google.generativeai.types.GenerationConfig"),
+        ):
             mock_model_instance = MagicMock()
             mock_model_cls.return_value = mock_model_instance
 
@@ -216,6 +234,7 @@ class TestGeminiProvider:
             mock_model_instance.generate_content.return_value = mock_response
 
             from providers.gemini_provider import GeminiProvider
+
             provider = GeminiProvider(api_key="test-key", model="gemini-test-model")
             result = provider.generate_response_with_image("describe", image_bytes, max_tokens=150)
 
@@ -233,47 +252,54 @@ class TestGeminiProvider:
 # create_llm_provider factory (from deps.py)
 # ------------------------------------------------------------------ #
 
+
 class TestCreateLLMProviderFactory:
     """Tests for the create_llm_provider factory function in deps.py."""
 
     def test_default_returns_llm_client(self):
-        with patch("config.LLM_PROVIDER", "openai_compatible"), \
-             patch("config.LLM_SERVER_URL", "http://localhost:1234"), \
-             patch("config.LLM_MODEL", "default-model"):
+        with (
+            patch("config.LLM_PROVIDER", "openai_compatible"),
+            patch("config.LLM_SERVER_URL", "http://localhost:1234"),
+            patch("config.LLM_MODEL", "default-model"),
+        ):
             from deps import create_llm_provider
+
             provider = create_llm_provider(provider="openai_compatible")
             assert isinstance(provider, LLMClient)
 
     def test_anthropic_with_api_key_returns_anthropic_provider(self):
-        with patch("anthropic.Anthropic") as mock_cls, \
-             patch("config.ANTHROPIC_MODEL", "claude-sonnet-4-20250514"):
+        with patch("anthropic.Anthropic") as mock_cls, patch("config.ANTHROPIC_MODEL", "claude-sonnet-4-20250514"):
             mock_cls.return_value = MagicMock()
             from deps import create_llm_provider
             from providers.anthropic_provider import AnthropicProvider
+
             provider = create_llm_provider(provider="anthropic", api_key="test-key")
             assert isinstance(provider, AnthropicProvider)
 
     def test_gemini_with_api_key_returns_gemini_provider(self):
-        with patch("google.generativeai.configure"), \
-             patch("google.generativeai.GenerativeModel") as mock_model_cls, \
-             patch("config.GEMINI_MODEL", "gemini-2.5-flash"):
+        with (
+            patch("google.generativeai.configure"),
+            patch("google.generativeai.GenerativeModel") as mock_model_cls,
+            patch("config.GEMINI_MODEL", "gemini-2.5-flash"),
+        ):
             mock_model_cls.return_value = MagicMock()
             from deps import create_llm_provider
             from providers.gemini_provider import GeminiProvider
+
             provider = create_llm_provider(provider="gemini", api_key="test-key")
             assert isinstance(provider, GeminiProvider)
 
     def test_anthropic_without_api_key_raises_value_error(self):
-        with patch("config.ANTHROPIC_API_KEY", ""), \
-             patch("config.ANTHROPIC_MODEL", "claude-sonnet-4-20250514"):
+        with patch("config.ANTHROPIC_API_KEY", ""), patch("config.ANTHROPIC_MODEL", "claude-sonnet-4-20250514"):
             from deps import create_llm_provider
+
             with pytest.raises(ValueError, match="ANTHROPIC_API_KEY"):
                 create_llm_provider(provider="anthropic", api_key=None)
 
     def test_gemini_without_api_key_raises_value_error(self):
-        with patch("config.GEMINI_API_KEY", ""), \
-             patch("config.GEMINI_MODEL", "gemini-2.5-flash"):
+        with patch("config.GEMINI_API_KEY", ""), patch("config.GEMINI_MODEL", "gemini-2.5-flash"):
             from deps import create_llm_provider
+
             with pytest.raises(ValueError, match="GEMINI_API_KEY"):
                 create_llm_provider(provider="gemini", api_key=None)
 
@@ -281,6 +307,7 @@ class TestCreateLLMProviderFactory:
 # ------------------------------------------------------------------ #
 # SwitchProviderRequest Pydantic model
 # ------------------------------------------------------------------ #
+
 
 class TestSwitchProviderRequest:
     def test_requires_provider_field(self):
@@ -308,6 +335,7 @@ class TestSwitchProviderRequest:
 # ------------------------------------------------------------------ #
 # Cache key includes provider and model
 # ------------------------------------------------------------------ #
+
 
 class TestCacheKeyIncludesProvider:
     def test_different_providers_produce_different_keys(self, temp_cache_db):

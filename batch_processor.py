@@ -326,10 +326,7 @@ class BatchProcessor:
         success = sum(1 for r in results if r.get("status") == "success")
         skipped = sum(1 for r in results if r.get("skipped"))
         failed = sum(1 for r in results if r.get("status") == "error")
-        print(
-            f"\nDone — {success} succeeded, {skipped} skipped, {failed} failed "
-            f"(total {len(results)})."
-        )
+        print(f"\nDone — {success} succeeded, {skipped} skipped, {failed} failed (total {len(results)}).")
         return results
 
     def watch(
@@ -358,10 +355,7 @@ class BatchProcessor:
             from watchdog.events import DirCreatedEvent, FileCreatedEvent, FileSystemEventHandler
             from watchdog.observers import Observer
         except ImportError as exc:
-            raise ImportError(
-                "watchdog is required for watch mode. "
-                "Install it with: pip install watchdog"
-            ) from exc
+            raise ImportError("watchdog is required for watch mode. Install it with: pip install watchdog") from exc
 
         processor = self
         _pending_lock = threading.Lock()

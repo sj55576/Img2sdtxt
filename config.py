@@ -48,16 +48,10 @@ RATE_LIMIT_GENERATION = int(os.getenv("RATE_LIMIT_GENERATION", "10"))  # request
 RATE_LIMIT_API = int(os.getenv("RATE_LIMIT_API", "60"))  # requests per minute
 
 # Prompt Customization Options
-STYLES = [
-    "photorealistic", "anime", "painting", "watercolor",
-    "concept_art", "sketch", "pixel_art", "3d_render"
-]
-TONES = [
-    "natural", "vibrant", "warm", "cool", "dark",
-    "soft", "dramatic", "cinematic"
-]
+STYLES = ["photorealistic", "anime", "painting", "watercolor", "concept_art", "sketch", "pixel_art", "3d_render"]
+TONES = ["natural", "vibrant", "warm", "cool", "dark", "soft", "dramatic", "cinematic"]
 QUALITY_LEVELS = {
     "standard": "best quality",
     "high": "best quality, masterpiece, highly detailed",
-    "ultra": "best quality, masterpiece, highly detailed, 8k uhd, sharp focus, professional"
+    "ultra": "best quality, masterpiece, highly detailed, 8k uhd, sharp focus, professional",
 }

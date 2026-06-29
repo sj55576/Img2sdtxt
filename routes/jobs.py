@@ -107,13 +107,15 @@ async def handle_multi_model(job, update_progress):
                 model=model,
                 loras=p.get("loras", ""),
             )
-            results.append({
-                "model": model,
-                "success": True,
-                "images": images,
-                "count": len(images),
-                "saved_files": saved_files,
-            })
+            results.append(
+                {
+                    "model": model,
+                    "success": True,
+                    "images": images,
+                    "count": len(images),
+                    "saved_files": saved_files,
+                }
+            )
         except Exception as e:
             results.append({"model": model, "success": False, "error": str(e)})
 
@@ -123,6 +125,7 @@ async def handle_multi_model(job, update_progress):
 # ------------------------------------------------------------------ #
 # REST endpoints
 # ------------------------------------------------------------------ #
+
 
 @router.post("/submit")
 async def submit_job(request_data: dict):
@@ -173,6 +176,7 @@ async def cancel_job(job_id: str):
 # ------------------------------------------------------------------ #
 # WebSocket for real-time job updates
 # ------------------------------------------------------------------ #
+
 
 @router.websocket("/{job_id}/ws")
 async def job_ws(websocket: WebSocket, job_id: str):

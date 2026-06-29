@@ -77,9 +77,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     timestamp REAL NOT NULL
                 )
             """)
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_ip_tier ON rate_limit_entries (ip, tier)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ip_tier ON rate_limit_entries (ip, tier)")
             conn.commit()
 
     # ------------------------------------------------------------------ #
@@ -95,16 +93,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         ip = _get_client_ip(request)
-        limit = (
-            config.RATE_LIMIT_GENERATION if tier == "generation" else config.RATE_LIMIT_API
-        )
+        limit = config.RATE_LIMIT_GENERATION if tier == "generation" else config.RATE_LIMIT_API
 
         allowed, retry_after = self._check_and_record(ip, tier, limit)
 
         if not allowed:
             logger.warning(
                 "Rate limit hit: ip=%s tier=%s path=%s retry_after=%ds",
-                ip, tier, request.url.path, retry_after,
+                ip,
+                tier,
+                request.url.path,
+                retry_after,
             )
             return JSONResponse(
                 status_code=429,

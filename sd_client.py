@@ -1,6 +1,7 @@
 """
 Stable Diffusion Web UI (AUTOMATIC1111) API クライアント
 """
+
 import base64
 import json
 import logging
@@ -56,11 +57,7 @@ class SDClient:
         """
         try:
             payload = {"sd_model_checkpoint": model_name}
-            response = requests.post(
-                f"{self.base_url}/sdapi/v1/options",
-                json=payload,
-                timeout=30
-            )
+            response = requests.post(f"{self.base_url}/sdapi/v1/options", json=payload, timeout=30)
             response.raise_for_status()
             logger.info("Model switched to: %s", model_name)
             return True
@@ -90,11 +87,7 @@ class SDClient:
     def get_progress(self) -> Optional[Dict]:
         """SD WebUI の生成進捗を取得。エラー時は None を返す (タイムアウト5秒)"""
         try:
-            r = requests.get(
-                f"{self.base_url}/sdapi/v1/progress",
-                params={"skip_current_image": "true"},
-                timeout=5
-            )
+            r = requests.get(f"{self.base_url}/sdapi/v1/progress", params={"skip_current_image": "true"}, timeout=5)
             r.raise_for_status()
             return r.json()
         except Exception:
@@ -146,10 +139,23 @@ class SDClient:
             r.raise_for_status()
             return [u["name"] for u in r.json()]
         except Exception:
-            return ["Latent", "Latent (antialiased)", "Latent (bicubic)", "Latent (bicubic antialiased)",
-                    "Latent (nearest)", "None", "Lanczos", "Nearest",
-                    "ESRGAN_4x", "LDSR", "R-ESRGAN 4x+", "R-ESRGAN 4x+ Anime6B",
-                    "ScuNET GAN", "ScuNET PSNR", "SwinIR 4x"]
+            return [
+                "Latent",
+                "Latent (antialiased)",
+                "Latent (bicubic)",
+                "Latent (bicubic antialiased)",
+                "Latent (nearest)",
+                "None",
+                "Lanczos",
+                "Nearest",
+                "ESRGAN_4x",
+                "LDSR",
+                "R-ESRGAN 4x+",
+                "R-ESRGAN 4x+ Anime6B",
+                "ScuNET GAN",
+                "ScuNET PSNR",
+                "SwinIR 4x",
+            ]
 
     @retry_with_backoff(max_retries=2, base_delay=2.0)
     def txt2img(
@@ -170,7 +176,7 @@ class SDClient:
         hr_upscaler: str = "R-ESRGAN 4x+",
         hr_second_pass_steps: int = 0,
         hr_denoising_strength: float = 0.7,
-        controlnet_args: Optional[List[Dict]] = None
+        controlnet_args: Optional[List[Dict]] = None,
     ) -> List[str]:
         """
         テキストから画像を生成し、Base64エンコードされた画像リストを返す
@@ -216,23 +222,15 @@ class SDClient:
             "hr_scale": hr_scale,
             "hr_upscaler": hr_upscaler,
             "hr_second_pass_steps": hr_second_pass_steps,
-            "denoising_strength": hr_denoising_strength if enable_hr else 0.7
+            "denoising_strength": hr_denoising_strength if enable_hr else 0.7,
         }
         if controlnet_args:
-            payload["alwayson_scripts"] = {
-                "controlnet": {
-                    "args": controlnet_args
-                }
-            }
+            payload["alwayson_scripts"] = {"controlnet": {"args": controlnet_args}}
             logger.info("txt2img: controlnet enabled with %d unit(s)", len(controlnet_args))
 
         logger.info("txt2img start url=%s width=%d height=%d steps=%d", self.base_url, width, height, steps)
         try:
-            r = requests.post(
-                f"{self.base_url}/sdapi/v1/txt2img",
-                json=payload,
-                timeout=120
-            )
+            r = requests.post(f"{self.base_url}/sdapi/v1/txt2img", json=payload, timeout=120)
             r.raise_for_status()
             result = r.json()
             return result.get("images", [])
@@ -265,7 +263,7 @@ class SDClient:
         hr_upscaler: str = "R-ESRGAN 4x+",
         hr_second_pass_steps: int = 0,
         hr_denoising_strength: float = 0.7,
-        controlnet_args: Optional[List[Dict]] = None
+        controlnet_args: Optional[List[Dict]] = None,
     ) -> List[str]:
         """
         画像から画像を生成し、Base64エンコードされた画像リストを返す
@@ -311,22 +309,14 @@ class SDClient:
             "hr_scale": hr_scale,
             "hr_upscaler": hr_upscaler,
             "hr_second_pass_steps": hr_second_pass_steps,
-            "hr_denoising_strength": hr_denoising_strength
+            "hr_denoising_strength": hr_denoising_strength,
         }
         if controlnet_args:
-            payload["alwayson_scripts"] = {
-                "controlnet": {
-                    "args": controlnet_args
-                }
-            }
+            payload["alwayson_scripts"] = {"controlnet": {"args": controlnet_args}}
             logger.info("img2img: controlnet enabled with %d unit(s)", len(controlnet_args))
 
         try:
-            r = requests.post(
-                f"{self.base_url}/sdapi/v1/img2img",
-                json=payload,
-                timeout=180
-            )
+            r = requests.post(f"{self.base_url}/sdapi/v1/img2img", json=payload, timeout=180)
             r.raise_for_status()
             result = r.json()
             return result.get("images", [])
@@ -357,7 +347,7 @@ class SDClient:
         inpaint_full_res: bool = True,
         inpaint_full_res_padding: int = 32,
         model: str = "",
-        loras: str = ""
+        loras: str = "",
     ) -> List[str]:
         """
         インペインティング（マスク領域を描き直す）を実施し、Base64エンコードされた画像リストを返す
@@ -399,14 +389,10 @@ class SDClient:
             "inpaint_full_res": inpaint_full_res,
             "inpaint_full_res_padding": inpaint_full_res_padding,
             "restore_faces": False,
-            "save_images": False
+            "save_images": False,
         }
         try:
-            r = requests.post(
-                f"{self.base_url}/sdapi/v1/img2img",
-                json=payload,
-                timeout=180
-            )
+            r = requests.post(f"{self.base_url}/sdapi/v1/img2img", json=payload, timeout=180)
             r.raise_for_status()
             result = r.json()
             return result.get("images", [])
@@ -440,7 +426,7 @@ class SDClient:
         model: str = "",
         loras: str = "",
         mode: str = "txt2img",
-        denoising_strength: float = 0.75
+        denoising_strength: float = 0.75,
     ) -> List[Dict]:
         """
         生成された画像（Base64エンコード）を保存
@@ -504,11 +490,7 @@ class SDClient:
                 except Exception as e:
                     print(f"Warning: thumbnail generation failed for {filename}: {e}")
 
-                saved_files.append({
-                    "filename": filename,
-                    "path": str(filepath),
-                    "index": idx
-                })
+                saved_files.append({"filename": filename, "path": str(filepath), "index": idx})
 
             # メタデータ（生成パラメータ）をJSONで保存
             params = {
@@ -521,7 +503,7 @@ class SDClient:
                 "sampler": sampler,
                 "seed": seed,
                 "model": model,
-                "loras": loras
+                "loras": loras,
             }
             if mode in ("img2img", "inpaint"):
                 params["denoising_strength"] = denoising_strength
@@ -531,7 +513,7 @@ class SDClient:
                 "mode": mode,
                 "image_count": len(images),
                 "parameters": params,
-                "files": saved_files
+                "files": saved_files,
             }
 
             metadata_filename = f"{prefix}_{timestamp}_metadata.json"
@@ -570,7 +552,7 @@ class SDClient:
             for line in lines:
                 if line.startswith("Negative prompt:"):
                     in_negative = True
-                    negative_lines.append(line[len("Negative prompt:"):].strip())
+                    negative_lines.append(line[len("Negative prompt:") :].strip())
                 elif in_negative and not line.startswith("Steps:"):
                     negative_lines.append(line)
                 elif line.startswith("Steps:"):

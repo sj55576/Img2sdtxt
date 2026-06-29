@@ -35,15 +35,15 @@ class LLMClient(LLMProvider):
             image = Image.open(BytesIO(image_bytes))
 
             # WebP形式の場合のみ変換
-            if image.format == 'WEBP':
+            if image.format == "WEBP":
                 # PNGに変換
                 png_buffer = BytesIO()
                 # RGBに変換（アルファチャンネルがある場合も対応）
-                if image.mode in ('RGBA', 'LA', 'P'):
+                if image.mode in ("RGBA", "LA", "P"):
                     # 透明度情報を保持
-                    image.save(png_buffer, format='PNG')
+                    image.save(png_buffer, format="PNG")
                 else:
-                    image.convert('RGB').save(png_buffer, format='PNG')
+                    image.convert("RGB").save(png_buffer, format="PNG")
                 return png_buffer.getvalue()
             else:
                 # WebP以外はそのまま返す
@@ -56,7 +56,7 @@ class LLMClient(LLMProvider):
         """画像バイトをBase64エンコード（WebP→PNG変換含む）"""
         # WebPをPNGに変換
         converted_bytes = self._convert_webp_to_png(image_bytes)
-        return base64.b64encode(converted_bytes).decode('utf-8')
+        return base64.b64encode(converted_bytes).decode("utf-8")
 
     @retry_with_backoff(max_retries=1, base_delay=0.5)
     def is_available(self) -> bool:
@@ -80,18 +80,14 @@ class LLMClient(LLMProvider):
                 "model": self.model,
                 "messages": [
                     {"role": "system", "content": "あなたはStable Diffusionのプロンプト生成の専門家です。"},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.7,
                 "max_tokens": max_tokens,
-                "top_p": 0.9
+                "top_p": 0.9,
             }
 
-            response = requests.post(
-                self.endpoint,
-                json=payload,
-                timeout=30
-            )
+            response = requests.post(self.endpoint, json=payload, timeout=30)
             response.raise_for_status()
 
             result = response.json()
@@ -117,7 +113,9 @@ class LLMClient(LLMProvider):
         画像を含めてLLMサーバーに対してプロンプトを送信し、レスポンスを取得
         LM Studio/Lemonade server 互換のOpenAI互換API (Vision Models対応)
         """
-        logger.debug("generate_response_with_image url=%s model=%s image_bytes=%d", self.endpoint, self.model, len(image_bytes))
+        logger.debug(
+            "generate_response_with_image url=%s model=%s image_bytes=%d", self.endpoint, self.model, len(image_bytes)
+        )
         t0 = time.time()
         try:
             image_base64 = self._encode_image_to_base64(image_bytes)
@@ -130,20 +128,16 @@ class LLMClient(LLMProvider):
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
-                        ]
-                    }
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
+                        ],
+                    },
                 ],
                 "temperature": 0.7,
                 "max_tokens": max_tokens,
-                "top_p": 0.9
+                "top_p": 0.9,
             }
 
-            response = requests.post(
-                self.endpoint,
-                json=payload,
-                timeout=60
-            )
+            response = requests.post(self.endpoint, json=payload, timeout=60)
             response.raise_for_status()
 
             result = response.json()
