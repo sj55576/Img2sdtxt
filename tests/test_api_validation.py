@@ -23,7 +23,10 @@ def _make_png_bytes() -> bytes:
 def client():
     """モック済みクライアントを注入した TestClient を生成"""
     import config
+    import deps
     import main as main_module
+    import routes.jobs as jobs_routes
+    import routes.sd as sd_routes
 
     config.RATE_LIMIT_ENABLED = False
 
@@ -55,9 +58,11 @@ def client():
         "status": "success",
     }
 
-    main_module.sd_client = mock_sd
-    main_module.llm_client = mock_llm
-    main_module.prompt_generator = mock_pg
+    deps.sd_client = mock_sd
+    deps.llm_client = mock_llm
+    deps.prompt_generator = mock_pg
+    sd_routes.sd_client = mock_sd
+    jobs_routes.sd_client = mock_sd
 
     with TestClient(main_module.app) as c:
         yield c
