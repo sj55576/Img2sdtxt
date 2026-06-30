@@ -234,9 +234,7 @@ def get_version_tree(item_id: int) -> List[Dict]:
             return []
         root_row = dict(current)
         while root_row.get("parent_id") is not None:
-            parent = conn.execute(
-                "SELECT * FROM prompt_history WHERE id = ?", (root_row["parent_id"],)
-            ).fetchone()
+            parent = conn.execute("SELECT * FROM prompt_history WHERE id = ?", (root_row["parent_id"],)).fetchone()
             if not parent:
                 break
             root_row = dict(parent)
