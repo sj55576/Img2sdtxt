@@ -1,0 +1,114 @@
+/**
+ * Tag Autocomplete styles
+ * Uses theme custom properties from style.css for light/dark consistency.
+ */
+
+.tag-ac-dropdown {
+    position: fixed;
+    z-index: 10000;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    max-height: 280px;
+    overflow-y: auto;
+    min-width: 260px;
+    max-width: 400px;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    pointer-events: none;
+}
+
+.tag-ac-dropdown[style*="display: block"] {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.tag-ac-dropdown::-webkit-scrollbar { width: 6px; height: 6px; }
+.tag-ac-dropdown::-webkit-scrollbar-track { background: transparent; }
+.tag-ac-dropdown::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+.tag-ac-dropdown::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+.tag-ac-dropdown { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+
+.tag-ac-list {
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+}
+
+.tag-ac-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.1s ease;
+}
+
+.tag-ac-item:hover {
+    background: var(--nav-hover-bg);
+}
+
+.tag-ac-item.active {
+    background: var(--nav-active-bg);
+}
+
+.tag-ac-name {
+    color: var(--text);
+    font-size: 13.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tag-ac-badge {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    line-height: 1;
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #ffffff;
+    white-space: nowrap;
+}
+
+/* ---- Category badge colors ---- */
+.tag-ac-cat-quality     { background: #059669; }
+.tag-ac-cat-negative    { background: #dc2626; }
+.tag-ac-cat-subject     { background: #7c3aed; }
+.tag-ac-cat-hair        { background: #d97706; }
+.tag-ac-cat-eyes        { background: #2563eb; }
+.tag-ac-cat-face        { background: #ec4899; }
+.tag-ac-cat-body        { background: #0d9488; }
+.tag-ac-cat-clothing    { background: #4f46e5; }
+.tag-ac-cat-accessory   { background: #b45309; }
+.tag-ac-cat-action      { background: #0891b2; }
+.tag-ac-cat-scene       { background: #047857; }
+.tag-ac-cat-style       { background: #7c3aed; }
+.tag-ac-cat-lighting    { background: #ca8a04; }
+.tag-ac-cat-composition { background: #475569; }
+.tag-ac-cat-effect      { background: #c026d3; }
+.tag-ac-cat-color       { background: #e11d48; }
+.tag-ac-cat-object      { background: #0284c7; }
+.tag-ac-cat-animal      { background: #65a30d; }
+.tag-ac-cat-time        { background: #78716c; }
+.tag-ac-cat-other       { background: var(--text-muted); }
+
+/* ---- Dark theme adjustments ---- */
+/* CSS variables (--surface, --border, --text, --nav-hover-bg, --nav-active-bg,
+   --scrollbar-thumb) already swap automatically via [data-theme="dark"] in
+   style.css. Only non-variable tweaks (shadow, badge text contrast) live here. */
+[data-theme="dark"] .tag-ac-dropdown {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .tag-ac-badge {
+    color: rgba(255, 255, 255, 0.95);
+    filter: saturate(0.9) brightness(0.95);
+}
