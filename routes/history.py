@@ -60,6 +60,34 @@ async def export_history(format: str = "json"):
         )
 
 
+@router.get("/history/diff")
+def get_diff(id_a: int, id_b: int):
+    diff = hist.get_version_diff(id_a, id_b)
+    if diff is None:
+        raise HTTPException(status_code=404, detail="One or both items not found.")
+    return {"success": True, "diff": diff}
+
+
+@router.get("/history/{item_id}/versions")
+def get_versions(item_id: int):
+    item = hist.get_history_item(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="History item not found.")
+    versions = hist.get_version_tree(item_id)
+    return {"success": True, "versions": versions}
+
+
+@router.post("/history/{item_id}/rollback")
+def rollback_version(item_id: int, body: dict):
+    target_id = body.get("target_id")
+    if target_id is None:
+        raise HTTPException(status_code=400, detail="target_id is required.")
+    result = hist.rollback_to_version(item_id, target_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Source or target item not found.")
+    return {"success": True, "item": result}
+
+
 @router.put("/history/{item_id}/favorite")
 def toggle_history_favorite(item_id: int):
     updated = hist.toggle_favorite(item_id)

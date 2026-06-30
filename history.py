@@ -30,6 +30,11 @@ def init_db():
             conn.execute("ALTER TABLE prompt_history ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError:
             pass  # カラムが既に存在する場合はスキップ
+        # 既存DBへの parent_id カラム追加（マイグレーション、バージョン管理用）
+        try:
+            conn.execute("ALTER TABLE prompt_history ADD COLUMN parent_id INTEGER REFERENCES prompt_history(id)")
+        except sqlite3.OperationalError:
+            pass  # カラムが既に存在する場合はスキップ
         conn.execute("""
             CREATE TABLE IF NOT EXISTS prompt_tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,16 +49,22 @@ def init_db():
 
 
 def save_history(
-    positive: str, negative: str, image_name: str = "", style: str = "", tone: str = "", quality: str = ""
+    positive: str,
+    negative: str,
+    image_name: str = "",
+    style: str = "",
+    tone: str = "",
+    quality: str = "",
+    parent_id: Optional[int] = None,
 ) -> int:
-    logger.debug("save_history image_name=%s style=%s", image_name, style)
+    logger.debug("save_history image_name=%s style=%s parent_id=%s", image_name, style, parent_id)
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.execute(
             """INSERT INTO prompt_history
-               (image_name, positive, negative, style, tone, quality, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (image_name, positive, negative, style, tone, quality, datetime.now().isoformat()),
+               (image_name, positive, negative, style, tone, quality, created_at, parent_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (image_name, positive, negative, style, tone, quality, datetime.now().isoformat(), parent_id),
         )
         conn.commit()
         return cursor.lastrowid or 0
@@ -205,6 +216,96 @@ def get_history_item(item_id: int) -> Optional[Dict]:
         conn.row_factory = sqlite3.Row
         row = conn.execute("SELECT * FROM prompt_history WHERE id = ?", (item_id,)).fetchone()
         return dict(row) if row else None
+
+
+def get_version_tree(item_id: int) -> List[Dict]:
+    """指定アイテムが属するバージョンツリー全体を取得する。
+
+    まず parent_id を辿ってルートを特定し、そこから子孫を深さ優先で
+    再帰的に収集する。各アイテムには木構造上の階層を表す ``depth`` を付与する。
+    """
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+
+        # ルートまで遡る
+        current = conn.execute("SELECT * FROM prompt_history WHERE id = ?", (item_id,)).fetchone()
+        if not current:
+            return []
+        root_row = dict(current)
+        while root_row.get("parent_id") is not None:
+            parent = conn.execute("SELECT * FROM prompt_history WHERE id = ?", (root_row["parent_id"],)).fetchone()
+            if not parent:
+                break
+            root_row = dict(parent)
+
+        # ルートから子孫を深さ優先で収集
+        result: List[Dict] = []
+
+        def _collect(node_id: int, depth: int):
+            row = conn.execute("SELECT * FROM prompt_history WHERE id = ?", (node_id,)).fetchone()
+            if not row:
+                return
+            node = dict(row)
+            node["depth"] = depth
+            result.append(node)
+            children = conn.execute(
+                "SELECT id FROM prompt_history WHERE parent_id = ? ORDER BY created_at ASC, id ASC",
+                (node_id,),
+            ).fetchall()
+            for child in children:
+                _collect(child["id"], depth + 1)
+
+        _collect(root_row["id"], 0)
+        return result
+
+
+def get_version_diff(id_a: int, id_b: int) -> Optional[Dict]:
+    """2つの履歴アイテムのポジティブ/ネガティブプロンプトをタグ単位で比較する。"""
+    init_db()
+    item_a = get_history_item(id_a)
+    item_b = get_history_item(id_b)
+    if not item_a or not item_b:
+        return None
+
+    def _tags(text: str) -> List[str]:
+        return [t.strip() for t in (text or "").split(",") if t.strip()]
+
+    def _diff(text_a: str, text_b: str) -> Dict:
+        tags_a = _tags(text_a)
+        tags_b = _tags(text_b)
+        set_a = set(tags_a)
+        set_b = set(tags_b)
+        return {
+            "added": [t for t in tags_b if t not in set_a],
+            "removed": [t for t in tags_a if t not in set_b],
+            "unchanged": [t for t in tags_a if t in set_b],
+        }
+
+    return {
+        "positive": _diff(item_a["positive"], item_b["positive"]),
+        "negative": _diff(item_a["negative"], item_b["negative"]),
+    }
+
+
+def rollback_to_version(source_id: int, target_id: int) -> Optional[Dict]:
+    """target_id のバージョン内容を、source_id を親とする新しい履歴として複製する。"""
+    init_db()
+    source = get_history_item(source_id)
+    target = get_history_item(target_id)
+    if not source or not target:
+        return None
+
+    new_id = save_history(
+        positive=target["positive"],
+        negative=target["negative"],
+        image_name="[rollback]",
+        style=target.get("style") or "",
+        tone=target.get("tone") or "",
+        quality=target.get("quality") or "",
+        parent_id=source_id,
+    )
+    return get_history_item(new_id)
 
 
 def delete_history_item(item_id: int) -> bool:

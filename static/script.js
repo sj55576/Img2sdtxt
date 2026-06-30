@@ -246,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Escape - close any open modal
         if (e.key === 'Escape') {
-            const modals = ['shortcuts-modal', 'preset-modal', 'model-confirm-modal'];
+            const modals = ['shortcuts-modal', 'preset-modal', 'model-confirm-modal', 'version-modal'];
             for (const id of modals) {
                 const m = document.getElementById(id);
                 if (m && !m.classList.contains('hidden')) {
@@ -1009,6 +1009,7 @@ async function doRefinePrompt() {
                 style: document.getElementById('refine-style').value,
                 tone: document.getElementById('refine-tone').value,
                 quality: document.getElementById('refine-quality').value,
+                parent_id: _refineParentId || undefined,
             })
         });
         if (!r.ok) throw new Error((await r.json()).detail);
@@ -1027,6 +1028,7 @@ async function doRefinePrompt() {
 
         resultBox.classList.remove('hidden');
         toast('プロンプトを改善しました！', 'success');
+        _refineParentId = null;
     } catch (e) {
         toast(e.message || '改善に失敗しました', 'error');
     } finally {
@@ -1067,6 +1069,10 @@ function setupHistoryPage() {
         loadHistory();
     });
     document.getElementById('history-filter-tag').addEventListener('input', debouncedLoad);
+
+    document.getElementById('version-modal').addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeVersionModal();
+    });
 }
 
 async function loadHistory() {
@@ -1102,7 +1108,8 @@ async function loadHistory() {
             <div class="history-item" id="hist-${item.id}">
                 <div class="history-item-header">
                     <div class="history-item-meta">
-                        <span class="image-name">${escHtml(item.image_name || 'Unknown')}</span><br>
+                        <span class="image-name">${escHtml(item.image_name || 'Unknown')}</span>
+                        ${item.parent_id ? '<span class="version-chain-badge" title="バージョン管理中">🌿</span>' : ''}<br>
                         ${item.style ? `<span>${item.style}</span> · ` : ''}
                         ${item.quality ? `<span>${item.quality}</span> · ` : ''}
                         ${item.created_at ? `<span>${new Date(item.created_at).toLocaleString('ja-JP')}</span>` : ''}
@@ -1112,6 +1119,7 @@ async function loadHistory() {
                             onclick="toggleFavorite(${item.id})" title="${item.is_favorite ? 'お気に入り解除' : 'お気に入り登録'}">⭐</button>
                         <button class="btn btn-sm btn-secondary" onclick="loadHistoryItem(${item.id})">使用</button>
                         <button class="btn btn-sm btn-secondary" onclick="sendToRefineFromHistory(${item.id})">🔧</button>
+                        <button class="btn btn-sm btn-secondary" onclick="showVersions(${item.id})" title="バージョン履歴">🌿</button>
                         <button class="btn btn-sm btn-ghost" onclick="copyHistoryPrompts(${item.id})" title="プロンプトをコピー">📋</button>
                         <button class="btn btn-sm btn-secondary" onclick="sendHistoryToSD(${item.id})" title="SDページへ送る">🎨 SDへ送る</button>
                         <button class="btn btn-sm btn-ghost" onclick="deleteHistoryItem(${item.id})">🗑️</button>
@@ -1154,9 +1162,12 @@ async function toggleFavorite(id) {
     }
 }
 
+let _refineParentId = null;
+
 function sendToRefineFromHistory(id) {
     const item = _historyItems.get(id);
     if (!item) return;
+    _refineParentId = id;
     sendToRefine(item.positive, item.negative);
 }
 
@@ -1242,6 +1253,159 @@ async function deleteHistoryItem(id) {
     const res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
     if (res.ok) { document.getElementById(`hist-${id}`)?.remove(); toast('削除しました', 'success'); }
     else { toast('削除に失敗しました', 'error'); }
+}
+
+/* =====================================================================
+   Version Management
+   ===================================================================== */
+let _versionSelectedIds = [];
+let _currentVersionItemId = null;
+
+async function showVersions(itemId) {
+    _currentVersionItemId = itemId;
+    _versionSelectedIds = [];
+    const modal = document.getElementById('version-modal');
+    const tree = document.getElementById('version-tree');
+    const diffPanel = document.getElementById('version-diff-panel');
+
+    modal.classList.remove('hidden');
+    diffPanel.classList.add('hidden');
+    tree.innerHTML = '<div class="loading-spinner">読み込み中...</div>';
+
+    try {
+        const r = await fetch(`/api/history/${itemId}/versions`);
+        if (!r.ok) throw new Error();
+        const data = await r.json();
+        renderVersionTree(data.versions, itemId);
+    } catch {
+        tree.innerHTML = '<p class="text-muted">バージョン情報の取得に失敗しました</p>';
+    }
+}
+
+function renderVersionTree(versions, currentId) {
+    const tree = document.getElementById('version-tree');
+    if (!versions.length) {
+        tree.innerHTML = '<p class="text-muted">バージョン履歴がありません</p>';
+        return;
+    }
+
+    tree.innerHTML = versions.map(v => {
+        const isCurrent = v.id === currentId;
+        const indent = v.depth * 24;
+        const date = v.created_at ? new Date(v.created_at).toLocaleString('ja-JP') : '';
+        const preview = (v.positive || '').substring(0, 80) + ((v.positive || '').length > 80 ? '...' : '');
+        const selected = _versionSelectedIds.includes(v.id);
+
+        return `
+            <div class="version-node ${isCurrent ? 'version-current' : ''} ${selected ? 'version-selected' : ''}"
+                 style="margin-left: ${indent}px"
+                 data-version-id="${v.id}">
+                <div class="version-node-connector" style="left: ${indent - 12}px"></div>
+                <div class="version-node-content">
+                    <div class="version-node-header">
+                        <span class="version-id">#${v.id}</span>
+                        ${isCurrent ? '<span class="version-badge">現在</span>' : ''}
+                        ${v.image_name === '[rollback]' ? '<span class="version-badge version-badge-rollback">ロールバック</span>' : ''}
+                        ${v.image_name === '[refine]' ? '<span class="version-badge version-badge-refine">リファイン</span>' : ''}
+                        <span class="version-date">${date}</span>
+                    </div>
+                    <div class="version-preview">${escHtml(preview)}</div>
+                    <div class="version-node-actions">
+                        <button class="btn btn-xs btn-secondary" onclick="toggleVersionSelect(${v.id})" title="差分比較用に選択">
+                            ${selected ? '✓ 選択中' : '比較'}
+                        </button>
+                        <button class="btn btn-xs btn-secondary" onclick="loadHistoryItem(${v.id}); closeVersionModal()" title="このバージョンを使用">使用</button>
+                        ${!isCurrent ? `<button class="btn btn-xs btn-accent" onclick="doRollback(${currentId}, ${v.id})" title="このバージョンに戻す">↩ 戻す</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function toggleVersionSelect(id) {
+    const idx = _versionSelectedIds.indexOf(id);
+    if (idx >= 0) {
+        _versionSelectedIds.splice(idx, 1);
+    } else {
+        if (_versionSelectedIds.length >= 2) {
+            _versionSelectedIds.shift();
+        }
+        _versionSelectedIds.push(id);
+    }
+
+    // Re-render selection state
+    document.querySelectorAll('.version-node').forEach(node => {
+        const vid = parseInt(node.dataset.versionId);
+        node.classList.toggle('version-selected', _versionSelectedIds.includes(vid));
+        const btn = node.querySelector('.version-node-actions button');
+        if (btn) btn.textContent = _versionSelectedIds.includes(vid) ? '✓ 選択中' : '比較';
+    });
+
+    if (_versionSelectedIds.length === 2) {
+        showVersionDiff(_versionSelectedIds[0], _versionSelectedIds[1]);
+    } else {
+        document.getElementById('version-diff-panel').classList.add('hidden');
+    }
+}
+
+async function showVersionDiff(idA, idB) {
+    const diffPanel = document.getElementById('version-diff-panel');
+    diffPanel.classList.remove('hidden');
+
+    document.getElementById('diff-label-a').textContent = `#${idA}`;
+    document.getElementById('diff-label-b').textContent = `#${idB}`;
+
+    try {
+        const r = await fetch(`/api/history/diff?id_a=${idA}&id_b=${idB}`);
+        if (!r.ok) throw new Error();
+        const data = await r.json();
+        renderDiff('diff-positive', data.diff.positive);
+        renderDiff('diff-negative', data.diff.negative);
+    } catch {
+        diffPanel.innerHTML = '<p class="text-muted">差分の取得に失敗しました</p>';
+    }
+}
+
+function renderDiff(elementId, diff) {
+    const el = document.getElementById(elementId);
+    const tags = [];
+
+    (diff.removed || []).forEach(tag => {
+        tags.push(`<span class="diff-tag diff-removed">${escHtml(tag)}</span>`);
+    });
+    (diff.added || []).forEach(tag => {
+        tags.push(`<span class="diff-tag diff-added">${escHtml(tag)}</span>`);
+    });
+    (diff.unchanged || []).forEach(tag => {
+        tags.push(`<span class="diff-tag diff-unchanged">${escHtml(tag)}</span>`);
+    });
+
+    el.innerHTML = tags.join('') || '<span class="text-muted">変更なし</span>';
+}
+
+async function doRollback(sourceId, targetId) {
+    if (!confirm('このバージョンに戻しますか？（新しいバージョンとして作成されます）')) return;
+
+    try {
+        const r = await fetch(`/api/history/${sourceId}/rollback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_id: targetId })
+        });
+        if (!r.ok) throw new Error();
+        toast('バージョンをロールバックしました', 'success');
+        loadHistory();
+        showVersions(sourceId);
+    } catch {
+        toast('ロールバックに失敗しました', 'error');
+    }
+}
+
+function closeVersionModal() {
+    document.getElementById('version-modal').classList.add('hidden');
+    _versionSelectedIds = [];
+    _currentVersionItemId = null;
 }
 
 /* =====================================================================

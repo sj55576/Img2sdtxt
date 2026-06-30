@@ -67,8 +67,9 @@ async def generate_prompts(
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
 
+    history_id = None
     if save_history:
-        hist.save_history(
+        history_id = hist.save_history(
             positive=result["positive"],
             negative=result["negative"],
             image_name=file.filename or "",
@@ -77,7 +78,10 @@ async def generate_prompts(
             quality=quality,
         )
 
-    return {"success": True, "data": {"positive": result["positive"], "negative": result["negative"]}}
+    response = {"success": True, "data": {"positive": result["positive"], "negative": result["negative"]}}
+    if history_id is not None:
+        response["history_id"] = history_id
+    return response
 
 
 # ------------------------------------------------------------------ #
@@ -190,8 +194,9 @@ def generate_prompts_text(request: TextPromptRequest):
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
 
+    history_id = None
     if save:
-        hist.save_history(
+        history_id = hist.save_history(
             positive=result["positive"],
             negative=result["negative"],
             image_name="[text input]",
@@ -200,7 +205,10 @@ def generate_prompts_text(request: TextPromptRequest):
             quality=quality,
         )
 
-    return {"success": True, "data": {"positive": result["positive"], "negative": result["negative"]}}
+    response = {"success": True, "data": {"positive": result["positive"], "negative": result["negative"]}}
+    if history_id is not None:
+        response["history_id"] = history_id
+    return response
 
 
 # ------------------------------------------------------------------ #
@@ -222,16 +230,18 @@ def refine_prompt(request: RefinePromptRequest):
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
 
-    hist.save_history(
+    history_id = hist.save_history(
         positive=result["positive"],
         negative=result["negative"],
         image_name="[refine]",
         style=request.style,
         tone=request.tone,
         quality=request.quality,
+        parent_id=request.parent_id,
     )
 
     return {
         "success": True,
         "data": {"positive": result["positive"], "negative": result["negative"], "changes": result.get("changes", "")},
+        "history_id": history_id,
     }
