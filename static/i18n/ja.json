@@ -305,6 +305,18 @@
       "modal_download_btn": "⬇ ダウンロード",
       "modal_copy_btn": "📋 プロンプトコピー",
       "modal_send_sd_btn": "🖼️ SDへ送る",
+      "search_placeholder": "🔍 プロンプト検索...",
+      "filter_all_models": "全モデル",
+      "filter_all_samplers": "全サンプラー",
+      "select_mode_btn": "☑ 選択モード",
+      "select_all_btn": "全選択",
+      "deselect_all_btn": "全解除",
+      "download_zip_btn": "📦 ZIPダウンロード",
+      "selected_count": "{count}枚選択中",
+      "no_images_selected": "画像が選択されていません",
+      "download_started": "ZIPダウンロードを開始しました",
+      "select_mode_on": "選択モードON",
+      "select_mode_off": "選択モードOFF",
       "param_mode": "モード",
       "param_date": "日付"
     }
@@ -449,6 +461,9 @@
     "gallery_load_failed": "ギャラリーの読み込みに失敗しました",
     "gallery_params_sent": "パラメータをSD生成に送りました",
     "count_unit": "枚",
-    "lora_count_unit": "件"
+    "lora_count_unit": "件",
+    "no_images_selected": "ダウンロードする画像を選択してください",
+    "zip_download_started": "ZIPダウンロードを開始しました",
+    "zip_download_failed": "ZIPダウンロードに失敗しました"
   }
 }

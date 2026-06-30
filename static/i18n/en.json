@@ -305,6 +305,18 @@
       "modal_download_btn": "⬇ Download",
       "modal_copy_btn": "📋 Copy Prompt",
       "modal_send_sd_btn": "🖼️ Send to SD",
+      "search_placeholder": "🔍 Search prompts...",
+      "filter_all_models": "All Models",
+      "filter_all_samplers": "All Samplers",
+      "select_mode_btn": "☑ Select",
+      "select_all_btn": "Select All",
+      "deselect_all_btn": "Deselect All",
+      "download_zip_btn": "📦 ZIP Download",
+      "selected_count": "{count} selected",
+      "no_images_selected": "No images selected",
+      "download_started": "ZIP download started",
+      "select_mode_on": "Selection mode ON",
+      "select_mode_off": "Selection mode OFF",
       "param_mode": "Mode",
       "param_date": "Date"
     }
@@ -449,6 +461,9 @@
     "gallery_load_failed": "Failed to load gallery",
     "gallery_params_sent": "Parameters sent to SD Generate",
     "count_unit": " image(s)",
-    "lora_count_unit": " item(s)"
+    "lora_count_unit": " item(s)",
+    "no_images_selected": "Please select images to download",
+    "zip_download_started": "ZIP download started",
+    "zip_download_failed": "ZIP download failed"
   }
 }
