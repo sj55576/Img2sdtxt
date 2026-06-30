@@ -60,6 +60,7 @@ class RefinePromptRequest(BaseModel):
     style: str = Field("")
     tone: str = Field("")
     quality: str = Field("high")
+    parent_id: Optional[int] = Field(None, description="Parent history item ID for version tracking")
 
 
 class SwitchProviderRequest(BaseModel):

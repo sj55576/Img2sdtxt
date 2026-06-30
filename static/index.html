@@ -1189,6 +1189,40 @@
         </div>
     </div>
 
+    <!-- Version History Modal -->
+    <div id="version-modal" class="modal hidden">
+        <div class="modal-box version-modal-content">
+            <div class="modal-header">
+                <h3>🌿 バージョン履歴</h3>
+                <button class="btn btn-sm btn-ghost" onclick="closeVersionModal()">✕</button>
+            </div>
+            <div class="version-modal-body">
+                <div class="version-tree-panel">
+                    <h4>バージョンツリー</h4>
+                    <div id="version-tree" class="version-tree"></div>
+                </div>
+                <div class="version-diff-panel hidden" id="version-diff-panel">
+                    <h4>差分表示</h4>
+                    <div class="version-diff-selectors">
+                        <span id="diff-label-a"></span>
+                        <span>→</span>
+                        <span id="diff-label-b"></span>
+                    </div>
+                    <div class="version-diff-content">
+                        <div class="diff-section">
+                            <div class="label">Positive</div>
+                            <div id="diff-positive" class="diff-tags"></div>
+                        </div>
+                        <div class="diff-section">
+                            <div class="label">Negative</div>
+                            <div id="diff-negative" class="diff-tags"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/weight-editor.js?v=1"></script>
     <script src="/static/tag-autocomplete.js?v=1"></script>
     <script src="/static/i18n.js?v=1"></script>
