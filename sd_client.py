@@ -5,6 +5,7 @@ Stable Diffusion Web UI (AUTOMATIC1111) API クライアント
 import base64
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -540,74 +541,100 @@ class SDClient:
             raw = info.get("parameters")
             if not raw:
                 return None
-
-            result: Dict = {}
-            lines = raw.split("\n")
-
-            positive_lines = []
-            negative_lines = []
-            settings_line = ""
-            in_negative = False
-
-            for line in lines:
-                if line.startswith("Negative prompt:"):
-                    in_negative = True
-                    negative_lines.append(line[len("Negative prompt:") :].strip())
-                elif in_negative and not line.startswith("Steps:"):
-                    negative_lines.append(line)
-                elif line.startswith("Steps:"):
-                    settings_line = line
-                    in_negative = False
-                elif not in_negative:
-                    positive_lines.append(line)
-
-            result["positive_prompt"] = "\n".join(positive_lines).strip()
-            if negative_lines:
-                result["negative_prompt"] = "\n".join(negative_lines).strip()
-
-            if settings_line:
-                for part in settings_line.split(","):
-                    part = part.strip()
-                    if ": " in part:
-                        key, _, value = part.partition(": ")
-                        key = key.strip()
-                        value = value.strip()
-                        mapping = {
-                            "Steps": "steps",
-                            "Sampler": "sampler",
-                            "CFG scale": "cfg_scale",
-                            "Seed": "seed",
-                            "Size": "size",
-                            "Model": "model",
-                            "LoRA": "loras",
-                            "Denoising strength": "denoising_strength",
-                        }
-                        if key in mapping:
-                            out_key = mapping[key]
-                            parsed: Any = value
-                            if out_key in ("steps", "seed"):
-                                try:
-                                    parsed = int(value)
-                                except ValueError:
-                                    pass
-                            elif out_key in ("cfg_scale", "denoising_strength"):
-                                try:
-                                    parsed = float(value)
-                                except ValueError:
-                                    pass
-                            elif out_key == "size":
-                                if "x" in value:
-                                    w, _, h = value.partition("x")
-                                    try:
-                                        result["width"] = int(w)
-                                        result["height"] = int(h)
-                                    except ValueError:
-                                        pass
-                                continue
-                            result[out_key] = parsed
-
-            result["raw"] = raw
-            return result
+            return parse_a1111_parameters(raw)
         except Exception as e:
             print(f"Warning: could not read PNG metadata from {filepath}: {e}")
             return None
+
+
+# A1111 が infotext の設定行に使う "Key: value" ペアのパターン。
+# 値にカンマや ": " を含む場合は "..."（\" エスケープあり）で囲まれる。
+_A1111_PARAM_PATTERN = re.compile(r'\s*(\w[\w \-/]*):\s*("(?:\\.|[^\\"])*"|[^,]*)(?:,|$)')
+
+# 設定行から既存レスポンスキーへのマッピング
+_A1111_KEY_MAPPING = {
+    "Steps": "steps",
+    "Sampler": "sampler",
+    "CFG scale": "cfg_scale",
+    "Seed": "seed",
+    "Size": "size",
+    "Model": "model",
+    "LoRA": "loras",
+    "Denoising strength": "denoising_strength",
+}
+
+
+def _unquote(value: str) -> str:
+    if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+        return value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+    return value
+
+
+def parse_a1111_parameters(raw: str) -> Dict:
+    """
+    A1111 形式の infotext（PNG tEXt "parameters" の内容）を辞書に変換する。
+
+    構造: ポジティブプロンプト（複数行可）→ 任意の "Negative prompt: ..."（複数行可）
+    → 最終行の設定行 "Steps: 20, Sampler: Euler a, ..."。
+    既知キーはトップレベルに型変換して格納し、それ以外は extras に文字列のまま集める。
+    """
+    result: Dict = {}
+    lines = raw.split("\n")
+
+    # 設定行は最終行が "Steps:" で始まる場合のみ（プロンプト途中の誤検出を防ぐ）
+    settings_line = ""
+    if lines and lines[-1].strip().startswith("Steps:"):
+        settings_line = lines.pop().strip()
+
+    positive_lines: List[str] = []
+    negative_lines: List[str] = []
+    in_negative = False
+    for line in lines:
+        if not in_negative and line.startswith("Negative prompt:"):
+            in_negative = True
+            negative_lines.append(line[len("Negative prompt:") :].strip())
+        elif in_negative:
+            negative_lines.append(line)
+        else:
+            positive_lines.append(line)
+
+    result["positive_prompt"] = "\n".join(positive_lines).strip()
+    if negative_lines:
+        result["negative_prompt"] = "\n".join(negative_lines).strip()
+
+    if settings_line:
+        extras: Dict[str, str] = {}
+        for match in _A1111_PARAM_PATTERN.finditer(settings_line):
+            key = match.group(1).strip()
+            value = _unquote(match.group(2).strip())
+            out_key = _A1111_KEY_MAPPING.get(key)
+            if out_key is None:
+                if key and value:
+                    extras[key] = value
+                continue
+            parsed: Any = value
+            if out_key in ("steps", "seed"):
+                try:
+                    parsed = int(value)
+                except ValueError:
+                    pass
+            elif out_key in ("cfg_scale", "denoising_strength"):
+                try:
+                    parsed = float(value)
+                except ValueError:
+                    pass
+            elif out_key == "size":
+                w, sep, h = value.partition("x")
+                if sep:
+                    try:
+                        result["width"] = int(w)
+                        result["height"] = int(h)
+                    except ValueError:
+                        pass
+                continue
+            result[out_key] = parsed
+        if extras:
+            result["extras"] = extras
+
+    result["raw"] = raw
+    return result

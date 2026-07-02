@@ -15,6 +15,10 @@ let _gallerySelectedPaths = new Set();
 let _galleryImages = [];
 let _galleryCurrentIndex = -1;
 
+// PNG Info page
+let pngInfoImage = null;
+let pngInfoParameters = null;
+
 // Negative prompt templates
 const NEGATIVE_TEMPLATES = {
     'general': { label: '🎯 汎用', text: 'lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry' },
@@ -189,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _setup('img2img', setupImg2ImgPage);
     _setup('inpaint', setupInpaintPage);
     _setup('gallery', setupGalleryPage);
+    _setup('pnginfo', setupPngInfoPage);
     _setup('weightEditors', setupWeightEditors);
     checkStatus();
     loadProviders();
@@ -3211,6 +3216,194 @@ async function loadGalleryFilters() {
 function closeGalleryModal() {
     document.getElementById('gallery-modal').classList.add('hidden');
     document.getElementById('gallery-modal-image').src = '';
+}
+
+/* =====================================================================
+   PNG Info Page
+   ===================================================================== */
+function setupPngInfoPage() {
+    const uploadArea = document.getElementById('pnginfo-upload-area');
+    const imageInput = document.getElementById('pnginfo-image-input');
+    if (!uploadArea || !imageInput) return;
+
+    uploadArea.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', e => handlePngInfoImageSelect(e.target.files[0]));
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        if (e.dataTransfer.files[0]) handlePngInfoImageSelect(e.dataTransfer.files[0]);
+    });
+
+    document.getElementById('pnginfo-clear-btn')?.addEventListener('click', clearPngInfo);
+    document.getElementById('pnginfo-send-sd-btn')?.addEventListener('click', sendPngInfoToSD);
+    document.getElementById('pnginfo-send-img2img-btn')?.addEventListener('click', sendPngInfoToImg2Img);
+    document.getElementById('pnginfo-copy-prompt-btn')?.addEventListener('click', copyPngInfoPrompt);
+}
+
+function handlePngInfoImageSelect(file) {
+    if (!file || !file.type.startsWith('image/')) {
+        toast(I18n.t('toast.image_file_required') || '画像ファイルを選択してください', 'error');
+        return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        toast(I18n.t('toast.file_too_large') || 'ファイルサイズが10MBを超えています', 'error');
+        return;
+    }
+    pngInfoImage = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('pnginfo-preview-image').src = e.target.result;
+        document.getElementById('pnginfo-preview-wrap').classList.remove('hidden');
+        document.getElementById('pnginfo-upload-area').classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+    analyzePngInfo(file);
+}
+
+function clearPngInfo() {
+    pngInfoImage = null;
+    pngInfoParameters = null;
+    document.getElementById('pnginfo-image-input').value = '';
+    document.getElementById('pnginfo-preview-wrap').classList.add('hidden');
+    document.getElementById('pnginfo-upload-area').classList.remove('hidden');
+    document.getElementById('pnginfo-result').classList.add('hidden');
+    document.getElementById('pnginfo-empty').classList.add('hidden');
+    document.getElementById('pnginfo-loading').classList.add('hidden');
+}
+
+async function analyzePngInfo(file) {
+    const loading = document.getElementById('pnginfo-loading');
+    const emptyBox = document.getElementById('pnginfo-empty');
+    const resultBox = document.getElementById('pnginfo-result');
+
+    loading.classList.remove('hidden');
+    emptyBox.classList.add('hidden');
+    resultBox.classList.add('hidden');
+    pngInfoParameters = null;
+
+    try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const r = await fetch('/api/png-info', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error((await r.json()).detail);
+        const data = await r.json();
+
+        if (!data.has_metadata) {
+            emptyBox.classList.remove('hidden');
+            return;
+        }
+        pngInfoParameters = data.parameters || {};
+        renderPngInfoResult(pngInfoParameters);
+        resultBox.classList.remove('hidden');
+    } catch (e) {
+        toast(e.message || I18n.t('toast.pnginfo_parse_failed') || 'PNG情報の解析に失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
+
+function renderPngInfoResult(p) {
+    document.getElementById('pnginfo-positive').value = p.positive_prompt || '';
+
+    const negCard = document.getElementById('pnginfo-negative-card');
+    if (p.negative_prompt) {
+        document.getElementById('pnginfo-negative').value = p.negative_prompt;
+        negCard.classList.remove('hidden');
+    } else {
+        document.getElementById('pnginfo-negative').value = '';
+        negCard.classList.add('hidden');
+    }
+
+    const rows = [
+        [I18n.t('page.pnginfo.param_steps') || 'Steps', p.steps],
+        [I18n.t('page.pnginfo.param_sampler') || 'Sampler', p.sampler],
+        [I18n.t('page.pnginfo.param_cfg') || 'CFG Scale', p.cfg_scale],
+        [I18n.t('page.pnginfo.param_seed') || 'Seed', p.seed],
+        [I18n.t('page.pnginfo.param_size') || 'Size', (p.width && p.height) ? `${p.width}×${p.height}` : undefined],
+        [I18n.t('page.pnginfo.param_model') || 'Model', p.model],
+        [I18n.t('page.pnginfo.param_denoising') || 'Denoising strength', p.denoising_strength],
+    ].filter(([, v]) => v !== undefined && v !== null && v !== '');
+
+    if (p.extras && typeof p.extras === 'object') {
+        for (const [key, val] of Object.entries(p.extras)) {
+            if (val !== undefined && val !== null && val !== '') rows.push([key, val]);
+        }
+    }
+
+    document.getElementById('pnginfo-params').innerHTML = rows.map(([label, value]) => `
+        <div class="gallery-param-row">
+            <span class="gallery-param-label">${escHtml(label)}</span>
+            <span class="gallery-param-value">${escHtml(String(value))}</span>
+        </div>
+    `).join('');
+    document.getElementById('pnginfo-params-panel').classList.toggle('hidden', rows.length === 0);
+
+    document.getElementById('pnginfo-raw').textContent = p.raw || '';
+}
+
+// 対象 <select> に一致する <option> がある場合のみ値を設定する（無ければ変更しない）
+function _pngInfoSetSelectIfExists(id, val) {
+    const el = document.getElementById(id);
+    if (!el || val === undefined || val === null || val === '') return;
+    const match = Array.from(el.options).some(o => o.value === String(val));
+    if (match) el.value = val;
+}
+
+function _pngInfoSetField(id, val) {
+    if (val === undefined || val === null || val === '') return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') {
+        _pngInfoSetSelectIfExists(id, val);
+    } else {
+        el.value = val;
+    }
+}
+
+function sendPngInfoToSD() {
+    const p = pngInfoParameters;
+    if (!p) return;
+    _pngInfoSetField('sd-positive', p.positive_prompt);
+    _pngInfoSetField('sd-negative', p.negative_prompt);
+    _pngInfoSetField('sd-steps', p.steps);
+    _pngInfoSetField('sd-cfg', p.cfg_scale);
+    _pngInfoSetField('sd-seed', p.seed);
+    _pngInfoSetField('sd-width', p.width);
+    _pngInfoSetField('sd-height', p.height);
+    _pngInfoSetSelectIfExists('sd-sampler', p.sampler);
+    document.querySelector('[data-page="sd"]').click();
+    checkSDStatus();
+    toast(I18n.t('toast.pnginfo_sent_to_sd') || 'txt2imgにパラメータを送りました', 'success');
+}
+
+function sendPngInfoToImg2Img() {
+    const p = pngInfoParameters;
+    if (!p) return;
+    _pngInfoSetField('i2i-positive', p.positive_prompt);
+    _pngInfoSetField('i2i-negative', p.negative_prompt);
+    _pngInfoSetField('i2i-steps', p.steps);
+    _pngInfoSetField('i2i-cfg', p.cfg_scale);
+    _pngInfoSetField('i2i-seed', p.seed);
+    _pngInfoSetField('i2i-width', p.width);
+    _pngInfoSetField('i2i-height', p.height);
+    _pngInfoSetField('i2i-denoising', p.denoising_strength);
+    _pngInfoSetSelectIfExists('i2i-sampler', p.sampler);
+    document.querySelector('[data-page="img2img"]').click();
+    checkImg2ImgStatus();
+    toast(I18n.t('toast.pnginfo_sent_to_img2img') || 'img2imgにパラメータを送りました', 'success');
+}
+
+function copyPngInfoPrompt() {
+    const p = pngInfoParameters;
+    if (!p) return;
+    const pos = p.positive_prompt || '';
+    const neg = p.negative_prompt || '';
+    const text = neg ? `Positive:\n${pos}\n\nNegative:\n${neg}` : pos;
+    navigator.clipboard.writeText(text)
+        .then(() => toast(I18n.t('toast.prompts_copied') || 'プロンプトをコピーしました', 'success'))
+        .catch(() => toast(I18n.t('toast.copy_failed') || 'コピーに失敗しました', 'error'));
 }
 
 // ------------------------------------------------------------------ //

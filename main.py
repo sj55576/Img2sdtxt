@@ -16,6 +16,7 @@ from routes.gallery import router as gallery_router
 from routes.history import router as history_router
 from routes.jobs import router as jobs_router
 from routes.llm import router as llm_router
+from routes.png_info import router as png_info_router
 from routes.presets import router as presets_router
 from routes.prompts import router as prompts_router
 from routes.sd import router as sd_router
@@ -71,6 +72,7 @@ app.include_router(gallery_router)
 app.include_router(jobs_router)
 app.include_router(llm_router)
 app.include_router(tags_router)
+app.include_router(png_info_router)
 
 
 # ------------------------------------------------------------------ #

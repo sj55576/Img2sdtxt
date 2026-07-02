@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Image to SD Prompt Generator</title>
-    <link rel="stylesheet" href="/static/style.css?v=5">
+    <link rel="stylesheet" href="/static/style.css?v=6">
     <link rel="stylesheet" href="/static/weight-editor.css?v=1">
     <link rel="stylesheet" href="/static/tag-autocomplete.css?v=1">
 </head>
@@ -26,6 +26,7 @@
                 <button class="nav-btn" data-page="img2img" data-i18n="sidebar.nav.img2img">🔄 Img2Img</button>
                 <button class="nav-btn" data-page="inpaint" data-i18n="sidebar.nav.inpaint">🖌️ Inpaint</button>
                 <button class="nav-btn" data-page="gallery" data-i18n="sidebar.nav.gallery">🗃️ Gallery</button>
+                <button class="nav-btn" data-page="pnginfo" data-i18n="sidebar.nav.pnginfo">🏷️ PNG Info</button>
             </nav>
             <div class="theme-toggle-wrap">
                 <button id="theme-toggle-btn" class="theme-toggle-btn" data-i18n="sidebar.theme.dark" data-i18n-title="sidebar.theme.toggle_title" title="テーマ切り替え">🌙 Dark</button>
@@ -1107,6 +1108,71 @@
                     </div>
                 </div>
             </section>
+            <!-- ======================== PNG INFO PAGE ======================== -->
+            <section id="page-pnginfo" class="page">
+                <div class="page-header">
+                    <h2 data-i18n="page.pnginfo.title">PNG Info</h2>
+                    <p data-i18n="page.pnginfo.subtitle">AUTOMATIC1111生成PNG画像からプロンプトと生成パラメータを抽出</p>
+                </div>
+                <div class="page-body two-col">
+                    <!-- Left: Input -->
+                    <div class="col">
+                        <div class="upload-area" id="pnginfo-upload-area">
+                            <div class="upload-icon">🏷️</div>
+                            <p data-i18n="page.pnginfo.upload_text">クリックまたはドラッグ&ドロップ</p>
+                            <small data-i18n="page.pnginfo.upload_hint">PNG画像 (最大 10MB)</small>
+                        </div>
+                        <input type="file" id="pnginfo-image-input" accept="image/*" hidden>
+                        <div id="pnginfo-preview-wrap" class="preview-wrap hidden">
+                            <img id="pnginfo-preview-image" src="" alt="Preview">
+                            <button id="pnginfo-clear-btn" class="btn btn-sm btn-ghost" data-i18n="page.pnginfo.clear_btn">✕ クリア</button>
+                        </div>
+                    </div>
+
+                    <!-- Right: Extracted Info -->
+                    <div class="col">
+                        <div id="pnginfo-loading" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p data-i18n="page.pnginfo.loading">画像を解析中...</p>
+                        </div>
+                        <div id="pnginfo-empty" class="empty-state hidden">
+                            <p data-i18n="page.pnginfo.no_metadata">この画像には生成パラメータが含まれていません</p>
+                        </div>
+                        <div id="pnginfo-result" class="result-box hidden">
+                            <div class="prompt-card positive">
+                                <div class="prompt-card-header">
+                                    <span data-i18n="page.pnginfo.positive_label">✅ Positive Prompt</span>
+                                    <button class="copy-btn" data-target="pnginfo-positive" data-i18n="page.pnginfo.copy_btn">Copy</button>
+                                </div>
+                                <textarea id="pnginfo-positive" class="prompt-ta" readonly></textarea>
+                            </div>
+                            <div class="prompt-card negative hidden" id="pnginfo-negative-card">
+                                <div class="prompt-card-header">
+                                    <span data-i18n="page.pnginfo.negative_label">❌ Negative Prompt</span>
+                                    <button class="copy-btn" data-target="pnginfo-negative" data-i18n="page.pnginfo.copy_btn">Copy</button>
+                                </div>
+                                <textarea id="pnginfo-negative" class="prompt-ta" readonly></textarea>
+                            </div>
+
+                            <div class="customization-panel" id="pnginfo-params-panel">
+                                <h3 data-i18n="page.pnginfo.params_title">⚙️ パラメータ</h3>
+                                <div id="pnginfo-params" class="gallery-params"></div>
+                            </div>
+
+                            <details class="pnginfo-raw-details">
+                                <summary data-i18n="page.pnginfo.raw_summary">Raw infotext を表示</summary>
+                                <pre id="pnginfo-raw"></pre>
+                            </details>
+
+                            <div class="result-actions">
+                                <button id="pnginfo-send-sd-btn" class="btn btn-accent" data-i18n="page.pnginfo.send_to_sd_btn">🖼️ txt2img へ送る</button>
+                                <button id="pnginfo-send-img2img-btn" class="btn btn-accent" data-i18n="page.pnginfo.send_to_img2img_btn">🔄 img2img へ送る</button>
+                                <button id="pnginfo-copy-prompt-btn" class="btn btn-secondary" data-i18n="page.pnginfo.copy_prompt_btn">📋 プロンプトをコピー</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             <!-- Gallery Image Modal -->
             <div id="gallery-modal" class="modal hidden">
@@ -1159,6 +1225,7 @@
         <button class="mobile-nav-btn" data-page="img2img">🔄<span data-i18n="mobile_nav.img2img">Img2Img</span></button>
         <button class="mobile-nav-btn" data-page="inpaint">🖌️<span data-i18n="mobile_nav.inpaint">Inpaint</span></button>
         <button class="mobile-nav-btn" data-page="gallery">🗃️<span data-i18n="mobile_nav.gallery">Gallery</span></button>
+        <button class="mobile-nav-btn" data-page="pnginfo">🏷️<span data-i18n="mobile_nav.pnginfo">PNG Info</span></button>
     </nav>
 
     <!-- Keyboard Shortcuts Modal -->
@@ -1226,6 +1293,6 @@
     <script src="/static/weight-editor.js?v=1"></script>
     <script src="/static/tag-autocomplete.js?v=1"></script>
     <script src="/static/i18n.js?v=1"></script>
-    <script src="/static/script.js?v=3"></script>
+    <script src="/static/script.js?v=4"></script>
 </body>
 </html>
