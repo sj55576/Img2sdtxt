@@ -123,3 +123,30 @@
 2. BE3-3 + FE3-3 — 並行実装
 3. FE3-2 — プロンプトウェイトエディター (メインセッション)
 4. BE3-4 — 生成キュー (メインセッション)
+
+---
+
+# Issue #80: PNG Info インポート機能 (2026-07-02)
+
+## 計画
+
+- [ ] 1. A1111 パラメータパーサーの堅牢化（メインセッション担当・最難部）
+  - `sd_client.py` のパース処理を module-level 関数 `parse_a1111_parameters(raw)` に抽出
+  - 引用符付き値（`Lora hashes: "a: b, c: d"` 等、カンマを含む値）に対応
+  - 未知キー（Model hash, VAE, Clip skip 等）は `extras` dict に収集
+  - 既存の戻り値キーとの後方互換を維持
+- [ ] 2. バックエンド `POST /api/png-info`（Sonnet サブエージェント A 担当）
+  - `routes/png_info.py` 新規作成、`main.py` に登録
+  - 既存バリデーション（type / MAX_IMAGE_SIZE / `_validate_image_bytes`）を踏襲
+  - bytes から PIL で `info["parameters"]` を読み `parse_a1111_parameters` でパース
+  - レスポンス: `{has_metadata, parameters}` / 無し時 `{has_metadata: false}`
+  - `tests/test_png_info.py`（パーサー単体 + エンドポイント）
+- [ ] 3. フロントエンド PNG Info タブ（Sonnet サブエージェント B 担当）
+  - ドロップゾーン + ファイル選択 → `/api/png-info`
+  - 抽出結果表示、txt2img / img2img への転送、コピー、i18n（ja/en）
+- [ ] 4. レビュー・テスト実行・検証（メインセッション担当）
+- [ ] 5. コミット & プッシュ（branch: claude/github-issues-implementation-ml1yiw）
+
+## レビュー結果
+
+（実装完了後に記入）
