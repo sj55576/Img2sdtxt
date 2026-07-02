@@ -11,7 +11,8 @@
       "sd": "🖼️ SD Generate",
       "img2img": "🔄 Img2Img",
       "inpaint": "🖌️ Inpaint",
-      "gallery": "🗃️ Gallery"
+      "gallery": "🗃️ Gallery",
+      "pnginfo": "🏷️ PNG Info"
     },
     "theme": {
       "dark": "🌙 Dark",
@@ -319,6 +320,30 @@
       "select_mode_off": "選択モードOFF",
       "param_mode": "モード",
       "param_date": "日付"
+    },
+    "pnginfo": {
+      "title": "PNG Info",
+      "subtitle": "AUTOMATIC1111生成PNG画像からプロンプトと生成パラメータを抽出",
+      "upload_text": "クリックまたはドラッグ&ドロップ",
+      "upload_hint": "PNG画像 (最大 10MB)",
+      "clear_btn": "✕ クリア",
+      "loading": "画像を解析中...",
+      "no_metadata": "この画像には生成パラメータが含まれていません",
+      "positive_label": "✅ Positive Prompt",
+      "negative_label": "❌ Negative Prompt",
+      "copy_btn": "Copy",
+      "params_title": "⚙️ パラメータ",
+      "param_steps": "Steps",
+      "param_sampler": "Sampler",
+      "param_cfg": "CFG Scale",
+      "param_seed": "Seed",
+      "param_size": "Size",
+      "param_model": "Model",
+      "param_denoising": "Denoising strength",
+      "raw_summary": "Raw infotext を表示",
+      "send_to_sd_btn": "🖼️ txt2img へ送る",
+      "send_to_img2img_btn": "🔄 img2img へ送る",
+      "copy_prompt_btn": "📋 プロンプトをコピー"
     }
   },
   "common": {
@@ -404,7 +429,8 @@
     "sd": "SD",
     "img2img": "Img2Img",
     "inpaint": "Inpaint",
-    "gallery": "Gallery"
+    "gallery": "Gallery",
+    "pnginfo": "PNG Info"
   },
   "toast": {
     "template_inserted": "テンプレートを挿入しました",
@@ -464,6 +490,9 @@
     "lora_count_unit": "件",
     "no_images_selected": "ダウンロードする画像を選択してください",
     "zip_download_started": "ZIPダウンロードを開始しました",
-    "zip_download_failed": "ZIPダウンロードに失敗しました"
+    "zip_download_failed": "ZIPダウンロードに失敗しました",
+    "pnginfo_parse_failed": "PNG情報の解析に失敗しました",
+    "pnginfo_sent_to_sd": "txt2imgにパラメータを送りました",
+    "pnginfo_sent_to_img2img": "img2imgにパラメータを送りました"
   }
 }

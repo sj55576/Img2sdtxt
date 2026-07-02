@@ -11,7 +11,8 @@
       "sd": "🖼️ SD Generate",
       "img2img": "🔄 Img2Img",
       "inpaint": "🖌️ Inpaint",
-      "gallery": "🗃️ Gallery"
+      "gallery": "🗃️ Gallery",
+      "pnginfo": "🏷️ PNG Info"
     },
     "theme": {
       "dark": "🌙 Dark",
@@ -319,6 +320,30 @@
       "select_mode_off": "Selection mode OFF",
       "param_mode": "Mode",
       "param_date": "Date"
+    },
+    "pnginfo": {
+      "title": "PNG Info",
+      "subtitle": "Extract the prompt and generation parameters from an AUTOMATIC1111-generated PNG",
+      "upload_text": "Click or drag & drop",
+      "upload_hint": "PNG image (max 10MB)",
+      "clear_btn": "✕ Clear",
+      "loading": "Analyzing image...",
+      "no_metadata": "This image does not contain generation parameters",
+      "positive_label": "✅ Positive Prompt",
+      "negative_label": "❌ Negative Prompt",
+      "copy_btn": "Copy",
+      "params_title": "⚙️ Parameters",
+      "param_steps": "Steps",
+      "param_sampler": "Sampler",
+      "param_cfg": "CFG Scale",
+      "param_seed": "Seed",
+      "param_size": "Size",
+      "param_model": "Model",
+      "param_denoising": "Denoising strength",
+      "raw_summary": "Show raw infotext",
+      "send_to_sd_btn": "🖼️ Send to txt2img",
+      "send_to_img2img_btn": "🔄 Send to img2img",
+      "copy_prompt_btn": "📋 Copy prompt"
     }
   },
   "common": {
@@ -404,7 +429,8 @@
     "sd": "SD",
     "img2img": "Img2Img",
     "inpaint": "Inpaint",
-    "gallery": "Gallery"
+    "gallery": "Gallery",
+    "pnginfo": "PNG Info"
   },
   "toast": {
     "template_inserted": "Template inserted",
@@ -464,6 +490,9 @@
     "lora_count_unit": " item(s)",
     "no_images_selected": "Please select images to download",
     "zip_download_started": "ZIP download started",
-    "zip_download_failed": "ZIP download failed"
+    "zip_download_failed": "ZIP download failed",
+    "pnginfo_parse_failed": "Failed to analyze PNG info",
+    "pnginfo_sent_to_sd": "Sent parameters to txt2img",
+    "pnginfo_sent_to_img2img": "Sent parameters to img2img"
   }
 }
