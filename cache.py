@@ -44,6 +44,8 @@ class LLMCache:
         quality: str,
         provider: str = "",
         model: str = "",
+        mode: str = "llm",
+        tagger_model: str = "",
     ) -> str:
         h = hashlib.sha256()
         if image_bytes:
@@ -53,6 +55,11 @@ class LLMCache:
         h.update(f"{style}:{tone}:{quality}".encode())
         h.update(provider.encode("utf-8"))
         h.update(model.encode("utf-8"))
+        # 後方互換: analysis_mode がデフォルト("llm")の場合は従来と同一のキーになるよう
+        # ハッシュチェーンに追加のバイト列を混ぜない。非デフォルトのモード(例: "hybrid")のみ
+        # tagger_model を含めてキーを分ける。
+        if mode != "llm":
+            h.update(f":mode={mode}:tagger_model={tagger_model}".encode("utf-8"))
         return h.hexdigest()
 
     def get(
@@ -64,10 +71,12 @@ class LLMCache:
         quality: str,
         provider: str = "",
         model: str = "",
+        mode: str = "llm",
+        tagger_model: str = "",
     ) -> Optional[Dict]:
         if not self.enabled:
             return None
-        key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model)
+        key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model, mode, tagger_model)
         with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
             row = conn.execute("SELECT value, created_at FROM cache_entries WHERE key = ?", (key,)).fetchone()
             if row is not None:
@@ -92,10 +101,12 @@ class LLMCache:
         result: Dict,
         provider: str = "",
         model: str = "",
+        mode: str = "llm",
+        tagger_model: str = "",
     ):
         if not self.enabled:
             return
-        key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model)
+        key = self._make_key(image_bytes, text_input, style, tone, quality, provider, model, mode, tagger_model)
         with sqlite3.connect(DB_PATH, check_same_thread=False) as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO cache_entries (key, value, created_at) VALUES (?, ?, ?)",

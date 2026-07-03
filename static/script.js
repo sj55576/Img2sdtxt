@@ -672,6 +672,10 @@ function setupGeneratePage() {
     document.getElementById('generate-btn').addEventListener('click', generatePrompt);
     document.getElementById('generate-and-multi-btn').addEventListener('click', generatePromptAndMultiGenerate);
 
+    // Analysis mode (LLM / Tagger / Hybrid) toggle
+    document.getElementById('select-analysis-mode').addEventListener('change', updateAnalysisModeUI);
+    updateAnalysisModeUI();
+
     // Result actions
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => copyText(btn.dataset.target, btn));
@@ -723,6 +727,12 @@ function updateGenerateBtn() {
     if (multiBtn) multiBtn.disabled = !enabled;
 }
 
+function updateAnalysisModeUI() {
+    const mode = document.getElementById('select-analysis-mode').value;
+    const taggerGroup = document.getElementById('tagger-model-group');
+    if (taggerGroup) taggerGroup.classList.toggle('hidden', mode === 'llm');
+}
+
 async function generatePrompt() {
     const loading = document.getElementById('loading-generate');
     const resultBox = document.getElementById('result-box');
@@ -734,9 +744,14 @@ async function generatePrompt() {
     const tone = document.getElementById('select-tone').value;
     const quality = document.getElementById('select-quality').value;
     const presetId = document.getElementById('select-preset').value;
+    const analysisMode = document.getElementById('select-analysis-mode').value;
+    const taggerModel = document.getElementById('select-tagger-model').value;
 
     // Save parameters for next startup
-    saveLastParams('generate', { style, tone, quality, preset_id: presetId });
+    saveLastParams('generate', {
+        style, tone, quality, preset_id: presetId,
+        analysis_mode: analysisMode, tagger_model: taggerModel
+    });
 
     try {
         let data;
@@ -747,6 +762,8 @@ async function generatePrompt() {
             fd.append('tone', tone);
             fd.append('quality', quality);
             fd.append('preset_id', presetId);
+            fd.append('analysis_mode', analysisMode);
+            fd.append('tagger_model', taggerModel);
             const r = await fetch('/api/generate-prompts', { method: 'POST', body: fd });
             if (!r.ok) throw new Error((await r.json()).detail);
             data = (await r.json()).data;
@@ -2584,6 +2601,9 @@ function applyLastParams(feature, params) {
         setVal('select-tone', params.tone);
         setVal('select-quality', params.quality);
         setPending('select-preset', params.preset_id);
+        setVal('select-analysis-mode', params.analysis_mode);
+        setVal('select-tagger-model', params.tagger_model);
+        updateAnalysisModeUI();
 
     } else if (feature === 'sd') {
         setVal('sd-positive', params.positive);

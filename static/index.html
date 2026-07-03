@@ -118,6 +118,25 @@
                                     ⚡ クリップボード一括実行
                                 </button>
                             </div>
+
+                            <!-- Analysis mode (LLM / Tagger / Hybrid) -->
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label data-i18n="page.generate.analysis_mode_label">分析モード</label>
+                                    <select id="select-analysis-mode">
+                                        <option value="llm" data-i18n="page.generate.analysis_mode_llm">LLM</option>
+                                        <option value="tagger" data-i18n="page.generate.analysis_mode_tagger">Tagger</option>
+                                        <option value="hybrid" data-i18n="page.generate.analysis_mode_hybrid">Hybrid</option>
+                                    </select>
+                                </div>
+                                <div class="form-group hidden" id="tagger-model-group">
+                                    <label data-i18n="page.generate.tagger_model_label">Taggerモデル</label>
+                                    <select id="select-tagger-model">
+                                        <option value="clip">CLIP</option>
+                                        <option value="deepdanbooru">DeepDanbooru</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Text input -->

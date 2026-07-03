@@ -17,6 +17,46 @@ logger = logging.getLogger("img2sdtxt.sd")
 
 router = APIRouter(prefix="/api/sd", tags=["sd"])
 
+# CLIP Interrogator / WD14 タガー系のモデル選択肢
+INTERROGATE_MODELS = ("clip", "deepdanbooru")
+
+# POST /api/interrogate は /api/sd プレフィックスではなく /api 直下に置くための専用ルーター
+interrogate_router = APIRouter(prefix="/api", tags=["sd"])
+
+
+@interrogate_router.post("/interrogate")
+async def sd_interrogate(
+    file: UploadFile = File(...),
+    model: str = Form("clip"),
+):
+    """CLIP Interrogator / DeepDanbooru (WD14系) で画像をキャプション・タグ化する。"""
+    if model not in INTERROGATE_MODELS:
+        raise HTTPException(status_code=400, detail=f"Invalid model. Must be one of {INTERROGATE_MODELS}.")
+
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image type.")
+
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=400, detail="Image too large (max 10MB).")
+
+    _validate_image_bytes(contents)
+
+    try:
+        caption = await run_in_threadpool(sd_client.interrogate, contents, model)
+    except ConnectionError:
+        raise HTTPException(status_code=502, detail="Stable Diffusion API is not available.")
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Interrogate timed out.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    if not caption:
+        raise HTTPException(status_code=502, detail="Interrogate returned no result.")
+
+    tags = [t.strip() for t in caption.split(",") if t.strip()]
+    return {"success": True, "caption": caption, "tags": tags}
+
 
 @router.get("/status")
 async def sd_status():

@@ -19,6 +19,9 @@ logger = logging.getLogger("img2sdtxt.prompts")
 
 router = APIRouter(prefix="/api", tags=["prompts"])
 
+ANALYSIS_MODES = ("llm", "tagger", "hybrid")
+TAGGER_MODELS = ("clip", "deepdanbooru")
+
 
 # ------------------------------------------------------------------ #
 # Prompt Generation (single image)
@@ -33,7 +36,14 @@ async def generate_prompts(
     quality: str = Form("high"),
     preset_id: str = Form(""),
     save_history: bool = Form(True),
+    analysis_mode: str = Form("llm"),
+    tagger_model: str = Form("clip"),
 ):
+    if analysis_mode not in ANALYSIS_MODES:
+        raise HTTPException(status_code=400, detail=f"Invalid analysis_mode. Must be one of {ANALYSIS_MODES}.")
+    if tagger_model not in TAGGER_MODELS:
+        raise HTTPException(status_code=400, detail=f"Invalid tagger_model. Must be one of {TAGGER_MODELS}.")
+
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")
 
@@ -51,23 +61,71 @@ async def generate_prompts(
     eff_tone = tone or (preset.get("tone", "") if preset else "")
     eff_quality = quality or (preset.get("quality", "high") if preset else "high")
 
-    _prov = deps.llm_client.provider_name
-    _mdl = deps.llm_client.model
-    cached = deps.llm_cache.get(contents, None, eff_style, eff_tone, eff_quality, provider=_prov, model=_mdl)
-    if cached is not None:
-        result = cached
-    else:
-        result = await run_in_threadpool(
-            deps.prompt_generator.generate_prompts,
-            contents,
-            style=eff_style,
-            tone=eff_tone,
+    async def _interrogate() -> str:
+        """CLIP Interrogator / WD14 タガーで画像をタグ化する（エラーはHTTPエラーに変換）"""
+        try:
+            caption = await run_in_threadpool(deps.sd_client.interrogate, contents, tagger_model)
+        except ConnectionError:
+            raise HTTPException(status_code=502, detail="Stable Diffusion API is not available.")
+        except TimeoutError:
+            raise HTTPException(status_code=504, detail="Interrogate timed out.")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        if not caption:
+            raise HTTPException(status_code=502, detail="Interrogate returned no result.")
+        return caption
+
+    if analysis_mode == "tagger":
+        # LLMを使わずタガーの結果のみからプロンプトを組み立てる（キャッシュ不要）
+        result = deps.prompt_generator.build_tagger_prompt(
+            await _interrogate(),
             quality=eff_quality,
             preset_suffix_positive=suffix_pos,
             preset_suffix_negative=suffix_neg,
         )
-        if result.get("status") == "success":
-            deps.llm_cache.set(contents, None, eff_style, eff_tone, eff_quality, result, provider=_prov, model=_mdl)
+    else:
+        _prov = deps.llm_client.provider_name
+        _mdl = deps.llm_client.model
+        cached = deps.llm_cache.get(
+            contents,
+            None,
+            eff_style,
+            eff_tone,
+            eff_quality,
+            provider=_prov,
+            model=_mdl,
+            mode=analysis_mode,
+            tagger_model=tagger_model if analysis_mode == "hybrid" else "",
+        )
+        if cached is not None:
+            result = cached
+        else:
+            # hybrid モードの interrogate はキャッシュミス時のみ実行する
+            # （タガー出力はキャッシュキーに含まれないため、ヒット時は不要）
+            tagger_tags = await _interrogate() if analysis_mode == "hybrid" else ""
+            result = await run_in_threadpool(
+                deps.prompt_generator.generate_prompts,
+                contents,
+                style=eff_style,
+                tone=eff_tone,
+                quality=eff_quality,
+                preset_suffix_positive=suffix_pos,
+                preset_suffix_negative=suffix_neg,
+                tagger_tags=tagger_tags,
+            )
+            if result.get("status") == "success":
+                deps.llm_cache.set(
+                    contents,
+                    None,
+                    eff_style,
+                    eff_tone,
+                    eff_quality,
+                    result,
+                    provider=_prov,
+                    model=_mdl,
+                    mode=analysis_mode,
+                    tagger_model=tagger_model if analysis_mode == "hybrid" else "",
+                )
 
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))

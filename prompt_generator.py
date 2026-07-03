@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict
 
-from config import QUALITY_LEVELS
+from config import DEFAULT_NEGATIVE_TAGS, QUALITY_LEVELS
 from llm_provider import LLMProvider
 
 logger = logging.getLogger("img2sdtxt.prompt")
@@ -58,12 +58,21 @@ class PromptGenerator:
             raise ValueError("LLMからレスポンスがありません")
         return self._parse_json_response(response_text)
 
-    def build_image_analysis_prompt(self, style: str = "", tone: str = "", quality: str = "high") -> str:
-        """画像分析用のLLMプロンプトを構築（ストリーミングエンドポイントからも利用）"""
+    def build_image_analysis_prompt(
+        self, style: str = "", tone: str = "", quality: str = "high", tagger_tags: str = ""
+    ) -> str:
+        """画像分析用のLLMプロンプトを構築（ストリーミングエンドポイントからも利用）
+
+        tagger_tags: hybrid モードで CLIP Interrogator / WD14 タガーが抽出したタグ列。
+        非空の場合、LLMへの参考情報としてプロンプトに含める。
+        """
         style_instruction = self._build_style_instruction(style, tone, quality)
         customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
+        tagger_note = (
+            f"\n\n参考: タガーが抽出したタグ列（これらを考慮して統合すること）: {tagger_tags}" if tagger_tags else ""
+        )
 
-        return f"""提供された画像を分析して、Stable Diffusion用のプロンプトを生成してください。{customization}
+        return f"""提供された画像を分析して、Stable Diffusion用のプロンプトを生成してください。{customization}{tagger_note}
 
 JSON形式のみで返してください：
 {{
@@ -118,6 +127,29 @@ JSON形式のみで返してください：
             logger.error("finalize_response error: %s", str(e))
             return {"positive": "", "negative": "", "error": str(e), "status": "error"}
 
+    def build_tagger_prompt(
+        self,
+        tags: str,
+        quality: str = "high",
+        preset_suffix_positive: str = "",
+        preset_suffix_negative: str = "",
+    ) -> Dict[str, str]:
+        """CLIP Interrogator / WD14 タガーの結果のみからプロンプトを組み立てる（LLM不使用）
+
+        positive: タガーが抽出したタグ列 + 品質タグ + preset の positive_suffix
+        negative: DEFAULT_NEGATIVE_TAGS + preset の negative_suffix
+        """
+        quality_tag = QUALITY_LEVELS.get(quality, QUALITY_LEVELS["standard"])
+
+        positive_parts = [p for p in (tags.strip(), quality_tag, preset_suffix_positive) if p]
+        negative_parts = [p for p in (DEFAULT_NEGATIVE_TAGS, preset_suffix_negative) if p]
+
+        return {
+            "positive": ", ".join(positive_parts),
+            "negative": ", ".join(negative_parts),
+            "status": "success",
+        }
+
     def generate_prompts(
         self,
         image_bytes: bytes,
@@ -126,11 +158,15 @@ JSON形式のみで返してください：
         quality: str = "high",
         preset_suffix_positive: str = "",
         preset_suffix_negative: str = "",
+        tagger_tags: str = "",
     ) -> Dict[str, str]:
-        """画像からポジティブ・ネガティブプロンプトを生成"""
+        """画像からポジティブ・ネガティブプロンプトを生成
+
+        tagger_tags: hybrid モードで interrogate 済みのタグ列を LLM への参考情報として渡す。
+        """
         logger.info("generate_prompts start style=%s tone=%s quality=%s", style, tone, quality)
         try:
-            analysis_prompt = self.build_image_analysis_prompt(style, tone, quality)
+            analysis_prompt = self.build_image_analysis_prompt(style, tone, quality, tagger_tags)
             response_text = self.llm_client.generate_response_with_image(analysis_prompt, image_bytes)
             if not response_text:
                 raise ValueError("LLMからレスポンスがありません")

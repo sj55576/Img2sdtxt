@@ -55,3 +55,6 @@ QUALITY_LEVELS = {
     "high": "best quality, masterpiece, highly detailed",
     "ultra": "best quality, masterpiece, highly detailed, 8k uhd, sharp focus, professional",
 }
+
+# Tagger (CLIP Interrogator / WD14 系) モードで使用するデフォルトのネガティブプロンプト
+DEFAULT_NEGATIVE_TAGS = "lowres, bad anatomy, bad hands, text, error, worst quality, low quality, blurry"
