@@ -194,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _setup('inpaint', setupInpaintPage);
     _setup('gallery', setupGalleryPage);
     _setup('pnginfo', setupPngInfoPage);
+    _setup('stats', setupStatsPage);
     _setup('weightEditors', setupWeightEditors);
     checkStatus();
     loadProviders();
@@ -336,6 +337,7 @@ function setupNavigation() {
         if (page === 'img2img') checkImg2ImgStatus();
         if (page === 'inpaint') checkInpaintStatus();
         if (page === 'gallery') { loadGallery(); loadGalleryFilters(); }
+        if (page === 'stats') loadStats();
     }
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -670,6 +672,13 @@ function setupGeneratePage() {
     document.getElementById('generate-btn').addEventListener('click', generatePrompt);
     document.getElementById('generate-and-multi-btn').addEventListener('click', generatePromptAndMultiGenerate);
 
+    // Analysis mode (LLM / Tagger / Hybrid) toggle
+    document.getElementById('select-analysis-mode').addEventListener('change', updateAnalysisModeUI);
+    updateAnalysisModeUI();
+
+    // ストリーミング生成のキャンセル（接続切断でサーバー側の生成も中断される）
+    document.getElementById('cancel-stream-btn')?.addEventListener('click', () => streamAbort?.abort());
+
     // Result actions
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => copyText(btn.dataset.target, btn));
@@ -721,6 +730,93 @@ function updateGenerateBtn() {
     if (multiBtn) multiBtn.disabled = !enabled;
 }
 
+function updateAnalysisModeUI() {
+    const mode = document.getElementById('select-analysis-mode').value;
+    const taggerGroup = document.getElementById('tagger-model-group');
+    if (taggerGroup) taggerGroup.classList.toggle('hidden', mode === 'llm');
+}
+
+// SSE ストリーミング生成のキャンセル用 AbortController
+let streamAbort = null;
+
+function _parseSSEBlock(block) {
+    let event = null;
+    let dataLine = null;
+    for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataLine = line.slice(5).trim();
+    }
+    if (!event || dataLine === null) return null;
+    try {
+        return { event, data: JSON.parse(dataLine) };
+    } catch (e) {
+        return null;
+    }
+}
+
+// /api/generate-prompts-stream を叩き、token イベントをタイプライター表示する。
+// 戻り値: done イベントのデータ。エンドポイント未対応(404/405・ネットワーク層失敗)は
+// null を返し、呼び出し元が従来の一括エンドポイントへフォールバックする。
+async function generatePromptViaStream({ isImageTab, style, tone, quality, presetId }) {
+    const fd = new FormData();
+    if (isImageTab) {
+        fd.append('file', selectedImage);
+    } else {
+        fd.append('description', document.getElementById('description-input').value.trim());
+    }
+    fd.append('style', style);
+    fd.append('tone', tone);
+    fd.append('quality', quality);
+    fd.append('preset_id', presetId);
+
+    streamAbort = new AbortController();
+    let r;
+    try {
+        r = await fetch('/api/generate-prompts-stream', { method: 'POST', body: fd, signal: streamAbort.signal });
+    } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        return null; // ネットワーク層の失敗 → 従来エンドポイントにフォールバック
+    }
+    if (r.status === 404 || r.status === 405) return null; // 旧サーバー → フォールバック
+    if (!r.ok) throw new Error((await r.json()).detail || '生成に失敗しました');
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('text/event-stream') || !r.body) return null;
+
+    const preview = document.getElementById('stream-preview');
+    const cancelBtn = document.getElementById('cancel-stream-btn');
+    preview.textContent = '';
+    preview.classList.remove('hidden');
+    cancelBtn.classList.remove('hidden');
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let doneData = null;
+    let errMsg = null;
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf('\n\n')) !== -1) {
+            const evt = _parseSSEBlock(buf.slice(0, idx));
+            buf = buf.slice(idx + 2);
+            if (!evt) continue;
+            if (evt.event === 'token') {
+                preview.textContent += evt.data.text;
+                preview.scrollTop = preview.scrollHeight;
+            } else if (evt.event === 'done') {
+                doneData = evt.data;
+            } else if (evt.event === 'error') {
+                errMsg = evt.data.error;
+            }
+        }
+    }
+    if (errMsg) throw new Error(errMsg);
+    if (!doneData) throw new Error(I18n.t('toast.stream_incomplete') || 'ストリーミングが完了しませんでした');
+    return doneData;
+}
+
 async function generatePrompt() {
     const loading = document.getElementById('loading-generate');
     const resultBox = document.getElementById('result-box');
@@ -732,33 +828,52 @@ async function generatePrompt() {
     const tone = document.getElementById('select-tone').value;
     const quality = document.getElementById('select-quality').value;
     const presetId = document.getElementById('select-preset').value;
+    const analysisMode = document.getElementById('select-analysis-mode').value;
+    const taggerModel = document.getElementById('select-tagger-model').value;
 
     // Save parameters for next startup
-    saveLastParams('generate', { style, tone, quality, preset_id: presetId });
+    saveLastParams('generate', {
+        style, tone, quality, preset_id: presetId,
+        analysis_mode: analysisMode, tagger_model: taggerModel
+    });
+
+    const isImageTab = currentTab === 'tab-img';
 
     try {
-        let data;
-        if (currentTab === 'tab-img') {
-            const fd = new FormData();
-            fd.append('file', selectedImage);
-            fd.append('style', style);
-            fd.append('tone', tone);
-            fd.append('quality', quality);
-            fd.append('preset_id', presetId);
-            const r = await fetch('/api/generate-prompts', { method: 'POST', body: fd });
-            if (!r.ok) throw new Error((await r.json()).detail);
-            data = (await r.json()).data;
-        } else {
-            const r = await fetch('/api/generate-prompts-text', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    description: document.getElementById('description-input').value.trim(),
-                    style, tone, quality, preset_id: presetId
-                })
-            });
-            if (!r.ok) throw new Error((await r.json()).detail);
-            data = (await r.json()).data;
+        let data = null;
+
+        // LLM モードは SSE ストリーミングで逐次表示（tagger/hybrid はストリーム非対応）
+        const canStream = !isImageTab || analysisMode === 'llm';
+        if (canStream) {
+            data = await generatePromptViaStream({ isImageTab, style, tone, quality, presetId });
+        }
+
+        if (data === null) {
+            // ストリーム非対応モード or ストリームエンドポイント未到達時の一括生成
+            if (isImageTab) {
+                const fd = new FormData();
+                fd.append('file', selectedImage);
+                fd.append('style', style);
+                fd.append('tone', tone);
+                fd.append('quality', quality);
+                fd.append('preset_id', presetId);
+                fd.append('analysis_mode', analysisMode);
+                fd.append('tagger_model', taggerModel);
+                const r = await fetch('/api/generate-prompts', { method: 'POST', body: fd });
+                if (!r.ok) throw new Error((await r.json()).detail);
+                data = (await r.json()).data;
+            } else {
+                const r = await fetch('/api/generate-prompts-text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        description: document.getElementById('description-input').value.trim(),
+                        style, tone, quality, preset_id: presetId
+                    })
+                });
+                if (!r.ok) throw new Error((await r.json()).detail);
+                data = (await r.json()).data;
+            }
         }
 
         document.getElementById('pos-prompt').value = data.positive;
@@ -768,9 +883,16 @@ async function generatePrompt() {
         resultBox.classList.remove('hidden');
         toast('プロンプト生成完了！', 'success');
     } catch (e) {
-        toast(e.message || '生成に失敗しました', 'error');
+        if (e.name === 'AbortError') {
+            toast(I18n.t('toast.generation_cancelled') || '生成をキャンセルしました', 'info');
+        } else {
+            toast(e.message || '生成に失敗しました', 'error');
+        }
     } finally {
         loading.classList.add('hidden');
+        document.getElementById('stream-preview')?.classList.add('hidden');
+        document.getElementById('cancel-stream-btn')?.classList.add('hidden');
+        streamAbort = null;
     }
 }
 
@@ -2582,6 +2704,9 @@ function applyLastParams(feature, params) {
         setVal('select-tone', params.tone);
         setVal('select-quality', params.quality);
         setPending('select-preset', params.preset_id);
+        setVal('select-analysis-mode', params.analysis_mode);
+        setVal('select-tagger-model', params.tagger_model);
+        updateAnalysisModeUI();
 
     } else if (feature === 'sd') {
         setVal('sd-positive', params.positive);
@@ -3404,6 +3529,199 @@ function copyPngInfoPrompt() {
     navigator.clipboard.writeText(text)
         .then(() => toast(I18n.t('toast.prompts_copied') || 'プロンプトをコピーしました', 'success'))
         .catch(() => toast(I18n.t('toast.copy_failed') || 'コピーに失敗しました', 'error'));
+}
+
+/* =====================================================================
+   Stats Page
+   ===================================================================== */
+let _statsData = null;
+let _statsTagKind = 'positive';
+
+function setupStatsPage() {
+    document.getElementById('refresh-stats-btn')?.addEventListener('click', loadStats);
+    document.getElementById('stats-top-n')?.addEventListener('change', loadStats);
+
+    document.getElementById('stats-tag-toggle')?.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-tag-kind]');
+        if (!btn) return;
+        _statsTagKind = btn.dataset.tagKind;
+        document.querySelectorAll('#stats-tag-toggle button').forEach(b => {
+            const active = b.dataset.tagKind === _statsTagKind;
+            b.classList.toggle('active', active);
+            b.classList.toggle('btn-accent', active);
+            b.classList.toggle('btn-secondary', !active);
+        });
+        renderStatsTags();
+    });
+
+    // タグバーをクリックすると History ページへ遷移し、そのタグで検索する
+    document.getElementById('stats-tags-chart')?.addEventListener('click', e => {
+        const row = e.target.closest('.stats-bar-row--clickable');
+        if (!row) return;
+        goToHistoryWithSearch(row.dataset.tag || '');
+    });
+}
+
+async function loadStats() {
+    const loading = document.getElementById('stats-loading');
+    const empty = document.getElementById('stats-empty');
+    const content = document.getElementById('stats-content');
+    loading.classList.remove('hidden');
+    empty.classList.add('hidden');
+    content.classList.add('hidden');
+
+    const topN = parseInt(document.getElementById('stats-top-n')?.value, 10) || 20;
+
+    try {
+        const r = await fetch(`/api/stats?top_n=${topN}`);
+        if (!r.ok) throw new Error();
+        const d = await r.json();
+        _statsData = d;
+
+        if (!d.total_history && !d.total_generated_images) {
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        renderStatsSummary(d);
+        renderStatsTags();
+        renderStatsBreakdown('stats-styles-chart', d.styles, 'common.style');
+        renderStatsBreakdown('stats-tones-chart', d.tones, 'common.tone');
+        renderStatsBreakdown('stats-quality-chart', d.quality_levels, 'common.quality');
+        renderStatsCountList('stats-models-chart', d.models);
+        renderStatsCountList('stats-samplers-chart', d.samplers);
+        renderStatsDailyChart(d.activity.daily);
+        renderStatsWeeklyChart(d.activity.weekly);
+
+        content.classList.remove('hidden');
+    } catch (e) {
+        toast(I18n.t('toast.stats_load_failed') || '統計の読み込みに失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
+
+function renderStatsSummary(d) {
+    document.getElementById('stats-total-history').textContent = d.total_history;
+    document.getElementById('stats-total-images').textContent = d.total_generated_images;
+    document.getElementById('stats-favorite-rate').textContent = `${d.favorite_rate}%`;
+    document.getElementById('stats-avg-prompt-length').textContent = d.avg_prompt_length;
+    document.getElementById('stats-avg-tag-count').textContent = d.avg_tag_count;
+}
+
+function _statsNoDataHtml() {
+    return `<p class="stats-empty-hint">${escHtml(I18n.t('page.stats.no_data') || 'データがありません')}</p>`;
+}
+
+function _statsTranslateOrRaw(namespace, value) {
+    if (!namespace) return value;
+    const key = `${namespace}.${value}`;
+    const translated = I18n.t(key);
+    return translated && translated !== key ? translated : value;
+}
+
+function renderStatsTags() {
+    if (!_statsData) return;
+    const items = (_statsData.top_tags || {})[_statsTagKind] || [];
+    const colorVar = _statsTagKind === 'positive' ? 'var(--success)' : 'var(--danger)';
+    const container = document.getElementById('stats-tags-chart');
+    if (!items.length) {
+        container.innerHTML = _statsNoDataHtml();
+        return;
+    }
+    const max = Math.max(...items.map(i => i.count));
+    container.innerHTML = items.map(item => {
+        const pct = max ? Math.round((item.count / max) * 100) : 0;
+        return `
+            <div class="stats-bar-row stats-bar-row--clickable" data-tag="${escHtml(item.tag)}" title="${escHtml(item.tag)}: ${item.count}">
+                <span class="stats-bar-label">${escHtml(item.tag)}</span>
+                <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${pct}%;background:${colorVar};"></div></div>
+                <span class="stats-bar-value">${item.count}</span>
+            </div>`;
+    }).join('');
+}
+
+function renderStatsBreakdown(containerId, breakdown, namespace) {
+    const container = document.getElementById(containerId);
+    const counts = breakdown?.counts || [];
+    if (!counts.length) {
+        container.innerHTML = _statsNoDataHtml();
+        return;
+    }
+    const max = Math.max(...counts.map(c => c.count));
+    container.innerHTML = counts.map(c => {
+        const pct = max ? Math.round((c.count / max) * 100) : 0;
+        const label = _statsTranslateOrRaw(namespace, c.value);
+        return `
+            <div class="stats-bar-row" title="${escHtml(label)}: ${c.count} (${c.percent}%)">
+                <span class="stats-bar-label">${escHtml(label)}</span>
+                <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${pct}%;background:var(--accent);"></div></div>
+                <span class="stats-bar-value">${c.count} (${c.percent}%)</span>
+            </div>`;
+    }).join('');
+}
+
+function renderStatsCountList(containerId, items) {
+    const container = document.getElementById(containerId);
+    if (!items?.length) {
+        container.innerHTML = _statsNoDataHtml();
+        return;
+    }
+    const max = Math.max(...items.map(i => i.count));
+    container.innerHTML = items.map(item => {
+        const pct = max ? Math.round((item.count / max) * 100) : 0;
+        return `
+            <div class="stats-bar-row" title="${escHtml(item.value)}: ${item.count}">
+                <span class="stats-bar-label">${escHtml(item.value)}</span>
+                <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${pct}%;background:var(--accent);"></div></div>
+                <span class="stats-bar-value">${item.count}</span>
+            </div>`;
+    }).join('');
+}
+
+function renderStatsDailyChart(daily) {
+    const container = document.getElementById('stats-daily-chart');
+    if (!daily?.length) {
+        container.innerHTML = _statsNoDataHtml();
+        return;
+    }
+    const max = Math.max(...daily.map(d => d.count), 1);
+    container.innerHTML = daily.map((d, idx) => {
+        const pct = Math.round((d.count / max) * 100);
+        const showLabel = idx % 5 === 0 || idx === daily.length - 1;
+        const shortDate = d.date.slice(5).replace('-', '/'); // MM/DD
+        return `
+            <div class="stats-daily-col" title="${d.date}: ${d.count}">
+                <div class="stats-daily-track"><div class="stats-daily-fill" style="height:${pct}%;"></div></div>
+                <span class="stats-daily-date">${showLabel ? shortDate : ''}</span>
+            </div>`;
+    }).join('');
+}
+
+function renderStatsWeeklyChart(weekly) {
+    const container = document.getElementById('stats-weekly-chart');
+    if (!weekly?.length) {
+        container.innerHTML = _statsNoDataHtml();
+        return;
+    }
+    const max = Math.max(...weekly.map(w => w.count));
+    container.innerHTML = weekly.map(w => {
+        const pct = max ? Math.round((w.count / max) * 100) : 0;
+        return `
+            <div class="stats-bar-row" title="${w.week_start}〜: ${w.count}">
+                <span class="stats-bar-label">${escHtml(w.week_start)}〜</span>
+                <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${pct}%;background:var(--accent);"></div></div>
+                <span class="stats-bar-value">${w.count}</span>
+            </div>`;
+    }).join('');
+}
+
+function goToHistoryWithSearch(tag) {
+    const navBtn = document.querySelector('.nav-btn[data-page="history"]');
+    if (navBtn) navBtn.click();
+    const input = document.getElementById('history-search');
+    if (input) input.value = tag;
+    loadHistory();
 }
 
 // ------------------------------------------------------------------ //

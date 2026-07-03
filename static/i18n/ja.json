@@ -12,7 +12,8 @@
       "img2img": "🔄 Img2Img",
       "inpaint": "🖌️ Inpaint",
       "gallery": "🗃️ Gallery",
-      "pnginfo": "🏷️ PNG Info"
+      "pnginfo": "🏷️ PNG Info",
+      "stats": "📊 Stats"
     },
     "theme": {
       "dark": "🌙 Dark",
@@ -69,6 +70,11 @@
       "clipboard_auto_title": "クリップボードから読み込み＋プロンプト生成＋マルチモデル実行",
       "description_label": "画像の説明:",
       "description_placeholder": "生成したい画像を説明してください...",
+      "analysis_mode_label": "分析モード",
+      "analysis_mode_llm": "LLM",
+      "analysis_mode_tagger": "Tagger",
+      "analysis_mode_hybrid": "Hybrid",
+      "tagger_model_label": "Taggerモデル",
       "customize_title": "⚙️ カスタマイズ",
       "style_label": "スタイル",
       "tone_label": "トーン",
@@ -86,7 +92,8 @@
       "send_to_sd_btn": "🖼️ SDで生成",
       "send_to_sd_auto_btn": "🚀 SD自動生成",
       "send_to_sd_multi_btn": "🔁 マルチモデル自動生成",
-      "send_to_img2img_btn": "🔄 Img2Imgへ"
+      "send_to_img2img_btn": "🔄 Img2Imgへ",
+      "cancel_stream_btn": "⏹ キャンセル"
     },
     "refine": {
       "title": "Refine Prompt",
@@ -344,6 +351,32 @@
       "send_to_sd_btn": "🖼️ txt2img へ送る",
       "send_to_img2img_btn": "🔄 img2img へ送る",
       "copy_prompt_btn": "📋 プロンプトをコピー"
+    },
+    "stats": {
+      "title": "Stats",
+      "subtitle": "履歴と生成画像の統計ダッシュボード",
+      "top_n_label": "Top N",
+      "refresh_btn": "🔄 更新",
+      "loading": "読み込み中...",
+      "empty": "まだ統計データがありません",
+      "empty_hint": "プロンプトを生成すると、ここに統計が表示されます",
+      "card_total_history": "総履歴件数",
+      "card_total_images": "総生成画像数",
+      "card_favorite_rate": "お気に入り率",
+      "card_avg_prompt_length": "平均プロンプト長（文字）",
+      "card_avg_tag_count": "平均タグ数",
+      "tags_title": "よく使うタグ",
+      "tags_positive": "Positive",
+      "tags_negative": "Negative",
+      "tags_hint": "タグをクリックすると履歴ページでそのタグを検索します",
+      "styles_title": "スタイル利用割合",
+      "tones_title": "トーン利用割合",
+      "quality_title": "品質レベル利用割合",
+      "models_title": "モデル別生成枚数",
+      "samplers_title": "サンプラー別生成枚数",
+      "activity_title": "日別生成アクティビティ（直近30日）",
+      "weekly_title": "週別集計",
+      "no_data": "データがありません"
     }
   },
   "common": {
@@ -430,7 +463,8 @@
     "img2img": "Img2Img",
     "inpaint": "Inpaint",
     "gallery": "Gallery",
-    "pnginfo": "PNG Info"
+    "pnginfo": "PNG Info",
+    "stats": "Stats"
   },
   "toast": {
     "template_inserted": "テンプレートを挿入しました",
@@ -493,6 +527,9 @@
     "zip_download_failed": "ZIPダウンロードに失敗しました",
     "pnginfo_parse_failed": "PNG情報の解析に失敗しました",
     "pnginfo_sent_to_sd": "txt2imgにパラメータを送りました",
-    "pnginfo_sent_to_img2img": "img2imgにパラメータを送りました"
+    "pnginfo_sent_to_img2img": "img2imgにパラメータを送りました",
+    "stats_load_failed": "統計の読み込みに失敗しました",
+    "generation_cancelled": "生成をキャンセルしました",
+    "stream_incomplete": "ストリーミングが完了しませんでした"
   }
 }

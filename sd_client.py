@@ -404,6 +404,29 @@ class SDClient:
         except Exception as e:
             raise Exception(f"SD API error: {str(e)}")
 
+    @retry_with_backoff(max_retries=1, base_delay=2.0)
+    def interrogate(self, image_bytes: bytes, model: str = "clip") -> Optional[str]:
+        """
+        CLIP Interrogator / DeepDanbooru (WD14系タガー) で画像をキャプション・タグ化する。
+        image_bytes: 入力画像の生バイト列
+        model: "clip" または "deepdanbooru"
+        interrogateはモデルロードで遅くなることがあるため、タイムアウトは長め(60秒)に設定。
+        """
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        payload = {"image": image_b64, "model": model}
+        logger.info("interrogate start url=%s model=%s", self.base_url, model)
+        try:
+            r = requests.post(f"{self.base_url}/sdapi/v1/interrogate", json=payload, timeout=60)
+            r.raise_for_status()
+            result = r.json()
+            return result.get("caption")
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
+        except requests.exceptions.Timeout:
+            raise TimeoutError("Stable Diffusion interrogate timed out")
+        except Exception as e:
+            raise Exception(f"SD API error: {str(e)}")
+
     @retry_with_backoff(max_retries=2, base_delay=1.0)
     def get_samplers(self) -> List[str]:
         try:

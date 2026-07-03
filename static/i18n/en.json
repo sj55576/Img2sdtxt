@@ -12,7 +12,8 @@
       "img2img": "🔄 Img2Img",
       "inpaint": "🖌️ Inpaint",
       "gallery": "🗃️ Gallery",
-      "pnginfo": "🏷️ PNG Info"
+      "pnginfo": "🏷️ PNG Info",
+      "stats": "📊 Stats"
     },
     "theme": {
       "dark": "🌙 Dark",
@@ -69,6 +70,11 @@
       "clipboard_auto_title": "Load from clipboard + prompt generation + multi-model run",
       "description_label": "Image description:",
       "description_placeholder": "Describe the image you want to generate...",
+      "analysis_mode_label": "Analysis Mode",
+      "analysis_mode_llm": "LLM",
+      "analysis_mode_tagger": "Tagger",
+      "analysis_mode_hybrid": "Hybrid",
+      "tagger_model_label": "Tagger Model",
       "customize_title": "⚙️ Customize",
       "style_label": "Style",
       "tone_label": "Tone",
@@ -86,7 +92,8 @@
       "send_to_sd_btn": "🖼️ Generate with SD",
       "send_to_sd_auto_btn": "🚀 SD Auto Generate",
       "send_to_sd_multi_btn": "🔁 Multi-model Auto Generate",
-      "send_to_img2img_btn": "🔄 Send to Img2Img"
+      "send_to_img2img_btn": "🔄 Send to Img2Img",
+      "cancel_stream_btn": "⏹ Cancel"
     },
     "refine": {
       "title": "Refine Prompt",
@@ -344,6 +351,32 @@
       "send_to_sd_btn": "🖼️ Send to txt2img",
       "send_to_img2img_btn": "🔄 Send to img2img",
       "copy_prompt_btn": "📋 Copy prompt"
+    },
+    "stats": {
+      "title": "Stats",
+      "subtitle": "Dashboard for history and generated image statistics",
+      "top_n_label": "Top N",
+      "refresh_btn": "🔄 Refresh",
+      "loading": "Loading...",
+      "empty": "No statistics yet",
+      "empty_hint": "Generate some prompts to see stats here",
+      "card_total_history": "Total History",
+      "card_total_images": "Total Generated Images",
+      "card_favorite_rate": "Favorite Rate",
+      "card_avg_prompt_length": "Avg Prompt Length (chars)",
+      "card_avg_tag_count": "Avg Tag Count",
+      "tags_title": "Most Used Tags",
+      "tags_positive": "Positive",
+      "tags_negative": "Negative",
+      "tags_hint": "Click a tag to search for it on the History page",
+      "styles_title": "Style Usage",
+      "tones_title": "Tone Usage",
+      "quality_title": "Quality Level Usage",
+      "models_title": "Generations by Model",
+      "samplers_title": "Generations by Sampler",
+      "activity_title": "Daily Generation Activity (last 30 days)",
+      "weekly_title": "Weekly Summary",
+      "no_data": "No data available"
     }
   },
   "common": {
@@ -430,7 +463,8 @@
     "img2img": "Img2Img",
     "inpaint": "Inpaint",
     "gallery": "Gallery",
-    "pnginfo": "PNG Info"
+    "pnginfo": "PNG Info",
+    "stats": "Stats"
   },
   "toast": {
     "template_inserted": "Template inserted",
@@ -493,6 +527,9 @@
     "zip_download_failed": "ZIP download failed",
     "pnginfo_parse_failed": "Failed to analyze PNG info",
     "pnginfo_sent_to_sd": "Sent parameters to txt2img",
-    "pnginfo_sent_to_img2img": "Sent parameters to img2img"
+    "pnginfo_sent_to_img2img": "Sent parameters to img2img",
+    "stats_load_failed": "Failed to load statistics",
+    "generation_cancelled": "Generation cancelled",
+    "stream_incomplete": "Streaming did not complete"
   }
 }

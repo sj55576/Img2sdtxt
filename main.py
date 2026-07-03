@@ -19,7 +19,9 @@ from routes.llm import router as llm_router
 from routes.png_info import router as png_info_router
 from routes.presets import router as presets_router
 from routes.prompts import router as prompts_router
+from routes.sd import interrogate_router
 from routes.sd import router as sd_router
+from routes.stats import router as stats_router
 from routes.tags import router as tags_router
 
 logging.basicConfig(
@@ -67,12 +69,14 @@ app.mount("/outputs", StaticFiles(directory=str(outputs_dir)), name="outputs")
 app.include_router(prompts_router)
 app.include_router(history_router)
 app.include_router(sd_router)
+app.include_router(interrogate_router)
 app.include_router(presets_router)
 app.include_router(gallery_router)
 app.include_router(jobs_router)
 app.include_router(llm_router)
 app.include_router(tags_router)
 app.include_router(png_info_router)
+app.include_router(stats_router)
 
 
 # ------------------------------------------------------------------ #
