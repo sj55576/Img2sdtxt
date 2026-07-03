@@ -27,6 +27,7 @@
                 <button class="nav-btn" data-page="inpaint" data-i18n="sidebar.nav.inpaint">🖌️ Inpaint</button>
                 <button class="nav-btn" data-page="gallery" data-i18n="sidebar.nav.gallery">🗃️ Gallery</button>
                 <button class="nav-btn" data-page="pnginfo" data-i18n="sidebar.nav.pnginfo">🏷️ PNG Info</button>
+                <button class="nav-btn" data-page="stats" data-i18n="sidebar.nav.stats">📊 Stats</button>
             </nav>
             <div class="theme-toggle-wrap">
                 <button id="theme-toggle-btn" class="theme-toggle-btn" data-i18n="sidebar.theme.dark" data-i18n-title="sidebar.theme.toggle_title" title="テーマ切り替え">🌙 Dark</button>
@@ -1173,6 +1174,100 @@
                     </div>
                 </div>
             </section>
+            <!-- ======================== STATS PAGE ======================== -->
+            <section id="page-stats" class="page">
+                <div class="page-header">
+                    <h2 data-i18n="page.stats.title">Stats</h2>
+                    <p data-i18n="page.stats.subtitle">履歴と生成画像の統計ダッシュボード</p>
+                    <div class="header-actions">
+                        <label for="stats-top-n" class="stats-topn-label" data-i18n="page.stats.top_n_label">Top N</label>
+                        <input type="number" id="stats-top-n" class="stats-topn-input" min="1" max="100" value="20">
+                        <button id="refresh-stats-btn" class="btn btn-sm btn-secondary" data-i18n="page.stats.refresh_btn">🔄 更新</button>
+                    </div>
+                </div>
+                <div class="page-body">
+                    <div id="stats-loading" class="loading-box hidden">
+                        <div class="spinner"></div>
+                        <p data-i18n="page.stats.loading">読み込み中...</p>
+                    </div>
+                    <div id="stats-empty" class="empty-state hidden">
+                        <p data-i18n="page.stats.empty">まだ統計データがありません</p>
+                        <small data-i18n="page.stats.empty_hint">プロンプトを生成すると、ここに統計が表示されます</small>
+                    </div>
+                    <div id="stats-content" class="stats-content hidden">
+                        <div class="stats-summary-grid">
+                            <div class="stats-card">
+                                <div class="stats-card-value" id="stats-total-history">0</div>
+                                <div class="stats-card-label" data-i18n="page.stats.card_total_history">総履歴件数</div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-value" id="stats-total-images">0</div>
+                                <div class="stats-card-label" data-i18n="page.stats.card_total_images">総生成画像数</div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-value" id="stats-favorite-rate">0%</div>
+                                <div class="stats-card-label" data-i18n="page.stats.card_favorite_rate">お気に入り率</div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-value" id="stats-avg-prompt-length">0</div>
+                                <div class="stats-card-label" data-i18n="page.stats.card_avg_prompt_length">平均プロンプト長（文字）</div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-value" id="stats-avg-tag-count">0</div>
+                                <div class="stats-card-label" data-i18n="page.stats.card_avg_tag_count">平均タグ数</div>
+                            </div>
+                        </div>
+
+                        <div class="stats-panel">
+                            <div class="stats-panel-header">
+                                <h3 data-i18n="page.stats.tags_title">よく使うタグ</h3>
+                                <div class="stats-tag-toggle" id="stats-tag-toggle">
+                                    <button class="btn btn-sm btn-accent active" data-tag-kind="positive" data-i18n="page.stats.tags_positive">Positive</button>
+                                    <button class="btn btn-sm btn-secondary" data-tag-kind="negative" data-i18n="page.stats.tags_negative">Negative</button>
+                                </div>
+                            </div>
+                            <p class="stats-hint" data-i18n="page.stats.tags_hint">タグをクリックすると履歴ページでそのタグを検索します</p>
+                            <div id="stats-tags-chart" class="stats-bar-list"></div>
+                        </div>
+
+                        <div class="stats-panel-row">
+                            <div class="stats-panel">
+                                <h3 data-i18n="page.stats.styles_title">スタイル利用割合</h3>
+                                <div id="stats-styles-chart" class="stats-bar-list"></div>
+                            </div>
+                            <div class="stats-panel">
+                                <h3 data-i18n="page.stats.tones_title">トーン利用割合</h3>
+                                <div id="stats-tones-chart" class="stats-bar-list"></div>
+                            </div>
+                            <div class="stats-panel">
+                                <h3 data-i18n="page.stats.quality_title">品質レベル利用割合</h3>
+                                <div id="stats-quality-chart" class="stats-bar-list"></div>
+                            </div>
+                        </div>
+
+                        <div class="stats-panel-row">
+                            <div class="stats-panel">
+                                <h3 data-i18n="page.stats.models_title">モデル別生成枚数</h3>
+                                <div id="stats-models-chart" class="stats-bar-list"></div>
+                            </div>
+                            <div class="stats-panel">
+                                <h3 data-i18n="page.stats.samplers_title">サンプラー別生成枚数</h3>
+                                <div id="stats-samplers-chart" class="stats-bar-list"></div>
+                            </div>
+                        </div>
+
+                        <div class="stats-panel">
+                            <h3 data-i18n="page.stats.activity_title">日別生成アクティビティ（直近30日）</h3>
+                            <div id="stats-daily-chart" class="stats-daily-chart"></div>
+                        </div>
+
+                        <div class="stats-panel">
+                            <h3 data-i18n="page.stats.weekly_title">週別集計</h3>
+                            <div id="stats-weekly-chart" class="stats-bar-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             <!-- Gallery Image Modal -->
             <div id="gallery-modal" class="modal hidden">
@@ -1226,6 +1321,7 @@
         <button class="mobile-nav-btn" data-page="inpaint">🖌️<span data-i18n="mobile_nav.inpaint">Inpaint</span></button>
         <button class="mobile-nav-btn" data-page="gallery">🗃️<span data-i18n="mobile_nav.gallery">Gallery</span></button>
         <button class="mobile-nav-btn" data-page="pnginfo">🏷️<span data-i18n="mobile_nav.pnginfo">PNG Info</span></button>
+        <button class="mobile-nav-btn" data-page="stats">📊<span data-i18n="mobile_nav.stats">Stats</span></button>
     </nav>
 
     <!-- Keyboard Shortcuts Modal -->

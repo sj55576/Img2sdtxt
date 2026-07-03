@@ -20,6 +20,7 @@ from routes.png_info import router as png_info_router
 from routes.presets import router as presets_router
 from routes.prompts import router as prompts_router
 from routes.sd import router as sd_router
+from routes.stats import router as stats_router
 from routes.tags import router as tags_router
 
 logging.basicConfig(
@@ -73,6 +74,7 @@ app.include_router(jobs_router)
 app.include_router(llm_router)
 app.include_router(tags_router)
 app.include_router(png_info_router)
+app.include_router(stats_router)
 
 
 # ------------------------------------------------------------------ #
