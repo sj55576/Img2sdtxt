@@ -1,8 +1,9 @@
 import base64
+import json
 import logging
 import time
 from io import BytesIO
-from typing import Optional
+from typing import Iterator, Optional
 
 import requests
 from PIL import Image
@@ -27,6 +28,84 @@ class LLMClient(LLMProvider):
     @property
     def model(self) -> str:
         return self._model
+
+    def supports_streaming(self) -> bool:
+        return True
+
+    def _build_text_payload(self, prompt: str, max_tokens: int) -> dict:
+        return {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": "あなたはStable Diffusionのプロンプト生成の専門家です。"},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.7,
+            "max_tokens": max_tokens,
+            "top_p": 0.9,
+        }
+
+    def _build_image_payload(self, prompt: str, image_bytes: bytes, max_tokens: int) -> dict:
+        image_base64 = self._encode_image_to_base64(image_bytes)
+        return {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": "あなたはStable Diffusionのプロンプト生成の専門家です。"},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
+                    ],
+                },
+            ],
+            "temperature": 0.7,
+            "max_tokens": max_tokens,
+            "top_p": 0.9,
+        }
+
+    def _stream_chat(self, payload: dict, timeout: int) -> Iterator[str]:
+        """OpenAI互換の SSE ストリーミングレスポンスから content の差分を逐次 yield する"""
+        payload = {**payload, "stream": True}
+        try:
+            with requests.post(self.endpoint, json=payload, timeout=timeout, stream=True) as response:
+                response.raise_for_status()
+                for line in response.iter_lines(decode_unicode=True):
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[len("data:") :].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = chunk.get("choices") or []
+                    if not choices:
+                        continue
+                    content = (choices[0].get("delta") or {}).get("content")
+                    if content:
+                        yield content
+        except requests.exceptions.ConnectionError:
+            logger.error("Cannot connect to LLM server at %s", self.base_url)
+            raise ConnectionError(f"Cannot connect to LLM server at {self.base_url}")
+        except requests.exceptions.Timeout:
+            logger.error("LLM streaming request timed out url=%s", self.endpoint)
+            raise TimeoutError("LLM server request timed out")
+
+    def generate_response_stream(self, prompt: str, max_tokens: int = 500) -> Iterator[str]:
+        logger.debug("generate_response_stream url=%s model=%s", self.endpoint, self.model)
+        yield from self._stream_chat(self._build_text_payload(prompt, max_tokens), timeout=30)
+
+    def generate_response_with_image_stream(
+        self, prompt: str, image_bytes: bytes, max_tokens: int = 500
+    ) -> Iterator[str]:
+        logger.debug(
+            "generate_response_with_image_stream url=%s model=%s image_bytes=%d",
+            self.endpoint,
+            self.model,
+            len(image_bytes),
+        )
+        yield from self._stream_chat(self._build_image_payload(prompt, image_bytes, max_tokens), timeout=60)
 
     def _convert_webp_to_png(self, image_bytes: bytes) -> bytes:
         """WebP形式の画像をPNG形式に変換"""
@@ -76,16 +155,7 @@ class LLMClient(LLMProvider):
         logger.debug("generate_response url=%s model=%s", self.endpoint, self.model)
         t0 = time.time()
         try:
-            payload = {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": "あなたはStable Diffusionのプロンプト生成の専門家です。"},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.7,
-                "max_tokens": max_tokens,
-                "top_p": 0.9,
-            }
+            payload = self._build_text_payload(prompt, max_tokens)
 
             response = requests.post(self.endpoint, json=payload, timeout=30)
             response.raise_for_status()
@@ -118,24 +188,7 @@ class LLMClient(LLMProvider):
         )
         t0 = time.time()
         try:
-            image_base64 = self._encode_image_to_base64(image_bytes)
-
-            payload = {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": "あなたはStable Diffusionのプロンプト生成の専門家です。"},
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
-                        ],
-                    },
-                ],
-                "temperature": 0.7,
-                "max_tokens": max_tokens,
-                "top_p": 0.9,
-            }
+            payload = self._build_image_payload(prompt, image_bytes, max_tokens)
 
             response = requests.post(self.endpoint, json=payload, timeout=60)
             response.raise_for_status()

@@ -1,9 +1,12 @@
 """Prompt generation endpoints."""
 
-from typing import List
+import json
+import logging
+from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.concurrency import run_in_threadpool
+from fastapi.concurrency import iterate_in_threadpool, run_in_threadpool
+from fastapi.responses import StreamingResponse
 
 import deps
 import history as hist
@@ -11,6 +14,8 @@ import presets as preset_mgr
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import _validate_image_bytes
 from models import RefinePromptRequest, TextPromptRequest
+
+logger = logging.getLogger("img2sdtxt.prompts")
 
 router = APIRouter(prefix="/api", tags=["prompts"])
 
@@ -82,6 +87,131 @@ async def generate_prompts(
     if history_id is not None:
         response["history_id"] = history_id
     return response
+
+
+# ------------------------------------------------------------------ #
+# Prompt Generation (streaming / SSE)
+# ------------------------------------------------------------------ #
+
+
+def _sse_event(event: str, data: dict) -> str:
+    """SSE 1イベント分の文字列を組み立てる"""
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@router.post("/generate-prompts-stream")
+async def generate_prompts_stream(
+    file: Optional[UploadFile] = File(None),
+    description: str = Form(""),
+    style: str = Form(""),
+    tone: str = Form(""),
+    quality: str = Form("high"),
+    preset_id: str = Form(""),
+    save_history: bool = Form(True),
+):
+    """プロンプト生成を SSE でストリーミングする。
+
+    画像 (file) またはテキスト (description) のどちらかを入力とする。
+    イベント: start → token* → done、エラー時は error。
+    非ストリーミング対応プロバイダーは基底クラスのフォールバックにより一括1チャンクで届く。
+    """
+    contents: Optional[bytes] = None
+    image_name = "[text input]"
+    if file is not None and file.filename:
+        if file.content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail="Invalid image type.")
+        contents = await file.read()
+        if len(contents) > MAX_IMAGE_SIZE:
+            raise HTTPException(status_code=400, detail="Image too large (max 10MB).")
+        _validate_image_bytes(contents)
+        image_name = file.filename
+
+    desc = description.strip()
+    if contents is None and not desc:
+        raise HTTPException(status_code=400, detail="Either an image file or a description is required.")
+
+    preset = preset_mgr.get_preset(preset_id) if preset_id else None
+    suffix_pos = preset.get("positive_suffix", "") if preset else ""
+    suffix_neg = preset.get("negative_suffix", "") if preset else ""
+    eff_style = style or (preset.get("style", "") if preset else "")
+    eff_tone = tone or (preset.get("tone", "") if preset else "")
+    eff_quality = quality or (preset.get("quality", "high") if preset else "high")
+
+    provider = deps.llm_client
+    generator = deps.prompt_generator
+    prov_name = provider.provider_name
+    mdl = provider.model
+
+    cache_image = contents
+    cache_text = None if contents is not None else desc
+    cached = deps.llm_cache.get(
+        cache_image, cache_text, eff_style, eff_tone, eff_quality, provider=prov_name, model=mdl
+    )
+
+    async def event_stream():
+        yield _sse_event("start", {"provider": prov_name, "model": mdl, "cached": cached is not None})
+
+        if cached is not None:
+            result = cached
+        else:
+            if contents is not None:
+                prompt = generator.build_image_analysis_prompt(eff_style, eff_tone, eff_quality)
+                chunk_iter = provider.generate_response_with_image_stream(prompt, contents)
+            else:
+                prompt = generator.build_text_prompt(desc, eff_style, eff_tone, eff_quality)
+                chunk_iter = provider.generate_response_stream(prompt)
+
+            parts: List[str] = []
+            try:
+                async for chunk in iterate_in_threadpool(chunk_iter):
+                    parts.append(chunk)
+                    yield _sse_event("token", {"text": chunk})
+            except Exception as e:
+                logger.error("generate_prompts_stream error: %s", str(e))
+                yield _sse_event("error", {"error": str(e)})
+                return
+
+            full_text = "".join(parts)
+            if not full_text:
+                yield _sse_event("error", {"error": "LLMからレスポンスがありません"})
+                return
+
+            result = generator.finalize_response(full_text, suffix_pos, suffix_neg)
+            if result.get("status") == "success":
+                deps.llm_cache.set(
+                    cache_image, cache_text, eff_style, eff_tone, eff_quality, result,
+                    provider=prov_name, model=mdl,
+                )
+
+        if result.get("status") == "error":
+            yield _sse_event("error", {"error": result.get("error", "unknown error")})
+            return
+
+        history_id = None
+        if save_history:
+            history_id = hist.save_history(
+                positive=result["positive"],
+                negative=result["negative"],
+                image_name=image_name,
+                style=style,
+                tone=tone,
+                quality=quality,
+            )
+
+        done: dict = {
+            "positive": result["positive"],
+            "negative": result["negative"],
+            "cached": cached is not None,
+        }
+        if history_id is not None:
+            done["history_id"] = history_id
+        yield _sse_event("done", done)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ------------------------------------------------------------------ #

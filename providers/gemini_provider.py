@@ -3,7 +3,7 @@
 import logging
 import time
 from io import BytesIO
-from typing import Optional
+from typing import Iterator, Optional
 
 import google.generativeai as genai
 from PIL import Image
@@ -126,3 +126,49 @@ class GeminiProvider(LLMProvider):
 
     def supports_vision(self) -> bool:
         return True
+
+    def supports_streaming(self) -> bool:
+        return True
+
+    def _stream_content(self, contents, max_tokens: int) -> Iterator[str]:
+        """generate_content(stream=True) からテキスト差分を逐次 yield する"""
+        generation_config = genai.types.GenerationConfig(
+            max_output_tokens=max_tokens,
+            temperature=0.7,
+            top_p=0.9,
+        )
+        try:
+            response = self._model.generate_content(
+                contents,
+                generation_config=generation_config,
+                stream=True,
+            )
+            for chunk in response:
+                try:
+                    text = chunk.text
+                except ValueError:
+                    # テキストを持たないチャンク（安全性ブロック等）はスキップ
+                    continue
+                if text:
+                    yield text
+        except (ConnectionError, TimeoutError):
+            logger.error("Gemini streaming connection error model=%s", self._model_name)
+            raise
+        except Exception as e:
+            logger.error("Gemini API streaming error: %s", str(e))
+            raise Exception(f"Gemini API error: {str(e)}")
+
+    def generate_response_stream(self, prompt: str, max_tokens: int = 500) -> Iterator[str]:
+        logger.debug("generate_response_stream model=%s", self._model_name)
+        yield from self._stream_content(prompt, max_tokens)
+
+    def generate_response_with_image_stream(
+        self, prompt: str, image_bytes: bytes, max_tokens: int = 500
+    ) -> Iterator[str]:
+        logger.debug(
+            "generate_response_with_image_stream model=%s image_bytes=%d",
+            self._model_name,
+            len(image_bytes),
+        )
+        image = Image.open(BytesIO(image_bytes))
+        yield from self._stream_content([prompt, image], max_tokens)

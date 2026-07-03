@@ -3,7 +3,7 @@
 import base64
 import logging
 import time
-from typing import Literal, Optional, Union
+from typing import Iterator, Literal, Optional, Union
 
 import anthropic
 from anthropic.types import ImageBlockParam, TextBlock, TextBlockParam
@@ -57,6 +57,59 @@ class AnthropicProvider(LLMProvider):
 
     def supports_vision(self) -> bool:
         return True
+
+    def supports_streaming(self) -> bool:
+        return True
+
+    @staticmethod
+    def _build_image_content(prompt: str, image_bytes: bytes) -> list[Union[ImageBlockParam, TextBlockParam]]:
+        media_type = _detect_media_type(image_bytes)
+        base64_data = base64.b64encode(image_bytes).decode("utf-8")
+        return [
+            ImageBlockParam(
+                type="image",
+                source={
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": base64_data,
+                },
+            ),
+            TextBlockParam(type="text", text=prompt),
+        ]
+
+    def _stream_messages(self, content, max_tokens: int, timeout: Optional[float] = None) -> Iterator[str]:
+        """messages.stream でテキスト差分を逐次 yield する"""
+        try:
+            client = self.client.with_options(timeout=timeout) if timeout is not None else self.client
+            with client.messages.stream(
+                model=self._model,
+                max_tokens=max_tokens,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": content}],
+                temperature=0.7,
+                top_p=0.9,
+            ) as stream:
+                yield from stream.text_stream
+        except anthropic.APIConnectionError:
+            logger.error("Cannot connect to Anthropic API")
+            raise ConnectionError("Cannot connect to Anthropic API")
+        except anthropic.APITimeoutError:
+            logger.error("Anthropic API streaming request timed out model=%s", self._model)
+            raise TimeoutError("Anthropic API request timed out")
+
+    def generate_response_stream(self, prompt: str, max_tokens: int = 500) -> Iterator[str]:
+        logger.debug("generate_response_stream model=%s", self._model)
+        yield from self._stream_messages(prompt, max_tokens)
+
+    def generate_response_with_image_stream(
+        self, prompt: str, image_bytes: bytes, max_tokens: int = 500
+    ) -> Iterator[str]:
+        logger.debug(
+            "generate_response_with_image_stream model=%s image_bytes=%d",
+            self._model,
+            len(image_bytes),
+        )
+        yield from self._stream_messages(self._build_image_content(prompt, image_bytes), max_tokens, timeout=60)
 
     @retry_with_backoff(max_retries=1, base_delay=0.5)
     def is_available(self) -> bool:
@@ -118,20 +171,7 @@ class AnthropicProvider(LLMProvider):
         )
         t0 = time.time()
         try:
-            media_type = _detect_media_type(image_bytes)
-            base64_data = base64.b64encode(image_bytes).decode("utf-8")
-
-            content: list[Union[ImageBlockParam, TextBlockParam]] = [
-                ImageBlockParam(
-                    type="image",
-                    source={
-                        "type": "base64",
-                        "media_type": media_type,
-                        "data": base64_data,
-                    },
-                ),
-                TextBlockParam(type="text", text=prompt),
-            ]
+            content = self._build_image_content(prompt, image_bytes)
 
             response = self.client.messages.create(
                 model=self._model,

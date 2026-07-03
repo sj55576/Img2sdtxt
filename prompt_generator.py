@@ -58,22 +58,12 @@ class PromptGenerator:
             raise ValueError("LLMからレスポンスがありません")
         return self._parse_json_response(response_text)
 
-    def generate_prompts(
-        self,
-        image_bytes: bytes,
-        style: str = "",
-        tone: str = "",
-        quality: str = "high",
-        preset_suffix_positive: str = "",
-        preset_suffix_negative: str = "",
-    ) -> Dict[str, str]:
-        """画像からポジティブ・ネガティブプロンプトを生成"""
-        logger.info("generate_prompts start style=%s tone=%s quality=%s", style, tone, quality)
-        try:
-            style_instruction = self._build_style_instruction(style, tone, quality)
-            customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
+    def build_image_analysis_prompt(self, style: str = "", tone: str = "", quality: str = "high") -> str:
+        """画像分析用のLLMプロンプトを構築（ストリーミングエンドポイントからも利用）"""
+        style_instruction = self._build_style_instruction(style, tone, quality)
+        customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
 
-            analysis_prompt = f"""提供された画像を分析して、Stable Diffusion用のプロンプトを生成してください。{customization}
+        return f"""提供された画像を分析して、Stable Diffusion用のプロンプトを生成してください。{customization}
 
 JSON形式のみで返してください：
 {{
@@ -86,11 +76,32 @@ JSON形式のみで返してください：
 
 注意: JSONのみ返してください。"""
 
-            response_text = self.llm_client.generate_response_with_image(analysis_prompt, image_bytes)
-            if not response_text:
-                raise ValueError("LLMからレスポンスがありません")
-            result = self._parse_json_response(response_text)
+    def build_text_prompt(self, description: str, style: str = "", tone: str = "", quality: str = "high") -> str:
+        """テキスト説明からのプロンプト生成用LLMプロンプトを構築（ストリーミングエンドポイントからも利用）"""
+        style_instruction = self._build_style_instruction(style, tone, quality)
+        customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
 
+        return f"""以下の説明に基づいてStable Diffusion用のプロンプトを生成してください。
+
+説明: {description}{customization}
+
+JSON形式のみで返してください：
+{{
+  "positive": "ポジティブプロンプト (英語のカンマ区切りタグ形式)",
+  "negative": "ネガティブプロンプト (英語のカンマ区切りタグ形式)"
+}}
+
+注意: JSONのみ返してください。"""
+
+    def finalize_response(
+        self,
+        response_text: str,
+        preset_suffix_positive: str = "",
+        preset_suffix_negative: str = "",
+    ) -> Dict[str, str]:
+        """生のLLM応答をパースし、プリセットサフィックスを適用して最終結果を組み立てる"""
+        try:
+            result = self._parse_json_response(response_text)
             positive = result.get("positive", "")
             negative = result.get("negative", "")
 
@@ -99,12 +110,36 @@ JSON形式のみで返してください：
             if preset_suffix_negative:
                 negative = f"{negative}, {preset_suffix_negative}"
 
-            logger.info("generate_prompts done")
             return {"positive": positive, "negative": negative, "status": "success"}
-
         except json.JSONDecodeError as e:
-            logger.error("generate_prompts JSON parse error: %s", str(e))
+            logger.error("finalize_response JSON parse error: %s", str(e))
             return {"positive": "", "negative": "", "error": f"JSON parse error: {str(e)}", "status": "error"}
+        except Exception as e:
+            logger.error("finalize_response error: %s", str(e))
+            return {"positive": "", "negative": "", "error": str(e), "status": "error"}
+
+    def generate_prompts(
+        self,
+        image_bytes: bytes,
+        style: str = "",
+        tone: str = "",
+        quality: str = "high",
+        preset_suffix_positive: str = "",
+        preset_suffix_negative: str = "",
+    ) -> Dict[str, str]:
+        """画像からポジティブ・ネガティブプロンプトを生成"""
+        logger.info("generate_prompts start style=%s tone=%s quality=%s", style, tone, quality)
+        try:
+            analysis_prompt = self.build_image_analysis_prompt(style, tone, quality)
+            response_text = self.llm_client.generate_response_with_image(analysis_prompt, image_bytes)
+            if not response_text:
+                raise ValueError("LLMからレスポンスがありません")
+
+            result = self.finalize_response(response_text, preset_suffix_positive, preset_suffix_negative)
+            if result.get("status") == "success":
+                logger.info("generate_prompts done")
+            return result
+
         except Exception as e:
             logger.error("generate_prompts error: %s", str(e))
             return {"positive": "", "negative": "", "error": str(e), "status": "error"}
@@ -170,32 +205,15 @@ JSON形式のみで返してください：
         """テキスト説明からプロンプトを生成"""
         logger.info("generate_prompts_text_only start style=%s tone=%s quality=%s", style, tone, quality)
         try:
-            style_instruction = self._build_style_instruction(style, tone, quality)
-            customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
+            prompt = self.build_text_prompt(description, style, tone, quality)
+            response_text = self.llm_client.generate_response(prompt)
+            if not response_text:
+                raise ValueError("LLMからレスポンスがありません")
 
-            prompt = f"""以下の説明に基づいてStable Diffusion用のプロンプトを生成してください。
-
-説明: {description}{customization}
-
-JSON形式のみで返してください：
-{{
-  "positive": "ポジティブプロンプト (英語のカンマ区切りタグ形式)",
-  "negative": "ネガティブプロンプト (英語のカンマ区切りタグ形式)"
-}}
-
-注意: JSONのみ返してください。"""
-
-            result = self._call_llm(prompt)
-            positive = result.get("positive", "")
-            negative = result.get("negative", "")
-
-            if preset_suffix_positive:
-                positive = f"{positive}, {preset_suffix_positive}"
-            if preset_suffix_negative:
-                negative = f"{negative}, {preset_suffix_negative}"
-
-            logger.info("generate_prompts_text_only done")
-            return {"positive": positive, "negative": negative, "status": "success"}
+            result = self.finalize_response(response_text, preset_suffix_positive, preset_suffix_negative)
+            if result.get("status") == "success":
+                logger.info("generate_prompts_text_only done")
+            return result
 
         except Exception as e:
             logger.error("generate_prompts_text_only error: %s", str(e))
