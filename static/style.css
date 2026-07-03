@@ -1464,3 +1464,26 @@ kbd {
     .stats-bar-row { grid-template-columns: minmax(70px, 110px) 1fr auto; }
     .stats-daily-chart { height: 120px; }
 }
+
+/* =====================================================================
+   Streaming preview (SSE prompt generation)
+   ===================================================================== */
+.stream-preview {
+    margin-top: 16px;
+    padding: 12px 14px;
+    max-height: 220px;
+    overflow-y: auto;
+    text-align: left;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    background: var(--prompt-ta-bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+}
+.stream-preview.hidden { display: none; }
+#cancel-stream-btn { margin-top: 12px; }
+#cancel-stream-btn.hidden { display: none; }

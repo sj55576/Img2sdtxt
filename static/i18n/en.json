@@ -92,7 +92,8 @@
       "send_to_sd_btn": "🖼️ Generate with SD",
       "send_to_sd_auto_btn": "🚀 SD Auto Generate",
       "send_to_sd_multi_btn": "🔁 Multi-model Auto Generate",
-      "send_to_img2img_btn": "🔄 Send to Img2Img"
+      "send_to_img2img_btn": "🔄 Send to Img2Img",
+      "cancel_stream_btn": "⏹ Cancel"
     },
     "refine": {
       "title": "Refine Prompt",
@@ -527,6 +528,8 @@
     "pnginfo_parse_failed": "Failed to analyze PNG info",
     "pnginfo_sent_to_sd": "Sent parameters to txt2img",
     "pnginfo_sent_to_img2img": "Sent parameters to img2img",
-    "stats_load_failed": "Failed to load statistics"
+    "stats_load_failed": "Failed to load statistics",
+    "generation_cancelled": "Generation cancelled",
+    "stream_incomplete": "Streaming did not complete"
   }
 }

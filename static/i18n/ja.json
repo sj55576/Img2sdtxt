@@ -92,7 +92,8 @@
       "send_to_sd_btn": "🖼️ SDで生成",
       "send_to_sd_auto_btn": "🚀 SD自動生成",
       "send_to_sd_multi_btn": "🔁 マルチモデル自動生成",
-      "send_to_img2img_btn": "🔄 Img2Imgへ"
+      "send_to_img2img_btn": "🔄 Img2Imgへ",
+      "cancel_stream_btn": "⏹ キャンセル"
     },
     "refine": {
       "title": "Refine Prompt",
@@ -527,6 +528,8 @@
     "pnginfo_parse_failed": "PNG情報の解析に失敗しました",
     "pnginfo_sent_to_sd": "txt2imgにパラメータを送りました",
     "pnginfo_sent_to_img2img": "img2imgにパラメータを送りました",
-    "stats_load_failed": "統計の読み込みに失敗しました"
+    "stats_load_failed": "統計の読み込みに失敗しました",
+    "generation_cancelled": "生成をキャンセルしました",
+    "stream_incomplete": "ストリーミングが完了しませんでした"
   }
 }

@@ -676,6 +676,9 @@ function setupGeneratePage() {
     document.getElementById('select-analysis-mode').addEventListener('change', updateAnalysisModeUI);
     updateAnalysisModeUI();
 
+    // ストリーミング生成のキャンセル（接続切断でサーバー側の生成も中断される）
+    document.getElementById('cancel-stream-btn')?.addEventListener('click', () => streamAbort?.abort());
+
     // Result actions
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', () => copyText(btn.dataset.target, btn));
@@ -733,6 +736,87 @@ function updateAnalysisModeUI() {
     if (taggerGroup) taggerGroup.classList.toggle('hidden', mode === 'llm');
 }
 
+// SSE ストリーミング生成のキャンセル用 AbortController
+let streamAbort = null;
+
+function _parseSSEBlock(block) {
+    let event = null;
+    let dataLine = null;
+    for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataLine = line.slice(5).trim();
+    }
+    if (!event || dataLine === null) return null;
+    try {
+        return { event, data: JSON.parse(dataLine) };
+    } catch (e) {
+        return null;
+    }
+}
+
+// /api/generate-prompts-stream を叩き、token イベントをタイプライター表示する。
+// 戻り値: done イベントのデータ。エンドポイント未対応(404/405・ネットワーク層失敗)は
+// null を返し、呼び出し元が従来の一括エンドポイントへフォールバックする。
+async function generatePromptViaStream({ isImageTab, style, tone, quality, presetId }) {
+    const fd = new FormData();
+    if (isImageTab) {
+        fd.append('file', selectedImage);
+    } else {
+        fd.append('description', document.getElementById('description-input').value.trim());
+    }
+    fd.append('style', style);
+    fd.append('tone', tone);
+    fd.append('quality', quality);
+    fd.append('preset_id', presetId);
+
+    streamAbort = new AbortController();
+    let r;
+    try {
+        r = await fetch('/api/generate-prompts-stream', { method: 'POST', body: fd, signal: streamAbort.signal });
+    } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        return null; // ネットワーク層の失敗 → 従来エンドポイントにフォールバック
+    }
+    if (r.status === 404 || r.status === 405) return null; // 旧サーバー → フォールバック
+    if (!r.ok) throw new Error((await r.json()).detail || '生成に失敗しました');
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('text/event-stream') || !r.body) return null;
+
+    const preview = document.getElementById('stream-preview');
+    const cancelBtn = document.getElementById('cancel-stream-btn');
+    preview.textContent = '';
+    preview.classList.remove('hidden');
+    cancelBtn.classList.remove('hidden');
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let doneData = null;
+    let errMsg = null;
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx;
+        while ((idx = buf.indexOf('\n\n')) !== -1) {
+            const evt = _parseSSEBlock(buf.slice(0, idx));
+            buf = buf.slice(idx + 2);
+            if (!evt) continue;
+            if (evt.event === 'token') {
+                preview.textContent += evt.data.text;
+                preview.scrollTop = preview.scrollHeight;
+            } else if (evt.event === 'done') {
+                doneData = evt.data;
+            } else if (evt.event === 'error') {
+                errMsg = evt.data.error;
+            }
+        }
+    }
+    if (errMsg) throw new Error(errMsg);
+    if (!doneData) throw new Error(I18n.t('toast.stream_incomplete') || 'ストリーミングが完了しませんでした');
+    return doneData;
+}
+
 async function generatePrompt() {
     const loading = document.getElementById('loading-generate');
     const resultBox = document.getElementById('result-box');
@@ -753,31 +837,43 @@ async function generatePrompt() {
         analysis_mode: analysisMode, tagger_model: taggerModel
     });
 
+    const isImageTab = currentTab === 'tab-img';
+
     try {
-        let data;
-        if (currentTab === 'tab-img') {
-            const fd = new FormData();
-            fd.append('file', selectedImage);
-            fd.append('style', style);
-            fd.append('tone', tone);
-            fd.append('quality', quality);
-            fd.append('preset_id', presetId);
-            fd.append('analysis_mode', analysisMode);
-            fd.append('tagger_model', taggerModel);
-            const r = await fetch('/api/generate-prompts', { method: 'POST', body: fd });
-            if (!r.ok) throw new Error((await r.json()).detail);
-            data = (await r.json()).data;
-        } else {
-            const r = await fetch('/api/generate-prompts-text', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    description: document.getElementById('description-input').value.trim(),
-                    style, tone, quality, preset_id: presetId
-                })
-            });
-            if (!r.ok) throw new Error((await r.json()).detail);
-            data = (await r.json()).data;
+        let data = null;
+
+        // LLM モードは SSE ストリーミングで逐次表示（tagger/hybrid はストリーム非対応）
+        const canStream = !isImageTab || analysisMode === 'llm';
+        if (canStream) {
+            data = await generatePromptViaStream({ isImageTab, style, tone, quality, presetId });
+        }
+
+        if (data === null) {
+            // ストリーム非対応モード or ストリームエンドポイント未到達時の一括生成
+            if (isImageTab) {
+                const fd = new FormData();
+                fd.append('file', selectedImage);
+                fd.append('style', style);
+                fd.append('tone', tone);
+                fd.append('quality', quality);
+                fd.append('preset_id', presetId);
+                fd.append('analysis_mode', analysisMode);
+                fd.append('tagger_model', taggerModel);
+                const r = await fetch('/api/generate-prompts', { method: 'POST', body: fd });
+                if (!r.ok) throw new Error((await r.json()).detail);
+                data = (await r.json()).data;
+            } else {
+                const r = await fetch('/api/generate-prompts-text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        description: document.getElementById('description-input').value.trim(),
+                        style, tone, quality, preset_id: presetId
+                    })
+                });
+                if (!r.ok) throw new Error((await r.json()).detail);
+                data = (await r.json()).data;
+            }
         }
 
         document.getElementById('pos-prompt').value = data.positive;
@@ -787,9 +883,16 @@ async function generatePrompt() {
         resultBox.classList.remove('hidden');
         toast('プロンプト生成完了！', 'success');
     } catch (e) {
-        toast(e.message || '生成に失敗しました', 'error');
+        if (e.name === 'AbortError') {
+            toast(I18n.t('toast.generation_cancelled') || '生成をキャンセルしました', 'info');
+        } else {
+            toast(e.message || '生成に失敗しました', 'error');
+        }
     } finally {
         loading.classList.add('hidden');
+        document.getElementById('stream-preview')?.classList.add('hidden');
+        document.getElementById('cancel-stream-btn')?.classList.add('hidden');
+        streamAbort = null;
     }
 }
 
