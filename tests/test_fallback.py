@@ -244,7 +244,9 @@ class TestFallbackChainStreaming:
         assert a.generate_calls == 1
 
     def test_falls_back_to_generate_response_when_stream_raises(self):
-        a = FakeProvider("a", streaming=True, raise_on_stream=ConnectionError("stream-down"), text_response="fallback-text")
+        a = FakeProvider(
+            "a", streaming=True, raise_on_stream=ConnectionError("stream-down"), text_response="fallback-text"
+        )
         chain = FallbackChain([a])
 
         chunks = list(chain.generate_response_stream("prompt"))
