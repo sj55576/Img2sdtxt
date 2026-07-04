@@ -21,6 +21,29 @@ def list_providers():
             "model": deps.llm_client.model,
         },
         "providers": providers,
+        "fallback": {
+            "enabled": deps.fallback_chain is not None,
+            "chain": [p.provider_name for p in deps.fallback_chain.providers] if deps.fallback_chain else [],
+            "last_used": deps.fallback_chain.last_used_provider if deps.fallback_chain else None,
+        },
+    }
+
+
+@router.get("/health")
+def provider_health():
+    """Return health status of all configured providers."""
+    statuses = deps.health_monitor.get_status() if deps.health_monitor else {}
+    return {
+        "providers": {
+            name: {
+                "status": status.status,
+                "last_check": status.last_check.isoformat(),
+                "response_time_ms": status.response_time_ms,
+            }
+            for name, status in statuses.items()
+        },
+        "fallback_chain": [p.provider_name for p in deps.fallback_chain.providers] if deps.fallback_chain else [],
+        "active_provider": deps.llm_client.provider_name,
     }
 
 
