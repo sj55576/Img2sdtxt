@@ -35,9 +35,44 @@ def get_history(
     return {"success": True, "items": items, "total": total}
 
 
+def _xlsx_cell_value(value):
+    """openpyxl only accepts scalar values — coerce lists/dicts/None to strings."""
+    if value is None:
+        return ""
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def _build_history_workbook(items: list) -> bytes:
+    """Build an xlsx workbook from history items and return its bytes."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "History"
+
+    if items:
+        fieldnames = list(items[0].keys())
+        ws.append(fieldnames)
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+        for item in items:
+            ws.append([_xlsx_cell_value(item.get(key)) for key in fieldnames])
+
+    buffer = _io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
 @router.get("/history/export")
 async def export_history(format: str = "json"):
-    """Download all history as JSON or CSV."""
+    """Download all history as JSON, CSV, or XLSX."""
     items = await run_in_threadpool(hist.get_history, limit=None, offset=0)
 
     if format == "csv":
@@ -51,6 +86,13 @@ async def export_history(format: str = "json"):
             content=output.getvalue(),
             media_type="text/csv",
             headers={"Content-Disposition": 'attachment; filename="prompt_history.csv"'},
+        )
+    elif format == "xlsx":
+        content = await run_in_threadpool(_build_history_workbook, items)
+        return Response(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="prompt_history.xlsx"'},
         )
     else:
         return Response(

@@ -1,13 +1,18 @@
 """tests/test_history.py — 一時 SQLite DB を使った history モジュールの CRUD テスト"""
 
+import io
 import sys
 from pathlib import Path
 
+import openpyxl
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import history as hist
+import routes.history as history_routes  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -16,6 +21,15 @@ def temp_db(tmp_path, monkeypatch):
     db_file = tmp_path / "test_history.db"
     monkeypatch.setattr(hist, "DB_PATH", db_file)
     yield db_file
+
+
+@pytest.fixture
+def client():
+    """/api/history/export 等のルートをテストするための TestClient"""
+    app = FastAPI()
+    app.include_router(history_routes.router)
+    with TestClient(app) as c:
+        yield c
 
 
 # ------------------------------------------------------------------ #
@@ -229,3 +243,49 @@ def test_delete_history_cascades_tags():
     hist.add_tags(rowid, ["portrait"])
     hist.delete_history_item(rowid)
     assert hist.get_tags(rowid) == []
+
+
+# ------------------------------------------------------------------ #
+# Export — XLSX
+# ------------------------------------------------------------------ #
+
+XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def test_export_xlsx_returns_200_with_correct_headers(client):
+    hist.save_history(positive="1girl, cute", negative="blurry")
+    response = client.get("/api/history/export", params={"format": "xlsx"})
+    assert response.status_code == 200
+    assert response.headers["content-type"] == XLSX_MEDIA_TYPE
+    assert response.headers["content-disposition"] == 'attachment; filename="prompt_history.xlsx"'
+
+
+def test_export_xlsx_workbook_matches_history(client):
+    r1 = hist.save_history(positive="1girl, cute", negative="blurry", image_name="a.png")
+    hist.save_history(positive="landscape", negative="ugly", image_name="b.png")
+    hist.add_tags(r1, ["portrait", "anime"])
+
+    items = hist.get_history(limit=None)
+    response = client.get("/api/history/export", params={"format": "xlsx"})
+    assert response.status_code == 200
+
+    wb = openpyxl.load_workbook(io.BytesIO(response.content))
+    ws = wb["History"]
+    rows = list(ws.iter_rows(values_only=True))
+
+    expected_header = list(items[0].keys())
+    assert list(rows[0]) == expected_header
+    assert len(rows) - 1 == len(items)  # header + one row per item
+
+    tags_col = expected_header.index("tags")
+    row_by_id = {row[expected_header.index("id")]: row for row in rows[1:]}
+    assert row_by_id[r1][tags_col] == "anime, portrait"
+
+
+def test_export_xlsx_empty_history_returns_valid_workbook(client):
+    response = client.get("/api/history/export", params={"format": "xlsx"})
+    assert response.status_code == 200
+    wb = openpyxl.load_workbook(io.BytesIO(response.content))
+    ws = wb["History"]
+    assert ws.max_row == 1
+    assert ws["A1"].value is None

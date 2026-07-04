@@ -303,7 +303,7 @@ Img2sdtxt/
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/history` | List history (`limit`, `offset`, `search`, `style`, `quality`, `favorites_only`) |
-| `GET` | `/api/history/export` | Download all history as JSON |
+| `GET` | `/api/history/export` | Download all history as JSON, CSV, or XLSX (`format`) |
 | `PUT` | `/api/history/{id}/favorite` | Toggle favorite on a history entry |
 | `DELETE` | `/api/history/{id}` | Delete one entry |
 | `DELETE` | `/api/history` | Clear all history |

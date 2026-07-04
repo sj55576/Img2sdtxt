@@ -237,7 +237,7 @@ Img2sdtxt/
 | メソッド | パス | 説明 |
 |---------|------|------|
 | `GET` | `/api/history` | 履歴一覧（`limit`・`offset`・`search`・`style`・`quality`・`favorites_only`対応） |
-| `GET` | `/api/history/export` | 全履歴をJSONとしてダウンロード |
+| `GET` | `/api/history/export` | 全履歴をJSON・CSV・XLSXとしてダウンロード（`format`） |
 | `PUT` | `/api/history/{id}/favorite` | お気に入りのトグル |
 | `DELETE` | `/api/history/{id}` | 特定エントリを削除 |
 | `DELETE` | `/api/history` | 全履歴を削除 |
