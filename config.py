@@ -42,6 +42,10 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
+# Fallback Configuration
+LLM_FALLBACK_CHAIN = os.getenv("LLM_FALLBACK_CHAIN", "")  # comma-separated provider IDs
+LLM_HEALTH_CHECK_INTERVAL = int(os.getenv("LLM_HEALTH_CHECK_INTERVAL", "60"))
+
 # Rate Limiting
 RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
 RATE_LIMIT_GENERATION = int(os.getenv("RATE_LIMIT_GENERATION", "10"))  # requests per minute

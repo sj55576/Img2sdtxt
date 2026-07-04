@@ -23,6 +23,7 @@ from routes.sd import interrogate_router
 from routes.sd import router as sd_router
 from routes.stats import router as stats_router
 from routes.tags import router as tags_router
+from routes.wildcards import router as wildcards_router
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
@@ -77,6 +78,7 @@ app.include_router(llm_router)
 app.include_router(tags_router)
 app.include_router(png_info_router)
 app.include_router(stats_router)
+app.include_router(wildcards_router)
 
 
 # ------------------------------------------------------------------ #

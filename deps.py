@@ -10,6 +10,8 @@ from PIL import Image
 
 import config
 from cache import LLMCache
+from fallback import FallbackChain
+from health_monitor import HealthMonitor
 from llm_client import LLMClient
 from llm_provider import LLMProvider
 from prompt_generator import PromptGenerator
@@ -52,10 +54,43 @@ def create_llm_provider(
         return LLMClient(base_url=base_url, model=mdl)
 
 
+def _build_fallback_chain(chain_config: str) -> Optional[FallbackChain]:
+    """LLM_FALLBACK_CHAIN (comma-separated provider IDs) からプロバイダーを組み立てる。
+
+    APIキー未設定などで生成に失敗したプロバイダーはスキップする。
+    """
+    provider_ids = [p.strip() for p in chain_config.split(",") if p.strip()]
+    providers: list[LLMProvider] = []
+    for provider_id in provider_ids:
+        try:
+            providers.append(create_llm_provider(provider=provider_id))
+        except Exception as e:
+            logger.warning("Skipping fallback provider '%s': %s", provider_id, e)
+
+    if not providers:
+        return None
+    return FallbackChain(providers)
+
+
 llm_client: LLMProvider = create_llm_provider()
 prompt_generator = PromptGenerator(llm_client)
 sd_client = SDClient()
 llm_cache = LLMCache(ttl_seconds=config.LLM_CACHE_TTL, enabled=config.LLM_CACHE_ENABLED)
+
+fallback_chain: Optional[FallbackChain] = None
+health_monitor: Optional[HealthMonitor] = None
+
+if config.LLM_FALLBACK_CHAIN:
+    fallback_chain = _build_fallback_chain(config.LLM_FALLBACK_CHAIN)
+    if fallback_chain is not None:
+        llm_client = fallback_chain
+        prompt_generator = PromptGenerator(fallback_chain)
+
+        health_monitor = HealthMonitor(
+            {p.provider_name: p for p in fallback_chain.providers},
+            check_interval=config.LLM_HEALTH_CHECK_INTERVAL,
+        )
+        health_monitor.start()
 
 
 def switch_provider(

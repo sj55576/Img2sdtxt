@@ -67,3 +67,20 @@ class SwitchProviderRequest(BaseModel):
     provider: str
     model: str = ""
     api_key: str = ""
+
+
+class CreateWildcardRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
+    entries: list[str] = Field(..., min_length=1)
+
+
+class UpdateWildcardRequest(BaseModel):
+    entries: list[str] = Field(..., min_length=1)
+
+
+class ExpandPromptRequest(BaseModel):
+    template: str = Field(..., min_length=1, max_length=10000)
+    mode: str = Field("random", pattern=r"^(random|combinatorial|preview)$")
+    count: int = Field(5, ge=1, le=100)
+    seed: Optional[int] = Field(None)
+    max_combinations: int = Field(100, ge=1, le=1000)

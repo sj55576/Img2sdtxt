@@ -195,9 +195,12 @@ document.addEventListener('DOMContentLoaded', () => {
     _setup('gallery', setupGalleryPage);
     _setup('pnginfo', setupPngInfoPage);
     _setup('stats', setupStatsPage);
+    _setup('wildcards', setupWildcardsPage);
     _setup('weightEditors', setupWeightEditors);
     checkStatus();
     loadProviders();
+    checkProviderHealth();
+    setInterval(checkProviderHealth, 30000);
 
     document.getElementById('llm-provider-select')?.addEventListener('change', function() {
         updateProviderUI();
@@ -454,6 +457,31 @@ async function applyProvider() {
         statusMsg.textContent = '通信エラー';
         statusMsg.className = 'provider-status-msg error';
     }
+}
+
+// ------------------------------------------------------------------ //
+// Provider Health Monitoring (#85)
+// ------------------------------------------------------------------ //
+
+async function checkProviderHealth() {
+    const container = document.getElementById('provider-health');
+    if (!container) return;
+    try {
+        const r = await fetch('/api/llm/health');
+        if (!r.ok) { container.innerHTML = ''; return; }
+        const data = await r.json();
+        if (!data.providers || Object.keys(data.providers).length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        const dots = Object.entries(data.providers).map(([name, info]) => {
+            const color = info.status === 'healthy' ? 'ok' : info.status === 'degraded' ? 'warn' : 'error';
+            const ms = Math.round(info.response_time_ms);
+            return `<span class="health-dot ${color}" title="${name}: ${info.status} (${ms}ms)"></span><span class="health-label">${name}</span>`;
+        }).join(' ');
+        const chainInfo = data.fallback_chain.length > 0 ? `<span class="health-chain">Fallback: ${data.fallback_chain.join(' → ')}</span>` : '';
+        container.innerHTML = dots + chainInfo;
+    } catch { container.innerHTML = ''; }
 }
 
 async function checkSDStatus() {
@@ -3738,4 +3766,169 @@ function setupWeightEditors() {
         const ta = document.getElementById(id);
         if (ta) WeightEditor.create(ta, { containerId: `we-${id}` });
     }
+}
+
+// ------------------------------------------------------------------ //
+// Wildcards Page (#82)
+// ------------------------------------------------------------------ //
+
+let _wcEditingName = null;
+
+function setupWildcardsPage() {
+    document.getElementById('wc-create-btn')?.addEventListener('click', wcStartCreate);
+    document.getElementById('wc-save-btn')?.addEventListener('click', wcSave);
+    document.getElementById('wc-delete-btn')?.addEventListener('click', wcDelete);
+    document.getElementById('wc-preview-btn')?.addEventListener('click', wcPreview);
+    document.getElementById('wc-count-btn')?.addEventListener('click', wcCount);
+    document.getElementById('sd-expand-btn')?.addEventListener('click', sdExpandPrompt);
+    loadWildcards();
+}
+
+async function loadWildcards() {
+    const list = document.getElementById('wc-list');
+    if (!list) return;
+    try {
+        const r = await fetch('/api/wildcards/');
+        if (!r.ok) return;
+        const data = await r.json();
+        if (!data.wildcards || data.wildcards.length === 0) {
+            list.innerHTML = '<div class="wc-empty">No wildcard files yet. Click "+ New" to create one.</div>';
+            return;
+        }
+        list.innerHTML = data.wildcards.map(w =>
+            `<div class="wc-item" data-name="${w.name}">
+                <strong>__${w.name}__</strong>
+                <span class="wc-count">${w.count} entries</span>
+                <div class="wc-preview-tags">${w.preview.slice(0, 3).join(', ')}${w.count > 3 ? '...' : ''}</div>
+            </div>`
+        ).join('');
+        list.querySelectorAll('.wc-item').forEach(el => {
+            el.addEventListener('click', () => wcLoadEdit(el.dataset.name));
+        });
+    } catch (e) {
+        console.error('Failed to load wildcards:', e);
+    }
+}
+
+function wcStartCreate() {
+    _wcEditingName = null;
+    const editor = document.getElementById('wc-editor');
+    editor.style.display = '';
+    document.getElementById('wc-editor-title').textContent = 'New Wildcard';
+    document.getElementById('wc-name-input').value = '';
+    document.getElementById('wc-name-input').disabled = false;
+    document.getElementById('wc-entries-input').value = '';
+    document.getElementById('wc-delete-btn').style.display = 'none';
+}
+
+async function wcLoadEdit(name) {
+    try {
+        const r = await fetch(`/api/wildcards/${name}`);
+        if (!r.ok) return;
+        const data = await r.json();
+        _wcEditingName = name;
+        const editor = document.getElementById('wc-editor');
+        editor.style.display = '';
+        document.getElementById('wc-editor-title').textContent = `Edit: __${name}__`;
+        document.getElementById('wc-name-input').value = name;
+        document.getElementById('wc-name-input').disabled = true;
+        document.getElementById('wc-entries-input').value = data.entries.join('\n');
+        document.getElementById('wc-delete-btn').style.display = '';
+    } catch (e) {
+        console.error('Failed to load wildcard:', e);
+    }
+}
+
+async function wcSave() {
+    const name = document.getElementById('wc-name-input').value.trim();
+    const entriesRaw = document.getElementById('wc-entries-input').value;
+    const entries = entriesRaw.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!name || entries.length === 0) return;
+    const isNew = !_wcEditingName;
+    const url = isNew ? '/api/wildcards/' : `/api/wildcards/${_wcEditingName}`;
+    const method = isNew ? 'POST' : 'PUT';
+    const body = isNew ? { name, entries } : { entries };
+    try {
+        const r = await fetch(url, {
+            method, headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (r.ok) {
+            _wcEditingName = name;
+            document.getElementById('wc-name-input').disabled = true;
+            document.getElementById('wc-delete-btn').style.display = '';
+            document.getElementById('wc-editor-title').textContent = `Edit: __${name}__`;
+            loadWildcards();
+        } else {
+            const d = await r.json().catch(() => ({}));
+            alert(d.detail || 'Save failed');
+        }
+    } catch (e) { alert('Network error'); }
+}
+
+async function wcDelete() {
+    if (!_wcEditingName) return;
+    if (!confirm(`Delete wildcard "__${_wcEditingName}__"?`)) return;
+    try {
+        await fetch(`/api/wildcards/${_wcEditingName}`, { method: 'DELETE' });
+        _wcEditingName = null;
+        document.getElementById('wc-editor').style.display = 'none';
+        loadWildcards();
+    } catch (e) { console.error(e); }
+}
+
+async function wcPreview() {
+    const template = document.getElementById('wc-expand-template')?.value?.trim();
+    if (!template) return;
+    const results = document.getElementById('wc-expand-results');
+    try {
+        const r = await fetch('/api/wildcards/expand', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template, mode: 'preview', count: 5 })
+        });
+        const data = await r.json();
+        if (r.ok) {
+            results.innerHTML = `<div class="wc-combo-count">${data.combination_count} total combinations</div>`
+                + data.expanded.map((s, i) => `<div class="wc-result-item">${i+1}. ${s}</div>`).join('');
+        } else {
+            results.innerHTML = `<div class="wc-error">${data.detail || 'Error'}</div>`;
+        }
+    } catch { results.innerHTML = '<div class="wc-error">Network error</div>'; }
+}
+
+async function wcCount() {
+    const template = document.getElementById('wc-expand-template')?.value?.trim();
+    if (!template) return;
+    const results = document.getElementById('wc-expand-results');
+    try {
+        const r = await fetch('/api/wildcards/expand', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template, mode: 'preview', count: 1 })
+        });
+        const data = await r.json();
+        if (r.ok) {
+            results.innerHTML = `<div class="wc-combo-count">${data.combination_count} total combinations</div>`;
+        }
+    } catch {}
+}
+
+async function sdExpandPrompt() {
+    const textarea = document.getElementById('sd-positive');
+    if (!textarea) return;
+    const template = textarea.value.trim();
+    if (!template || (!template.includes('{') && !template.includes('__'))) return;
+    try {
+        const r = await fetch('/api/wildcards/expand', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ template, mode: 'random' })
+        });
+        const data = await r.json();
+        if (r.ok && data.expanded && data.expanded.length > 0) {
+            textarea.value = data.expanded[0];
+            textarea.dispatchEvent(new Event('input'));
+        }
+    } catch (e) { console.error('Expand failed:', e); }
 }
