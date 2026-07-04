@@ -62,3 +62,9 @@ QUALITY_LEVELS = {
 
 # Tagger (CLIP Interrogator / WD14 系) モードで使用するデフォルトのネガティブプロンプト
 DEFAULT_NEGATIVE_TAGS = "lowres, bad anatomy, bad hands, text, error, worst quality, low quality, blurry"
+
+# Webhook Notifications
+WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")  # empty disables webhook notifications
+WEBHOOK_EVENTS = os.getenv("WEBHOOK_EVENTS", "job_completed,job_failed,batch_completed")
+WEBHOOK_FORMAT = os.getenv("WEBHOOK_FORMAT", "generic")  # generic, discord, or slack
+WEBHOOK_TIMEOUT = int(os.getenv("WEBHOOK_TIMEOUT", "5"))

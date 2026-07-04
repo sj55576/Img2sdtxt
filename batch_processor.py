@@ -20,6 +20,7 @@ from tqdm import tqdm
 import history as hist
 from llm_provider import LLMProvider
 from prompt_generator import PromptGenerator
+from webhook import webhook_notifier
 
 # Supported image extensions
 IMAGE_EXTENSIONS: Tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")
@@ -327,6 +328,7 @@ class BatchProcessor:
         skipped = sum(1 for r in results if r.get("skipped"))
         failed = sum(1 for r in results if r.get("status") == "error")
         print(f"\nDone — {success} succeeded, {skipped} skipped, {failed} failed (total {len(results)}).")
+        webhook_notifier.notify_batch(results)
         return results
 
     def watch(
