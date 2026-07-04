@@ -140,7 +140,7 @@ class _Parser:
         last_end = 0
         for match in _WILDCARD_PATTERN.finditer(text):
             if match.start() > last_end:
-                parts.append(TextNode(text[last_end:match.start()]))
+                parts.append(TextNode(text[last_end : match.start()]))
             parts.append(WildcardNode(match.group(1)))
             last_end = match.end()
         if last_end < len(text):
@@ -272,7 +272,7 @@ def _count_sequence_combinations(seq: SequenceNode, wildcards_dir: Path) -> int:
     return total
 
 
-def expand_prompt(template: str, wildcards_dir: Path = None, seed: int = None) -> str:
+def expand_prompt(template: str, wildcards_dir: Optional[Path] = None, seed: Optional[int] = None) -> str:
     """Expand a dynamic prompt template, picking random options.
 
     Args:
@@ -290,7 +290,7 @@ def expand_prompt(template: str, wildcards_dir: Path = None, seed: int = None) -
     return _postprocess_escapes(result)
 
 
-def count_combinations(template: str, wildcards_dir: Path = None) -> int:
+def count_combinations(template: str, wildcards_dir: Optional[Path] = None) -> int:
     """Count the number of possible combinations without expanding.
 
     Returns the total number of unique expansions possible.
@@ -300,7 +300,9 @@ def count_combinations(template: str, wildcards_dir: Path = None) -> int:
     return _count_sequence_combinations(tree, resolved_dir)
 
 
-def expand_prompt_combinatorial(template: str, wildcards_dir: Path = None, max_combinations: int = 100) -> List[str]:
+def expand_prompt_combinatorial(
+    template: str, wildcards_dir: Optional[Path] = None, max_combinations: int = 100
+) -> List[str]:
     """Generate all combinations from a dynamic prompt template.
 
     Args:
@@ -319,15 +321,15 @@ def expand_prompt_combinatorial(template: str, wildcards_dir: Path = None, max_c
 
     estimated = _count_sequence_combinations(tree, resolved_dir)
     if estimated > max_combinations:
-        raise ValueError(
-            f"Estimated combinations ({estimated}) exceed max_combinations ({max_combinations})."
-        )
+        raise ValueError(f"Estimated combinations ({estimated}) exceed max_combinations ({max_combinations}).")
 
     combos = _sequence_option_texts(tree, resolved_dir)
     return [_postprocess_escapes(c) for c in combos]
 
 
-def preview_expansion(template: str, wildcards_dir: Path = None, count: int = 5, seed: int = None) -> List[str]:
+def preview_expansion(
+    template: str, wildcards_dir: Optional[Path] = None, count: int = 5, seed: Optional[int] = None
+) -> List[str]:
     """Generate a few sample expansions for preview purposes."""
     resolved_dir = _resolve_wildcards_dir(wildcards_dir)
     rng = random.Random(seed)

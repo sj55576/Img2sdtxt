@@ -237,8 +237,14 @@ async def generate_prompts_stream(
             result = generator.finalize_response(full_text, suffix_pos, suffix_neg)
             if result.get("status") == "success":
                 deps.llm_cache.set(
-                    cache_image, cache_text, eff_style, eff_tone, eff_quality, result,
-                    provider=prov_name, model=mdl,
+                    cache_image,
+                    cache_text,
+                    eff_style,
+                    eff_tone,
+                    eff_quality,
+                    result,
+                    provider=prov_name,
+                    model=mdl,
                 )
 
         if result.get("status") == "error":

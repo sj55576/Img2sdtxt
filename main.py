@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 import config
 import deps
 from config import API_HOST, API_PORT, DEBUG, HTTPS_ENABLED, QUALITY_LEVELS, SSL_CERTFILE, SSL_KEYFILE, STYLES, TONES
+from job_queue import job_queue
 from rate_limit import RateLimitMiddleware
 from routes.gallery import router as gallery_router
 from routes.history import router as history_router
@@ -24,6 +25,7 @@ from routes.sd import router as sd_router
 from routes.stats import router as stats_router
 from routes.tags import router as tags_router
 from routes.wildcards import router as wildcards_router
+from webhook import webhook_notifier
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
@@ -79,6 +81,8 @@ app.include_router(tags_router)
 app.include_router(png_info_router)
 app.include_router(stats_router)
 app.include_router(wildcards_router)
+
+job_queue.add_listener(webhook_notifier.job_listener)
 
 
 # ------------------------------------------------------------------ #

@@ -423,12 +423,8 @@ class TestCacheKeyBackwardCompatibility:
 
     def test_hybrid_mode_key_differs_by_tagger_model(self, tmp_path, monkeypatch):
         c = self._make_cache(tmp_path, monkeypatch)
-        key_clip = c._make_key(
-            b"img", None, "", "", "high", mode="hybrid", tagger_model="clip"
-        )
-        key_deepdanbooru = c._make_key(
-            b"img", None, "", "", "high", mode="hybrid", tagger_model="deepdanbooru"
-        )
+        key_clip = c._make_key(b"img", None, "", "", "high", mode="hybrid", tagger_model="clip")
+        key_deepdanbooru = c._make_key(b"img", None, "", "", "high", mode="hybrid", tagger_model="deepdanbooru")
         assert key_clip != key_deepdanbooru
 
     def test_get_set_roundtrip_with_mode(self, tmp_path, monkeypatch):

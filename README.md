@@ -112,6 +112,10 @@ Open <http://localhost:8000> in your browser.
 | `HTTPS_ENABLED` | `false` | Serve over HTTPS |
 | `SSL_CERTFILE` | *(auto)* | Path to TLS certificate file (PEM) |
 | `SSL_KEYFILE` | *(auto)* | Path to TLS private key file (PEM) |
+| `WEBHOOK_URL` | *(empty)* | Webhook endpoint URL; empty disables notifications |
+| `WEBHOOK_EVENTS` | `job_completed,job_failed,batch_completed` | Comma-separated events to notify on (`job_completed`, `job_failed`, `job_cancelled`, `batch_completed`) |
+| `WEBHOOK_FORMAT` | `generic` | Payload format: `generic`, `discord`, or `slack` |
+| `WEBHOOK_TIMEOUT` | `5` | Webhook request timeout in seconds |
 
 ---
 
@@ -303,7 +307,7 @@ Img2sdtxt/
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/history` | List history (`limit`, `offset`, `search`, `style`, `quality`, `favorites_only`) |
-| `GET` | `/api/history/export` | Download all history as JSON |
+| `GET` | `/api/history/export` | Download all history as JSON, CSV, or XLSX (`format`) |
 | `PUT` | `/api/history/{id}/favorite` | Toggle favorite on a history entry |
 | `DELETE` | `/api/history/{id}` | Delete one entry |
 | `DELETE` | `/api/history` | Clear all history |

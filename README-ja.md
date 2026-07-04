@@ -110,6 +110,10 @@ python main.py
 | `HTTPS_ENABLED` | `false` | HTTPSで起動する |
 | `SSL_CERTFILE` | *(自動)* | TLS証明書ファイルのパス（PEM形式） |
 | `SSL_KEYFILE` | *(自動)* | TLS秘密鍵ファイルのパス（PEM形式） |
+| `WEBHOOK_URL` | *(空)* | Webhook送信先URL。空の場合は通知を無効化 |
+| `WEBHOOK_EVENTS` | `job_completed,job_failed,batch_completed` | 通知対象イベント（カンマ区切り）（`job_completed`, `job_failed`, `job_cancelled`, `batch_completed`） |
+| `WEBHOOK_FORMAT` | `generic` | ペイロード形式：`generic`、`discord`、`slack` のいずれか |
+| `WEBHOOK_TIMEOUT` | `5` | Webhookリクエストのタイムアウト秒数 |
 
 ---
 
@@ -237,7 +241,7 @@ Img2sdtxt/
 | メソッド | パス | 説明 |
 |---------|------|------|
 | `GET` | `/api/history` | 履歴一覧（`limit`・`offset`・`search`・`style`・`quality`・`favorites_only`対応） |
-| `GET` | `/api/history/export` | 全履歴をJSONとしてダウンロード |
+| `GET` | `/api/history/export` | 全履歴をJSON・CSV・XLSXとしてダウンロード（`format`） |
 | `PUT` | `/api/history/{id}/favorite` | お気に入りのトグル |
 | `DELETE` | `/api/history/{id}` | 特定エントリを削除 |
 | `DELETE` | `/api/history` | 全履歴を削除 |

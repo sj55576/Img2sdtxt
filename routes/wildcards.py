@@ -91,9 +91,7 @@ def expand_dynamic_prompt(request: ExpandPromptRequest):
         if request.mode == "random":
             expanded = [dp.expand_prompt(request.template, WILDCARDS_DIR, seed=request.seed)]
         elif request.mode == "preview":
-            expanded = dp.preview_expansion(
-                request.template, WILDCARDS_DIR, count=request.count, seed=request.seed
-            )
+            expanded = dp.preview_expansion(request.template, WILDCARDS_DIR, count=request.count, seed=request.seed)
         else:
             expanded = dp.expand_prompt_combinatorial(
                 request.template, WILDCARDS_DIR, max_combinations=request.max_combinations

@@ -105,9 +105,9 @@ def _parse_sse(body: str):
         data = None
         for line in block.splitlines():
             if line.startswith("event:"):
-                event = line[len("event:"):].strip()
+                event = line[len("event:") :].strip()
             elif line.startswith("data:"):
-                data = _json.loads(line[len("data:"):].strip())
+                data = _json.loads(line[len("data:") :].strip())
         if event is not None:
             events.append((event, data))
     return events
