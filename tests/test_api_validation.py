@@ -197,6 +197,33 @@ def test_jobs_queue_stats_returns_stats(client):
     assert set(data["stats"]) == {"total", "queue_size", "running", "by_status"}
 
 
+def test_jobs_submit_invalid_priority_type_returns_400(client):
+    """POST /api/jobs/submit に文字列の priority を渡すと 400"""
+    payload = {"job_type": "txt2img", "params": {"positive": "a cat"}, "priority": "high"}
+    response = client.post("/api/jobs/submit", json=payload)
+    assert response.status_code == 400
+
+
+def test_jobs_submit_priority_is_clamped(client):
+    """POST /api/jobs/submit の priority は -10..10 にクランプされる"""
+    payload = {"job_type": "txt2img", "params": {"positive": "a cat"}, "priority": 999}
+    response = client.post("/api/jobs/submit", json=payload)
+    assert response.status_code == 200
+    assert response.json()["job"]["priority"] == 10
+
+
+def test_jobs_priority_endpoint_unknown_job_returns_400(client):
+    """POST /api/jobs/{job_id}/priority は存在しない job_id で 400"""
+    response = client.post("/api/jobs/nonexistent/priority", json={"priority": 5})
+    assert response.status_code == 400
+
+
+def test_jobs_priority_endpoint_invalid_type_returns_400(client):
+    """POST /api/jobs/{job_id}/priority に不正な priority を渡すと 400"""
+    response = client.post("/api/jobs/nonexistent/priority", json={"priority": "high"})
+    assert response.status_code == 400
+
+
 # ------------------------------------------------------------------ #
 # BE-4: /health の形状確認
 # ------------------------------------------------------------------ #

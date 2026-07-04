@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
@@ -127,10 +128,17 @@ async def handle_multi_model(job, update_progress):
 # ------------------------------------------------------------------ #
 
 
+def _clamp_priority(raw_priority: Any) -> int:
+    if not isinstance(raw_priority, int) or isinstance(raw_priority, bool):
+        raise HTTPException(status_code=400, detail="priority must be an integer")
+    return max(-10, min(10, raw_priority))
+
+
 @router.post("/submit")
 async def submit_job(request_data: dict):
     job_type = request_data.get("job_type", "")
     params = request_data.get("params", {})
+    priority = _clamp_priority(request_data.get("priority", 0))
 
     if not job_type:
         raise HTTPException(status_code=400, detail="job_type is required")
@@ -142,8 +150,8 @@ async def submit_job(request_data: dict):
     if job_type == "multi_model" and not params.get("models"):
         raise HTTPException(status_code=400, detail="models list is required")
 
-    job = await job_queue.submit(job_type, params)
-    return {"success": True, "job": job.to_dict()}
+    job = await job_queue.submit(job_type, params, priority=priority)
+    return {"success": True, "job": job_queue.job_info(job)}
 
 
 @router.get("/queue/stats")
@@ -156,7 +164,7 @@ async def get_job(job_id: str):
     job = job_queue.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {"success": True, "job": job.to_dict()}
+    return {"success": True, "job": job_queue.job_info(job)}
 
 
 @router.get("")
@@ -171,6 +179,18 @@ async def cancel_job(job_id: str):
     if not cancelled:
         raise HTTPException(status_code=400, detail="Cannot cancel job (not found or already finished)")
     return {"success": True}
+
+
+@router.post("/{job_id}/priority")
+async def set_job_priority(job_id: str, request_data: dict):
+    priority = _clamp_priority(request_data.get("priority"))
+    success = await job_queue.set_priority(job_id, priority)
+    if not success:
+        raise HTTPException(status_code=400, detail="Cannot set priority (job not found or not pending)")
+    job = job_queue.get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"success": True, "job": job_queue.job_info(job)}
 
 
 # ------------------------------------------------------------------ #
