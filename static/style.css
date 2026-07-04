@@ -1487,3 +1487,39 @@ kbd {
 .stream-preview.hidden { display: none; }
 #cancel-stream-btn { margin-top: 12px; }
 #cancel-stream-btn.hidden { display: none; }
+
+/* ================================================================== */
+/* Provider Health Indicators (#85)                                   */
+/* ================================================================== */
+.provider-health { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.75rem; }
+.health-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.health-dot.ok { background: var(--green, #22c55e); }
+.health-dot.warn { background: var(--yellow, #f59e0b); }
+.health-dot.error { background: var(--red, #ef4444); }
+.health-label { color: var(--text-muted); margin-right: 6px; }
+.health-chain { display: block; width: 100%; color: var(--text-muted); font-size: 0.7rem; margin-top: 2px; }
+
+/* ================================================================== */
+/* Wildcards Page (#82)                                               */
+/* ================================================================== */
+.wildcards-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+@media (max-width: 768px) { .wildcards-layout { grid-template-columns: 1fr; } }
+.wildcards-panel, .wildcards-editor-panel { background: var(--card-bg); border-radius: 12px; padding: 16px; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.panel-header h3 { margin: 0; }
+.wc-list { display: flex; flex-direction: column; gap: 6px; }
+.wc-item { padding: 10px 12px; border-radius: 8px; background: var(--bg-secondary, var(--surface-2)); cursor: pointer; transition: background 0.15s; }
+.wc-item:hover { background: var(--bg-hover, var(--surface-3)); }
+.wc-item strong { display: block; font-size: 0.9rem; }
+.wc-count { font-size: 0.75rem; color: var(--text-muted); }
+.wc-preview-tags { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+.wc-empty { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 20px; }
+.wc-editor { margin-bottom: 20px; }
+.wildcards-expand-panel { margin-top: 16px; }
+.wildcards-expand-panel h3 { margin: 0 0 12px 0; }
+.expand-actions { display: flex; gap: 8px; margin: 8px 0; }
+.wc-expand-results { margin-top: 10px; }
+.wc-result-item { padding: 6px 10px; border-radius: 6px; background: var(--bg-secondary, var(--surface-2)); margin-bottom: 4px; font-size: 0.85rem; word-break: break-word; }
+.wc-combo-count { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; }
+.wc-error { color: var(--red, #ef4444); font-size: 0.85rem; }
+.btn-xs { font-size: 0.7rem; padding: 2px 6px; vertical-align: middle; }
