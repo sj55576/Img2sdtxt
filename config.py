@@ -18,6 +18,15 @@ API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.getenv("CORS_ALLOWED_ORIGINS", "*").split(",") if origin.strip()
+]
+CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
+
+# Proxy / rate-limit configuration
+TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").lower() == "true"
+
 # HTTPS Configuration
 HTTPS_ENABLED = os.getenv("HTTPS_ENABLED", "false").lower() == "true"
 SSL_CERTFILE = os.getenv("SSL_CERTFILE", "")

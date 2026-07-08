@@ -109,6 +109,9 @@ Open <http://localhost:8000> in your browser.
 | `API_HOST` | `0.0.0.0` | API server bind address |
 | `API_PORT` | `8000` | API server port |
 | `DEBUG` | `false` | Enable debug / hot-reload |
+| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed browser origins; use explicit origins in production |
+| `CORS_ALLOW_CREDENTIALS` | `false` | Allow credentialed CORS requests; enable only with restricted origins |
+| `TRUST_PROXY_HEADERS` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` only behind a trusted reverse proxy |
 | `HTTPS_ENABLED` | `false` | Serve over HTTPS |
 | `SSL_CERTFILE` | *(auto)* | Path to TLS certificate file (PEM) |
 | `SSL_KEYFILE` | *(auto)* | Path to TLS private key file (PEM) |

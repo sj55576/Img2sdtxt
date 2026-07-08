@@ -55,6 +55,18 @@ class TestLLMClientInterface:
         client = self._make_client()
         assert client.model == "test-model"
 
+    def test_base_url_is_normalized_for_endpoint_and_health_check(self):
+        client = LLMClient(base_url="http://localhost:1234/v1/", model="test-model")
+        assert client.base_url == "http://localhost:1234/v1"
+        assert client.endpoint == "http://localhost:1234/v1/chat/completions"
+
+    @patch("llm_client.requests.get")
+    def test_is_available_checks_models_under_configured_base_url(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=200)
+        client = LLMClient(base_url="http://localhost:1234/v1", model="test-model")
+        assert client.is_available() is True
+        mock_get.assert_called_once_with("http://localhost:1234/v1/models", timeout=5)
+
     def test_supports_vision_returns_true(self):
         client = self._make_client()
         assert client.supports_vision() is True

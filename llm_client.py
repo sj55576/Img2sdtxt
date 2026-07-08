@@ -17,9 +17,9 @@ logger = logging.getLogger("img2sdtxt.llm")
 
 class LLMClient(LLMProvider):
     def __init__(self, base_url: str = LLM_SERVER_URL, model: str = LLM_MODEL):
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/")
         self._model = model
-        self.endpoint = f"{base_url}/chat/completions"
+        self.endpoint = f"{self.base_url}/chat/completions"
 
     @property
     def provider_name(self) -> str:
@@ -141,7 +141,7 @@ class LLMClient(LLMProvider):
     def is_available(self) -> bool:
         """LLMサーバーへの軽量な疎通確認 (GET /v1/models、タイムアウト5秒)"""
         try:
-            r = requests.get(f"{self.base_url}/v1/models", timeout=5)
+            r = requests.get(f"{self.base_url}/models", timeout=5)
             return r.status_code < 300
         except Exception:
             return False

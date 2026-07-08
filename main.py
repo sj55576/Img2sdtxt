@@ -10,7 +10,19 @@ from fastapi.staticfiles import StaticFiles
 
 import config
 import deps
-from config import API_HOST, API_PORT, DEBUG, HTTPS_ENABLED, QUALITY_LEVELS, SSL_CERTFILE, SSL_KEYFILE, STYLES, TONES
+from config import (
+    API_HOST,
+    API_PORT,
+    CORS_ALLOW_CREDENTIALS,
+    CORS_ALLOWED_ORIGINS,
+    DEBUG,
+    HTTPS_ENABLED,
+    QUALITY_LEVELS,
+    SSL_CERTFILE,
+    SSL_KEYFILE,
+    STYLES,
+    TONES,
+)
 from job_queue import job_queue
 from rate_limit import RateLimitMiddleware
 from routes.gallery import router as gallery_router
@@ -43,8 +55,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ALLOWED_ORIGINS,
+    allow_credentials=CORS_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

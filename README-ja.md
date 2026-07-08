@@ -107,6 +107,9 @@ python main.py
 | `API_HOST` | `0.0.0.0` | APIサーバーのバインドアドレス |
 | `API_PORT` | `8000` | APIサーバーのポート番号 |
 | `DEBUG` | `false` | デバッグモード / ホットリロード |
+| `CORS_ALLOWED_ORIGINS` | `*` | 許可するブラウザOrigin（カンマ区切り）。本番環境では明示指定を推奨 |
+| `CORS_ALLOW_CREDENTIALS` | `false` | 認証情報付きCORSリクエストを許可。Originを制限した場合のみ有効化推奨 |
+| `TRUST_PROXY_HEADERS` | `false` | 信頼済みリバースプロキシ配下でのみ `X-Forwarded-For` / `X-Real-IP` を信頼 |
 | `HTTPS_ENABLED` | `false` | HTTPSで起動する |
 | `SSL_CERTFILE` | *(自動)* | TLS証明書ファイルのパス（PEM形式） |
 | `SSL_KEYFILE` | *(自動)* | TLS秘密鍵ファイルのパス（PEM形式） |

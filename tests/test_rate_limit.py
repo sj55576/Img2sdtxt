@@ -62,6 +62,25 @@ def test_static_not_rate_limited(client):
         assert r.status_code == 200
 
 
+def test_x_forwarded_for_is_ignored_by_default(client):
+    headers = {"X-Forwarded-For": "203.0.113.10"}
+    for _ in range(5):
+        client.get("/api/config", headers=headers)
+    r = client.get("/api/config", headers={"X-Forwarded-For": "203.0.113.11"})
+    assert r.status_code == 429
+
+
+def test_x_forwarded_for_is_used_only_when_trusted(client):
+    config.TRUST_PROXY_HEADERS = True
+    try:
+        for _ in range(5):
+            client.get("/api/config", headers={"X-Forwarded-For": "203.0.113.10"})
+        r = client.get("/api/config", headers={"X-Forwarded-For": "203.0.113.11"})
+        assert r.status_code == 200
+    finally:
+        config.TRUST_PROXY_HEADERS = False
+
+
 def test_rate_limit_disabled():
     config.RATE_LIMIT_ENABLED = False
     from main import app
