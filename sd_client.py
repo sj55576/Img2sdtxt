@@ -459,7 +459,7 @@ class SDClient:
         """
         saved_files = []
         now = datetime.now()
-        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        timestamp = now.strftime("%Y%m%d_%H%M%S_%f")
         date_str = now.strftime("%Y-%m-%d")
         if mode == "img2img":
             prefix = "i2i"

@@ -226,22 +226,22 @@ async def sd_img2img(
     file: UploadFile = File(...),
     positive: str = Form(...),
     negative: str = Form(""),
-    denoising_strength: float = Form(0.75),
-    width: int = Form(512),
-    height: int = Form(512),
-    steps: int = Form(20),
-    cfg_scale: float = Form(7.0),
+    denoising_strength: float = Form(0.75, ge=0.0, le=1.0),
+    width: int = Form(512, ge=64, le=2048),
+    height: int = Form(512, ge=64, le=2048),
+    steps: int = Form(20, ge=1, le=150),
+    cfg_scale: float = Form(7.0, ge=1.0, le=30.0),
     sampler: str = Form("Euler a"),
     seed: int = Form(-1),
-    batch_size: int = Form(1),
-    resize_mode: int = Form(0),
+    batch_size: int = Form(1, ge=1, le=4),
+    resize_mode: int = Form(0, ge=0, le=3),
     model: str = Form(""),
     loras: str = Form(""),
     enable_hr: bool = Form(False),
-    hr_scale: float = Form(2.0),
+    hr_scale: float = Form(2.0, ge=1.0, le=4.0),
     hr_upscaler: str = Form("R-ESRGAN 4x+"),
-    hr_second_pass_steps: int = Form(0),
-    hr_denoising_strength: float = Form(0.7),
+    hr_second_pass_steps: int = Form(0, ge=0, le=150),
+    hr_denoising_strength: float = Form(0.7, ge=0.0, le=1.0),
     controlnet_args: str = Form(""),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
@@ -261,6 +261,10 @@ async def sd_img2img(
             parsed_controlnet_args = json.loads(controlnet_args)
         except (json.JSONDecodeError, ValueError) as e:
             raise HTTPException(status_code=400, detail=f"Invalid controlnet_args JSON: {e}")
+        if not isinstance(parsed_controlnet_args, list) or not all(
+            isinstance(item, dict) for item in parsed_controlnet_args
+        ):
+            raise HTTPException(status_code=400, detail="controlnet_args must be a JSON array of objects.")
 
     try:
         images = await run_in_threadpool(
@@ -275,7 +279,7 @@ async def sd_img2img(
             cfg_scale=cfg_scale,
             sampler=sampler,
             seed=seed,
-            batch_size=min(batch_size, 4),
+            batch_size=batch_size,
             resize_mode=resize_mode,
             model=model,
             loras=loras,
@@ -324,18 +328,18 @@ async def sd_inpaint(
     mask: str = Form(...),
     positive: str = Form(...),
     negative: str = Form(""),
-    denoising_strength: float = Form(0.75),
-    width: int = Form(512),
-    height: int = Form(512),
-    steps: int = Form(20),
-    cfg_scale: float = Form(7.0),
+    denoising_strength: float = Form(0.75, ge=0.0, le=1.0),
+    width: int = Form(512, ge=64, le=2048),
+    height: int = Form(512, ge=64, le=2048),
+    steps: int = Form(20, ge=1, le=150),
+    cfg_scale: float = Form(7.0, ge=1.0, le=30.0),
     sampler: str = Form("Euler a"),
     seed: int = Form(-1),
-    batch_size: int = Form(1),
-    mask_blur: int = Form(4),
-    inpainting_fill: int = Form(1),
+    batch_size: int = Form(1, ge=1, le=4),
+    mask_blur: int = Form(4, ge=0, le=64),
+    inpainting_fill: int = Form(1, ge=0, le=3),
     inpaint_full_res: bool = Form(True),
-    inpaint_full_res_padding: int = Form(32),
+    inpaint_full_res_padding: int = Form(32, ge=0, le=256),
     model: str = Form(""),
     loras: str = Form(""),
 ):
@@ -364,7 +368,7 @@ async def sd_inpaint(
             cfg_scale=cfg_scale,
             sampler=sampler,
             seed=seed,
-            batch_size=min(batch_size, 4),
+            batch_size=batch_size,
             mask_blur=mask_blur,
             inpainting_fill=inpainting_fill,
             inpaint_full_res=inpaint_full_res,
