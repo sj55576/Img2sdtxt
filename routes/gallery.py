@@ -102,18 +102,21 @@ def get_gallery_filters():
     models: set[str] = set()
     samplers: set[str] = set()
 
-    with _gallery_cache_lock:
-        cache_values = list(_gallery_cache.values())
+    if not _OUTPUTS_DIR.exists():
+        return {"success": True, "models": [], "samplers": []}
 
-    for _mtime, _ts, date_images in cache_values:
-        for img in date_images:
-            params = img.get("parameters", {})
+    for meta_file in _OUTPUTS_DIR.glob("*/*_metadata.json"):
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            params = meta.get("parameters", {})
             model_val = params.get("model") or ""
             if model_val:
                 models.add(model_val)
             sampler_val = params.get("sampler") or ""
             if sampler_val:
                 samplers.add(sampler_val)
+        except Exception:
+            continue
 
     return {
         "success": True,

@@ -9,6 +9,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from deps import sd_client
 from job_queue import JobStatus, job_queue, register_job_handler
+from models import SDGenerateRequest, SDMultiModelRequest
 
 logger = logging.getLogger("img2sdtxt.jobs")
 
@@ -134,6 +135,18 @@ def _clamp_priority(raw_priority: Any) -> int:
     return max(-10, min(10, raw_priority))
 
 
+def _model_validate(model_cls, data: dict):
+    if hasattr(model_cls, "model_validate"):
+        return model_cls.model_validate(data)
+    return model_cls.parse_obj(data)
+
+
+def _model_dump(model) -> dict:
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+    return model.dict()
+
+
 @router.post("/submit")
 async def submit_job(request_data: dict):
     job_type = request_data.get("job_type", "")
@@ -145,10 +158,13 @@ async def submit_job(request_data: dict):
     if job_type not in ("txt2img", "multi_model"):
         raise HTTPException(status_code=400, detail=f"Unknown job_type: {job_type}")
 
-    if job_type == "txt2img" and not params.get("positive", "").strip():
-        raise HTTPException(status_code=400, detail="positive prompt is required")
-    if job_type == "multi_model" and not params.get("models"):
-        raise HTTPException(status_code=400, detail="models list is required")
+    try:
+        if job_type == "txt2img":
+            params = _model_dump(_model_validate(SDGenerateRequest, params))
+        elif job_type == "multi_model":
+            params = _model_dump(_model_validate(SDMultiModelRequest, params))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     job = await job_queue.submit(job_type, params, priority=priority)
     return {"success": True, "job": job_queue.job_info(job)}
