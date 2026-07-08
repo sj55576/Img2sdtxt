@@ -142,12 +142,13 @@ async def download_zip(request_data: dict):
                 # The paths are expected to start with "outputs/..."
                 # Resolve against the parent of _OUTPUTS_DIR for safety
                 candidate = (_OUTPUTS_DIR.parent / relative).resolve()
-                if not str(candidate).startswith(str(outputs_resolved)):
+                try:
+                    arc_name = candidate.relative_to(outputs_resolved)
+                except ValueError:
                     continue  # path traversal attempt – skip silently
                 if not candidate.is_file():
                     continue  # missing file – skip silently
                 # Use the path relative to outputs dir as the name inside the ZIP
-                arc_name = candidate.relative_to(outputs_resolved)
                 zf.write(candidate, arcname=arc_name)
         return buf.getvalue()
 

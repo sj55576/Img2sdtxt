@@ -50,10 +50,14 @@ def _classify_path(path: str) -> Optional[str]:
 
 
 def _get_client_ip(request: Request) -> str:
-    """Return the real client IP, honouring X-Forwarded-For."""
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+    """Return the client IP, trusting proxy headers only when configured."""
+    if config.TRUST_PROXY_HEADERS:
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip()
+        real_ip = request.headers.get("x-real-ip")
+        if real_ip:
+            return real_ip.strip()
     return request.client.host if request.client else "unknown"
 
 
