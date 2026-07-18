@@ -3,6 +3,8 @@
 A web application that analyzes images (or text descriptions) with a local LLM and generates ready-to-use Stable Diffusion prompts.  
 It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API** so you can generate images without leaving the app.
 
+> ⚠️ **Work in Progress**: This repository is still under verification. Its functionality has **not** been fully tested or confirmed to work. Use at your own risk.
+
 > 📖 **Japanese documentation**: [README-ja.md](README-ja.md)
 
 ---
