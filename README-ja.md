@@ -3,6 +3,8 @@
 画像（またはテキスト説明）をローカルLLMで解析し、Stable Diffusion用のプロンプトを自動生成するWebアプリです。  
 **AUTOMATIC1111 Stable Diffusion WebUI API** との直接連携により、アプリ内で画像生成も行えます。
 
+> ⚠️ **検証中**: 本リポジトリは現在検証中であり、動作を確実に確認したものではありません。利用は自己責任でお願いします。
+
 > 📖 **English documentation**: [README.md](README.md)
 
 ---
