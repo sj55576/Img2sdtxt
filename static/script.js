@@ -198,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _setup('img2img', setupImg2ImgPage);
     _setup('inpaint', setupInpaintPage);
     _setup('xyplot', setupXYPlotPage);
+    _setup('compare', setupComparePage);
     _setup('gallery', setupGalleryPage);
     _setup('pnginfo', setupPngInfoPage);
     _setup('stats', setupStatsPage);
@@ -350,6 +351,7 @@ function setupNavigation() {
         if (page === 'img2img') checkImg2ImgStatus();
         if (page === 'inpaint') checkInpaintStatus();
         if (page === 'xyplot') checkXYPlotStatus();
+        if (page === 'compare') checkCompareStatus();
         if (page === 'gallery') { loadGallery(); loadGalleryFilters(); }
         if (page === 'stats') loadStats();
     }
@@ -4312,4 +4314,521 @@ async function sdExpandPrompt() {
             textarea.dispatchEvent(new Event('input'));
         }
     } catch (e) { console.error('Expand failed:', e); }
+}
+
+/* =====================================================================
+   Compare Page (Prompt A/B Comparison - issue #77)
+   ===================================================================== */
+const COMPARE_STYLE_OPTIONS = [
+    ['', '-- なし --'], ['photorealistic', 'Photorealistic'], ['anime', 'Anime'],
+    ['painting', 'Painting'], ['watercolor', 'Watercolor'], ['concept_art', 'Concept Art'],
+    ['sketch', 'Sketch'], ['pixel_art', 'Pixel Art'], ['3d_render', '3D Render']
+];
+const COMPARE_TONE_OPTIONS = [
+    ['', '-- なし --'], ['natural', 'Natural'], ['vibrant', 'Vibrant'], ['warm', 'Warm'],
+    ['cool', 'Cool'], ['dark', 'Dark'], ['soft', 'Soft'], ['dramatic', 'Dramatic'], ['cinematic', 'Cinematic']
+];
+const COMPARE_QUALITY_OPTIONS = [['standard', 'Standard'], ['high', 'High'], ['ultra', 'Ultra']];
+
+let compareSelectedImage = null;
+let _compareVariantSeq = 0;
+let _abHistoryLoaded = false;
+
+async function checkCompareStatus() {
+    const badge = document.getElementById('compare-api-badge');
+    if (badge) { badge.className = 'badge badge-gray'; badge.textContent = 'Checking...'; }
+    try {
+        const r = await fetch('/api/sd/status');
+        const d = await r.json();
+        if (d.available) {
+            if (badge) { badge.className = 'badge badge-green'; badge.textContent = 'Connected'; }
+            if (d.samplers?.length) {
+                const sel = document.getElementById('ab-sampler');
+                if (sel) sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+            }
+        } else if (badge) {
+            badge.className = 'badge badge-red'; badge.textContent = 'Disconnected';
+        }
+    } catch {
+        if (badge) { badge.className = 'badge badge-red'; badge.textContent = 'Error'; }
+    }
+}
+
+function _compareBuildSelect(id, options, selectedValue) {
+    const sel = document.createElement('select');
+    sel.id = id;
+    options.forEach(([value, label]) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        if (value === selectedValue) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    return sel;
+}
+
+function setupComparePage() {
+    // Image upload
+    const uploadArea = document.getElementById('compare-upload-area');
+    const imageInput = document.getElementById('compare-image-input');
+    uploadArea?.addEventListener('click', () => imageInput.click());
+    imageInput?.addEventListener('change', e => handleCompareImageSelect(e.target.files[0]));
+    uploadArea?.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+    uploadArea?.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea?.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) handleCompareImageSelect(file);
+    });
+    document.getElementById('compare-clear-image-btn')?.addEventListener('click', clearCompareImage);
+
+    // Variants
+    document.getElementById('compare-add-variant-btn')?.addEventListener('click', () => addCompareVariant());
+    addCompareVariant();
+    addCompareVariant();
+
+    document.getElementById('compare-generate-btn')?.addEventListener('click', runPromptCompare);
+
+    // A/B test
+    document.getElementById('ab-generate-btn')?.addEventListener('click', runABGenerate);
+    document.getElementById('ab-history-toggle-btn')?.addEventListener('click', toggleABHistory);
+
+    checkCompareStatus();
+    updateCompareVariantButtons();
+}
+
+function handleCompareImageSelect(file) {
+    if (!file || !file.type.startsWith('image/')) { toast('画像ファイルを選択してください', 'error'); return; }
+    if (file.size > 10 * 1024 * 1024) { toast('ファイルサイズが10MBを超えています', 'error'); return; }
+    compareSelectedImage = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('compare-preview-image').src = e.target.result;
+        document.getElementById('compare-preview-wrap').classList.remove('hidden');
+        document.getElementById('compare-upload-area').classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearCompareImage() {
+    compareSelectedImage = null;
+    const input = document.getElementById('compare-image-input');
+    if (input) input.value = '';
+    document.getElementById('compare-preview-wrap')?.classList.add('hidden');
+    document.getElementById('compare-upload-area')?.classList.remove('hidden');
+}
+
+function addCompareVariant() {
+    const list = document.getElementById('compare-variants-list');
+    if (!list) return;
+    const count = list.querySelectorAll('.compare-variant-row').length;
+    if (count >= 4) { toast(I18n.t('page.compare.max_variants', 'バリエーションは最大4個までです'), 'error'); return; }
+
+    const seq = ++_compareVariantSeq;
+    const row = document.createElement('div');
+    row.className = 'compare-variant-row';
+    row.dataset.seq = String(seq);
+
+    const header = document.createElement('div');
+    header.className = 'compare-variant-row-header';
+    const title = document.createElement('span');
+    title.textContent = `# ${count + 1}`;
+    header.appendChild(title);
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-sm btn-ghost compare-variant-remove-btn';
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', () => removeCompareVariant(seq));
+    header.appendChild(removeBtn);
+    row.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.className = 'form-grid';
+
+    const styleGroup = document.createElement('div');
+    styleGroup.className = 'form-group';
+    const styleLabel = document.createElement('label');
+    styleLabel.textContent = I18n.t('page.compare.style_label', 'スタイル');
+    styleGroup.appendChild(styleLabel);
+    styleGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-style`, COMPARE_STYLE_OPTIONS, ''));
+    grid.appendChild(styleGroup);
+
+    const toneGroup = document.createElement('div');
+    toneGroup.className = 'form-group';
+    const toneLabel = document.createElement('label');
+    toneLabel.textContent = I18n.t('page.compare.tone_label', 'トーン');
+    toneGroup.appendChild(toneLabel);
+    toneGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-tone`, COMPARE_TONE_OPTIONS, ''));
+    grid.appendChild(toneGroup);
+
+    const qualityGroup = document.createElement('div');
+    qualityGroup.className = 'form-group';
+    const qualityLabel = document.createElement('label');
+    qualityLabel.textContent = I18n.t('page.compare.quality_label', '品質');
+    qualityGroup.appendChild(qualityLabel);
+    qualityGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-quality`, COMPARE_QUALITY_OPTIONS, 'high'));
+    grid.appendChild(qualityGroup);
+
+    row.appendChild(grid);
+    list.appendChild(row);
+    updateCompareVariantButtons();
+}
+
+function removeCompareVariant(seq) {
+    const list = document.getElementById('compare-variants-list');
+    if (!list) return;
+    if (list.querySelectorAll('.compare-variant-row').length <= 2) {
+        toast(I18n.t('page.compare.min_variants', 'バリエーションは最低2個必要です'), 'error');
+        return;
+    }
+    const row = list.querySelector(`.compare-variant-row[data-seq="${seq}"]`);
+    row?.remove();
+    list.querySelectorAll('.compare-variant-row').forEach((r, i) => {
+        const t = r.querySelector('.compare-variant-row-header span');
+        if (t) t.textContent = `# ${i + 1}`;
+    });
+    updateCompareVariantButtons();
+}
+
+function updateCompareVariantButtons() {
+    const list = document.getElementById('compare-variants-list');
+    const count = list ? list.querySelectorAll('.compare-variant-row').length : 0;
+    const addBtn = document.getElementById('compare-add-variant-btn');
+    if (addBtn) addBtn.disabled = count >= 4;
+    document.querySelectorAll('.compare-variant-remove-btn').forEach(btn => {
+        btn.disabled = count <= 2;
+    });
+}
+
+function _collectCompareVariants() {
+    const rows = document.querySelectorAll('#compare-variants-list .compare-variant-row');
+    const variants = [];
+    rows.forEach(row => {
+        const seq = row.dataset.seq;
+        const style = document.getElementById(`compare-variant-${seq}-style`)?.value || '';
+        const tone = document.getElementById(`compare-variant-${seq}-tone`)?.value || '';
+        const quality = document.getElementById(`compare-variant-${seq}-quality`)?.value || 'high';
+        variants.push({ style, tone, quality });
+    });
+    return variants;
+}
+
+async function runPromptCompare() {
+    if (!compareSelectedImage) { toast(I18n.t('page.compare.no_image', '画像を選択してください'), 'error'); return; }
+    const variants = _collectCompareVariants();
+    if (variants.length < 2) { toast(I18n.t('page.compare.min_variants', 'バリエーションは最低2個必要です'), 'error'); return; }
+
+    const btn = document.getElementById('compare-generate-btn');
+    const loading = document.getElementById('compare-loading');
+    const errorEl = document.getElementById('compare-error');
+    const resultsEl = document.getElementById('compare-results');
+    btn.disabled = true;
+    loading.classList.remove('hidden');
+    errorEl.classList.add('hidden');
+    resultsEl.classList.add('hidden');
+    while (resultsEl.firstChild) resultsEl.removeChild(resultsEl.firstChild);
+
+    try {
+        const fd = new FormData();
+        fd.append('file', compareSelectedImage);
+        fd.append('variants', JSON.stringify(variants));
+        fd.append('save_history', 'true');
+        const r = await fetch('/api/generate-prompts-compare', { method: 'POST', body: fd });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || data.message || I18n.t('page.compare.generate_failed', '比較生成に失敗しました'));
+        renderCompareResults(data.results || [], variants);
+        toast(I18n.t('page.compare.generate_success', '比較生成が完了しました'), 'success');
+    } catch (e) {
+        errorEl.textContent = e.message || I18n.t('page.compare.generate_failed', '比較生成に失敗しました');
+        errorEl.classList.remove('hidden');
+        toast(e.message || I18n.t('page.compare.generate_failed', '比較生成に失敗しました'), 'error');
+    } finally {
+        btn.disabled = false;
+        loading.classList.add('hidden');
+    }
+}
+
+function renderCompareResults(results, variants) {
+    const resultsEl = document.getElementById('compare-results');
+    while (resultsEl.firstChild) resultsEl.removeChild(resultsEl.firstChild);
+
+    results.forEach((res, i) => {
+        const variant = variants[i] || {};
+        const card = document.createElement('div');
+        card.className = 'compare-result-card' + (res.success ? '' : ' compare-result-card-error');
+
+        const header = document.createElement('div');
+        header.className = 'compare-result-card-header';
+        const labelParts = [variant.style, variant.tone, variant.quality].filter(Boolean);
+        header.textContent = `#${i + 1} ${labelParts.join(' / ') || I18n.t('page.compare.no_settings', '(設定なし)')}`;
+        card.appendChild(header);
+
+        if (res.success) {
+            const posLabel = document.createElement('div');
+            posLabel.className = 'label';
+            posLabel.textContent = I18n.t('page.compare.positive_label', 'Positive Prompt');
+            card.appendChild(posLabel);
+            const posTa = document.createElement('textarea');
+            posTa.className = 'prompt-ta';
+            posTa.rows = 4;
+            posTa.readOnly = true;
+            posTa.id = `compare-result-pos-${i}`;
+            posTa.value = res.positive || '';
+            card.appendChild(posTa);
+
+            const negLabel = document.createElement('div');
+            negLabel.className = 'label';
+            negLabel.textContent = I18n.t('page.compare.negative_label', 'Negative Prompt');
+            card.appendChild(negLabel);
+            const negTa = document.createElement('textarea');
+            negTa.className = 'prompt-ta';
+            negTa.rows = 3;
+            negTa.readOnly = true;
+            negTa.id = `compare-result-neg-${i}`;
+            negTa.value = res.negative || '';
+            card.appendChild(negTa);
+
+            const actions = document.createElement('div');
+            actions.className = 'compare-result-actions';
+            const copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className = 'btn btn-sm btn-secondary';
+            copyBtn.textContent = I18n.t('page.compare.copy_btn', '📋 コピー');
+            copyBtn.addEventListener('click', () => {
+                const text = `Positive:\n${res.positive || ''}\n\nNegative:\n${res.negative || ''}`;
+                navigator.clipboard.writeText(text)
+                    .then(() => toast(I18n.t('toast.copied', 'コピーしました'), 'success'))
+                    .catch(() => toast(I18n.t('toast.copy_failed', 'コピーに失敗しました'), 'error'));
+            });
+            actions.appendChild(copyBtn);
+
+            const sendBtn = document.createElement('button');
+            sendBtn.type = 'button';
+            sendBtn.className = 'btn btn-sm btn-accent';
+            sendBtn.textContent = I18n.t('page.compare.send_to_sd_btn', 'この設定でSD生成へ');
+            sendBtn.addEventListener('click', () => sendCompareResultToSD(res));
+            actions.appendChild(sendBtn);
+
+            card.appendChild(actions);
+        } else {
+            const errDiv = document.createElement('div');
+            errDiv.className = 'compare-result-error';
+            errDiv.textContent = res.error || I18n.t('page.compare.status_failed', '失敗');
+            card.appendChild(errDiv);
+        }
+
+        resultsEl.appendChild(card);
+    });
+
+    resultsEl.classList.remove('hidden');
+}
+
+function sendCompareResultToSD(res) {
+    document.getElementById('sd-positive').value = res.positive || '';
+    document.getElementById('sd-negative').value = res.negative || '';
+    document.querySelector('[data-page="sd"]').click();
+    checkSDStatus();
+    toast(I18n.t('page.compare.sent_to_sd', 'SDページに送りました'), 'info');
+}
+
+/* ---- A/B Test ---- */
+async function runABGenerate() {
+    const btn = document.getElementById('ab-generate-btn');
+    const loading = document.getElementById('ab-loading');
+    const errorEl = document.getElementById('ab-error');
+    const resultsEl = document.getElementById('ab-results');
+
+    const positiveA = document.getElementById('ab-a-positive').value.trim();
+    const positiveB = document.getElementById('ab-b-positive').value.trim();
+    if (!positiveA || !positiveB) {
+        toast(I18n.t('page.compare.ab_no_prompt', 'A・B両方のPositive Promptを入力してください'), 'error');
+        return;
+    }
+
+    const steps = parseInt(document.getElementById('ab-steps').value) || 20;
+    const cfg_scale = parseFloat(document.getElementById('ab-cfg').value) || 7;
+    const sampler = document.getElementById('ab-sampler').value;
+    const width = parseInt(document.getElementById('ab-width').value) || 512;
+    const height = parseInt(document.getElementById('ab-height').value) || 512;
+    const seed = parseInt(document.getElementById('ab-seed').value);
+
+    const payload = {
+        config_a: { positive: positiveA, negative: document.getElementById('ab-a-negative').value.trim(), steps, cfg_scale, sampler, width, height },
+        config_b: { positive: positiveB, negative: document.getElementById('ab-b-negative').value.trim(), steps, cfg_scale, sampler, width, height },
+        seed: Number.isFinite(seed) ? seed : -1
+    };
+
+    btn.disabled = true;
+    loading.classList.remove('hidden');
+    errorEl.classList.add('hidden');
+    resultsEl.classList.add('hidden');
+    while (resultsEl.firstChild) resultsEl.removeChild(resultsEl.firstChild);
+
+    try {
+        const r = await fetch('/api/compare/ab-generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || data.message || I18n.t('page.compare.ab_generate_failed', 'A/B生成に失敗しました'));
+        renderABResult(data);
+        toast(I18n.t('page.compare.ab_generate_success', 'A/B生成が完了しました'), 'success');
+        _abHistoryLoaded = false;
+    } catch (e) {
+        errorEl.textContent = e.message || I18n.t('page.compare.ab_generate_failed', 'A/B生成に失敗しました');
+        errorEl.classList.remove('hidden');
+        toast(e.message || I18n.t('page.compare.ab_generate_failed', 'A/B生成に失敗しました'), 'error');
+    } finally {
+        btn.disabled = false;
+        loading.classList.add('hidden');
+    }
+}
+
+function _buildABColumn(label, images, comparisonId, winnerKey, currentWinner) {
+    const col = document.createElement('div');
+    col.className = 'ab-result-col';
+
+    const h = document.createElement('h4');
+    h.textContent = label;
+    if (currentWinner === winnerKey) {
+        const badge = document.createElement('span');
+        badge.className = 'ab-winner-badge';
+        badge.textContent = I18n.t('page.compare.ab_winner_badge', '🏆 採用');
+        h.appendChild(badge);
+    }
+    col.appendChild(h);
+
+    (images || []).forEach(b64 => {
+        const img = document.createElement('img');
+        img.src = `data:image/png;base64,${b64}`;
+        img.className = 'ab-result-image';
+        col.appendChild(img);
+    });
+
+    const voteBtn = document.createElement('button');
+    voteBtn.type = 'button';
+    voteBtn.className = 'btn btn-sm btn-primary ab-vote-btn';
+    voteBtn.textContent = I18n.t('page.compare.ab_vote_btn', 'こちらを採用');
+    voteBtn.dataset.comparisonId = comparisonId;
+    voteBtn.dataset.winner = winnerKey;
+    if (currentWinner) voteBtn.disabled = true;
+    voteBtn.addEventListener('click', () => voteAB(comparisonId, winnerKey, col.parentElement));
+    col.appendChild(voteBtn);
+
+    return col;
+}
+
+function renderABResult(data) {
+    const resultsEl = document.getElementById('ab-results');
+    while (resultsEl.firstChild) resultsEl.removeChild(resultsEl.firstChild);
+
+    const seedInfo = document.createElement('div');
+    seedInfo.className = 'ab-seed-info';
+    seedInfo.textContent = `${I18n.t('page.compare.ab_used_seed', '使用シード')}: ${data.seed}`;
+    resultsEl.appendChild(seedInfo);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ab-result-cols';
+    wrap.appendChild(_buildABColumn('A', data.a?.images, data.comparison_id, 'a', null));
+    wrap.appendChild(_buildABColumn('B', data.b?.images, data.comparison_id, 'b', null));
+    resultsEl.appendChild(wrap);
+
+    resultsEl.classList.remove('hidden');
+}
+
+async function voteAB(comparisonId, winner, wrapEl) {
+    try {
+        const r = await fetch(`/api/compare/ab/${comparisonId}/vote`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ winner })
+        });
+        if (!r.ok) {
+            const d = await r.json().catch(() => ({}));
+            throw new Error(d.detail || d.message || I18n.t('page.compare.ab_vote_failed', '投票に失敗しました'));
+        }
+        wrapEl?.querySelectorAll('.ab-vote-btn').forEach(btn => { btn.disabled = true; });
+        const winnerCol = wrapEl?.querySelector(`.ab-vote-btn[data-winner="${winner}"]`)?.closest('.ab-result-col');
+        if (winnerCol) {
+            const h = winnerCol.querySelector('h4');
+            if (h && !h.querySelector('.ab-winner-badge')) {
+                const badge = document.createElement('span');
+                badge.className = 'ab-winner-badge';
+                badge.textContent = I18n.t('page.compare.ab_winner_badge', '🏆 採用');
+                h.appendChild(badge);
+            }
+        }
+        toast(I18n.t('page.compare.ab_voted', '投票しました'), 'success');
+        _abHistoryLoaded = false;
+    } catch (e) {
+        toast(e.message || I18n.t('page.compare.ab_vote_failed', '投票に失敗しました'), 'error');
+    }
+}
+
+async function toggleABHistory() {
+    const list = document.getElementById('ab-history-list');
+    if (!list) return;
+    const nowHidden = list.classList.toggle('hidden');
+    if (!nowHidden && !_abHistoryLoaded) {
+        await loadABHistory();
+    }
+}
+
+function _truncate(text, max) {
+    if (!text) return '';
+    return text.length > max ? text.slice(0, max) + '…' : text;
+}
+
+async function loadABHistory() {
+    const list = document.getElementById('ab-history-list');
+    if (!list) return;
+    while (list.firstChild) list.removeChild(list.firstChild);
+    try {
+        const r = await fetch('/api/compare/ab-history');
+        const data = await r.json();
+        const items = data.comparisons || [];
+        if (!items.length) {
+            const empty = document.createElement('p');
+            empty.className = 'ab-history-empty';
+            empty.textContent = I18n.t('page.compare.ab_history_empty', 'A/B履歴がありません');
+            list.appendChild(empty);
+        } else {
+            items.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'ab-history-item';
+
+                const meta = document.createElement('div');
+                meta.className = 'ab-history-item-meta';
+                const created = item.created_at ? new Date(item.created_at).toLocaleString('ja-JP') : '';
+                meta.textContent = created;
+                if (item.winner) {
+                    const badge = document.createElement('span');
+                    badge.className = 'ab-winner-badge';
+                    badge.textContent = `🏆 ${item.winner.toUpperCase()}`;
+                    meta.appendChild(badge);
+                }
+                row.appendChild(meta);
+
+                const promptA = document.createElement('div');
+                promptA.className = 'ab-history-item-prompt';
+                promptA.textContent = `A: ${_truncate(item.config_a?.positive || item.positive_a || '', 80)}`;
+                row.appendChild(promptA);
+
+                const promptB = document.createElement('div');
+                promptB.className = 'ab-history-item-prompt';
+                promptB.textContent = `B: ${_truncate(item.config_b?.positive || item.positive_b || '', 80)}`;
+                row.appendChild(promptB);
+
+                list.appendChild(row);
+            });
+        }
+        _abHistoryLoaded = true;
+    } catch {
+        const err = document.createElement('p');
+        err.className = 'ab-history-empty';
+        err.textContent = I18n.t('page.compare.ab_history_load_failed', 'A/B履歴の読み込みに失敗しました');
+        list.appendChild(err);
+    }
 }

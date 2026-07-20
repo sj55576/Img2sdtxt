@@ -25,6 +25,7 @@ from config import (
 )
 from job_queue import job_queue
 from rate_limit import RateLimitMiddleware
+from routes.compare import router as compare_router
 from routes.gallery import router as gallery_router
 from routes.history import router as history_router
 from routes.jobs import router as jobs_router
@@ -93,6 +94,7 @@ app.include_router(tags_router)
 app.include_router(png_info_router)
 app.include_router(stats_router)
 app.include_router(wildcards_router)
+app.include_router(compare_router)
 
 job_queue.add_listener(webhook_notifier.job_listener)
 

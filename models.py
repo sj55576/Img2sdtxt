@@ -100,6 +100,27 @@ class UpdateWildcardRequest(BaseModel):
     entries: list[str] = Field(..., min_length=1)
 
 
+class ABConfig(BaseModel):
+    positive: str = Field(..., min_length=1, description="Positive prompt")
+    negative: str = Field("", description="Negative prompt")
+    steps: int = Field(20, ge=1, le=150, description="Sampling steps")
+    cfg_scale: float = Field(7.0, ge=1.0, le=30.0, description="CFG scale")
+    sampler: str = Field("Euler a", description="Sampler name")
+    width: int = Field(512, ge=64, le=2048, description="Image width")
+    height: int = Field(512, ge=64, le=2048, description="Image height")
+
+
+class ABGenerateRequest(BaseModel):
+    config_a: ABConfig = Field(..., description="A案の生成設定")
+    config_b: ABConfig = Field(..., description="B案の生成設定")
+    seed: int = Field(-1, description="共有シード（-1でランダム生成し両方に使用）")
+
+
+class ABVoteRequest(BaseModel):
+    winner: str = Field(..., description="勝者。'a' または 'b'")
+    note: str = Field("", description="投票メモ")
+
+
 class ExpandPromptRequest(BaseModel):
     template: str = Field(..., min_length=1, max_length=10000)
     mode: str = Field("random", pattern=r"^(random|combinatorial|preview)$")
