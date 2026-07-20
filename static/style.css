@@ -948,6 +948,17 @@ textarea { resize: vertical; }
 /* Ctrl+Enter hint (FE-5) */
 .ctrl-enter-hint { font-size: 0.72rem; color: var(--text-muted); text-align: right; margin-top: 4px; }
 
+/* XY Plot */
+.xyplot-cell-count { margin-top: 10px; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+.xyplot-cell-count.warning { color: var(--danger); }
+.xyplot-error { margin-top: 10px; padding: 10px 14px; border-radius: 8px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: var(--danger); font-size: 0.85rem; }
+.xyplot-grid-wrap { margin: 10px 0; }
+.xyplot-grid-wrap img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); }
+.xyplot-cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
+.xyplot-cell { border: 1px solid var(--border); border-radius: 8px; padding: 6px; text-align: center; background: var(--surface2); }
+.xyplot-cell img { max-width: 100%; border-radius: 4px; }
+.xyplot-cell-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; word-break: break-word; }
+
 /* Image Compare Slider (FE3-3) */
 .image-compare {
     position: relative;

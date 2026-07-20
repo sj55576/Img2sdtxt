@@ -67,15 +67,20 @@ function updateTokenCounter(textareaId, counterId) {
 }
 
 // モデル選択の永続化（タブ切り替えでリセットされないよう変数で保持）
-const _selectedModel = { sd: '', img2img: '', inpaint: '' };
+const _selectedModel = { sd: '', img2img: '', inpaint: '', xyplot: '' };
 // モデルリストの初回ロード済みフラグ（タブ切り替え時の再構築を防ぐ）
-const _modelsLoaded = { sd: false, img2img: false, inpaint: false };
+const _modelsLoaded = { sd: false, img2img: false, inpaint: false, xyplot: false };
 
 // FE-2: Status check promise cache (prevents concurrent duplicate fetches)
-const _sdStatusPromise = { sd: null, img2img: null, inpaint: null };
+const _sdStatusPromise = { sd: null, img2img: null, inpaint: null, xyplot: null };
 
 // FE-1: Multi-model running guard
 let _multiModelRunning = false;
+
+// XY Plot job state
+let _xyPlotJobId = null;
+let _xyPlotWs = null;
+let _xyPlotRunning = false;
 
 // FE-6: History items map (id → item object)
 const _historyItems = new Map();
@@ -192,6 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _setup('sd', setupSDPage);
     _setup('img2img', setupImg2ImgPage);
     _setup('inpaint', setupInpaintPage);
+    _setup('xyplot', setupXYPlotPage);
     _setup('gallery', setupGalleryPage);
     _setup('pnginfo', setupPngInfoPage);
     _setup('stats', setupStatsPage);
@@ -214,6 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkSDStatus();
     checkImg2ImgStatus();
     checkInpaintStatus();
+    checkXYPlotStatus();
 
     // FE-5: Ctrl+Enter shortcut to trigger generation
     document.addEventListener('keydown', e => {
@@ -235,6 +242,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btn && !btn.disabled) btn.click();
             } else if (pageId === 'page-inpaint') {
                 const btn = document.getElementById('inpaint-generate-btn');
+                if (btn && !btn.disabled) btn.click();
+            } else if (pageId === 'page-xyplot') {
+                const btn = document.getElementById('xyplot-run-btn');
                 if (btn && !btn.disabled) btn.click();
             }
         }
@@ -339,6 +349,7 @@ function setupNavigation() {
         if (page === 'sd') checkSDStatus();
         if (page === 'img2img') checkImg2ImgStatus();
         if (page === 'inpaint') checkInpaintStatus();
+        if (page === 'xyplot') checkXYPlotStatus();
         if (page === 'gallery') { loadGallery(); loadGalleryFilters(); }
         if (page === 'stats') loadStats();
     }
@@ -2809,6 +2820,38 @@ function applyLastParams(feature, params) {
             const chk = document.getElementById('inpaint-full-res');
             if (chk) { chk.checked = params.inpaint_full_res; }
         }
+
+    } else if (feature === 'xyplot') {
+        setVal('xyplot-positive', params.positive);
+        setVal('xyplot-negative', params.negative);
+        setVal('xyplot-width', params.width);
+        setVal('xyplot-height', params.height);
+        setVal('xyplot-steps', params.steps);
+        setVal('xyplot-cfg', params.cfg_scale);
+        setVal('xyplot-seed', params.seed);
+        setVal('xyplot-sampler', params.sampler);
+        setVal('xyplot-model', params.model);
+        if (params.model) _selectedModel.xyplot = params.model;
+        setVal('xyplot-loras', params.loras);
+        if (params.x_axis) {
+            setVal('xyplot-x-type', params.x_axis.type);
+            setVal('xyplot-x-values', (params.x_axis.values || []).join(', '));
+        }
+        if (params.y_axis) {
+            setVal('xyplot-y-type', params.y_axis.type);
+            setVal('xyplot-y-values', (params.y_axis.values || []).join(', '));
+            const group = document.getElementById('xyplot-y-values-group');
+            if (group) group.classList.toggle('hidden', params.y_axis.type === 'none');
+        }
+        if (params.draw_legend !== undefined) {
+            const chk = document.getElementById('xyplot-draw-legend');
+            if (chk) chk.checked = params.draw_legend;
+        }
+        if (params.include_cell_images !== undefined) {
+            const chk = document.getElementById('xyplot-include-cells');
+            if (chk) chk.checked = params.include_cell_images;
+        }
+        updateXYPlotCellCount();
     }
 }
 
@@ -2866,6 +2909,332 @@ function startSDProgress(containerEl) {
         fill.style.width = '0%';
         text.textContent = '';
     };
+}
+
+/* =====================================================================
+   XY Plot Page
+   ===================================================================== */
+async function checkXYPlotStatus() {
+    if (!_sdStatusPromise.xyplot) {
+        _sdStatusPromise.xyplot = (async () => {
+            const badge = document.getElementById('xyplot-api-badge');
+            if (badge) { badge.className = 'badge badge-gray'; badge.textContent = 'Checking...'; }
+            try {
+                const r = await fetch('/api/sd/status');
+                const d = await r.json();
+                if (d.available) {
+                    if (badge) { badge.className = 'badge badge-green'; badge.textContent = 'Connected'; }
+
+                    if (!_modelsLoaded.xyplot) {
+                        if (d.samplers?.length) {
+                            const sel = document.getElementById('xyplot-sampler');
+                            if (sel) {
+                                sel.innerHTML = d.samplers.map(s => `<option>${s}</option>`).join('');
+                                if (sel.dataset.pendingValue) { sel.value = sel.dataset.pendingValue; delete sel.dataset.pendingValue; }
+                            }
+                        }
+                        if (d.models?.length) {
+                            const modelSel = document.getElementById('xyplot-model');
+                            if (modelSel) {
+                                const toRestore = _selectedModel.xyplot || modelSel.dataset.pendingValue || '';
+                                const defaultLabel = I18n.t('page.xyplot.model_default', '-- Current --');
+                                modelSel.innerHTML = `<option value="">${defaultLabel}</option>` + d.models.map(m => {
+                                    const name = m.model_name || m.title || '';
+                                    return `<option value="${name}">${name}</option>`;
+                                }).join('');
+                                if (toRestore) modelSel.value = toRestore;
+                                if (modelSel.dataset.pendingValue) delete modelSel.dataset.pendingValue;
+                            }
+                        }
+                        _modelsLoaded.xyplot = true;
+                    } else {
+                        const modelSel = document.getElementById('xyplot-model');
+                        if (modelSel && _selectedModel.xyplot && modelSel.value !== _selectedModel.xyplot) {
+                            modelSel.value = _selectedModel.xyplot;
+                        }
+                    }
+                } else {
+                    if (badge) { badge.className = 'badge badge-red'; badge.textContent = 'Disconnected'; }
+                }
+            } catch {
+                if (badge) { badge.className = 'badge badge-red'; badge.textContent = 'Error'; }
+            }
+        })().finally(() => { _sdStatusPromise.xyplot = null; });
+    }
+    return _sdStatusPromise.xyplot;
+}
+
+function setupXYPlotPage() {
+    document.getElementById('xyplot-model')?.addEventListener('change', e => { _selectedModel.xyplot = e.target.value; });
+    document.getElementById('xyplot-x-values')?.addEventListener('input', updateXYPlotCellCount);
+    document.getElementById('xyplot-y-values')?.addEventListener('input', updateXYPlotCellCount);
+    document.getElementById('xyplot-x-type')?.addEventListener('change', updateXYPlotCellCount);
+    document.getElementById('xyplot-y-type')?.addEventListener('change', () => {
+        const yType = document.getElementById('xyplot-y-type').value;
+        const group = document.getElementById('xyplot-y-values-group');
+        if (group) group.classList.toggle('hidden', yType === 'none');
+        updateXYPlotCellCount();
+    });
+    document.getElementById('xyplot-run-btn')?.addEventListener('click', runXYPlot);
+    document.getElementById('xyplot-cancel-btn')?.addEventListener('click', cancelXYPlotJob);
+    document.getElementById('xyplot-cells-toggle-btn')?.addEventListener('click', toggleXYPlotCells);
+
+    checkXYPlotStatus().then(() => loadLastParams('xyplot'));
+    updateXYPlotCellCount();
+}
+
+function _xyplotParseValues(id) {
+    const raw = document.getElementById(id)?.value || '';
+    return raw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+}
+
+function updateXYPlotCellCount() {
+    const el = document.getElementById('xyplot-cell-count');
+    const runBtn = document.getElementById('xyplot-run-btn');
+    if (!el) return;
+
+    const xValues = _xyplotParseValues('xyplot-x-values');
+    const yType = document.getElementById('xyplot-y-type')?.value || 'none';
+    const yValues = yType === 'none' ? [] : _xyplotParseValues('xyplot-y-values');
+
+    const xCount = xValues.length;
+    const yCount = yType === 'none' ? 1 : yValues.length;
+
+    if (xCount === 0 || (yType !== 'none' && yCount === 0)) {
+        el.textContent = '';
+        el.classList.remove('warning');
+        if (runBtn) runBtn.disabled = false;
+        return;
+    }
+
+    const total = xCount * yCount;
+    const label = I18n.t('page.xyplot.cell_count_label', 'cells');
+    let text = `${xCount} × ${yCount} = ${total} ${label}`;
+    const tooMany = total > 36;
+    if (tooMany) {
+        text += ' — ' + I18n.t('page.xyplot.cell_count_too_many', 'Too many cells (max 36). Reduce the number of X/Y values.');
+    }
+    el.textContent = text;
+    el.classList.toggle('warning', tooMany);
+    if (runBtn && !_xyPlotRunning) runBtn.disabled = tooMany;
+}
+
+function toggleXYPlotCells() {
+    const cellsEl = document.getElementById('xyplot-cells');
+    const btn = document.getElementById('xyplot-cells-toggle-btn');
+    if (!cellsEl || !btn) return;
+    const nowHidden = cellsEl.classList.toggle('hidden');
+    const key = nowHidden ? 'page.xyplot.show_cells_btn' : 'page.xyplot.hide_cells_btn';
+    const fallback = nowHidden ? '🔍 Show Individual Cells' : '🔼 Hide Individual Cells';
+    btn.setAttribute('data-i18n', key);
+    btn.textContent = I18n.t(key, fallback);
+}
+
+function setXYPlotProgress(pct01, statusText) {
+    const wrap = document.getElementById('xyplot-progress-wrap');
+    if (!wrap) return;
+    const fill = wrap.querySelector('.sd-progress-fill');
+    const textEl = wrap.querySelector('.sd-progress-text');
+    const pct = Math.round((pct01 || 0) * 100);
+    if (fill) fill.style.width = pct + '%';
+    if (textEl) textEl.textContent = statusText ? `${pct}% - ${statusText}` : `${pct}%`;
+    const loadingText = document.getElementById('xyplot-loading-text');
+    if (loadingText && statusText) loadingText.textContent = statusText;
+}
+
+function resetXYPlotUI() {
+    const errorEl = document.getElementById('xyplot-error');
+    if (errorEl) { errorEl.classList.add('hidden'); errorEl.textContent = ''; }
+    document.getElementById('xyplot-results')?.classList.add('hidden');
+    const gridWrap = document.getElementById('xyplot-grid-wrap');
+    if (gridWrap) gridWrap.innerHTML = '';
+    const cellsEl = document.getElementById('xyplot-cells');
+    if (cellsEl) { cellsEl.innerHTML = ''; cellsEl.classList.add('hidden'); }
+    const cellsToggleBtn = document.getElementById('xyplot-cells-toggle-btn');
+    if (cellsToggleBtn) {
+        cellsToggleBtn.classList.add('hidden');
+        cellsToggleBtn.setAttribute('data-i18n', 'page.xyplot.show_cells_btn');
+        cellsToggleBtn.textContent = I18n.t('page.xyplot.show_cells_btn', '🔍 Show Individual Cells');
+    }
+    setXYPlotProgress(0, '');
+}
+
+function showXYPlotError(msg) {
+    const el = document.getElementById('xyplot-error');
+    if (!el) return;
+    el.textContent = msg || I18n.t('page.xyplot.status_failed', 'Failed');
+    el.classList.remove('hidden');
+}
+
+function finishXYPlotRun() {
+    _xyPlotRunning = false;
+    _xyPlotJobId = null;
+    if (_xyPlotWs) { try { _xyPlotWs.close(); } catch {} _xyPlotWs = null; }
+    const btn = document.getElementById('xyplot-run-btn');
+    document.getElementById('xyplot-cancel-btn')?.classList.add('hidden');
+    document.getElementById('xyplot-loading')?.classList.add('hidden');
+    updateXYPlotCellCount();
+    if (btn && btn.disabled && !document.getElementById('xyplot-cell-count')?.classList.contains('warning')) {
+        btn.disabled = false;
+    }
+}
+
+function handleXYPlotJobUpdate(job) {
+    if (!job) return;
+    const status = job.status;
+    if (status === 'pending') {
+        setXYPlotProgress(job.progress || 0, I18n.t('page.xyplot.status_pending', 'Queued...'));
+    } else if (status === 'running') {
+        setXYPlotProgress(job.progress || 0, I18n.t('page.xyplot.status_running', 'Generating...'));
+    } else if (status === 'completed') {
+        setXYPlotProgress(1, I18n.t('page.xyplot.status_completed', 'Complete'));
+        renderXYPlotResult(job.result || {});
+        toast(I18n.t('page.xyplot.status_completed', 'Complete'), 'success');
+        finishXYPlotRun();
+    } else if (status === 'failed') {
+        showXYPlotError(job.error || job.detail || I18n.t('page.xyplot.status_failed', 'Failed'));
+        toast(I18n.t('page.xyplot.status_failed', 'Failed'), 'error');
+        finishXYPlotRun();
+    } else if (status === 'cancelled') {
+        showXYPlotError(I18n.t('page.xyplot.status_cancelled', 'Cancelled'));
+        toast(I18n.t('page.xyplot.status_cancelled', 'Cancelled'), 'info');
+        finishXYPlotRun();
+    }
+}
+
+function connectXYPlotWs(jobId) {
+    if (_xyPlotWs) { try { _xyPlotWs.close(); } catch {} _xyPlotWs = null; }
+    try {
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        _xyPlotWs = new WebSocket(`${protocol}//${location.host}/api/jobs/${jobId}/ws`);
+        _xyPlotWs.onmessage = e => {
+            try { handleXYPlotJobUpdate(JSON.parse(e.data)); }
+            catch (err) { console.error('[XYPLOT] Failed to parse ws message:', err); }
+        };
+        _xyPlotWs.onerror = () => { console.error('[XYPLOT] WebSocket error'); };
+        _xyPlotWs.onclose = () => { _xyPlotWs = null; };
+    } catch (e) {
+        showXYPlotError(e.message);
+        finishXYPlotRun();
+    }
+}
+
+function renderXYPlotResult(result) {
+    const gridWrap = document.getElementById('xyplot-grid-wrap');
+    const resultsEl = document.getElementById('xyplot-results');
+    const downloadLink = document.getElementById('xyplot-download-link');
+    const cellsToggleBtn = document.getElementById('xyplot-cells-toggle-btn');
+    const cellsEl = document.getElementById('xyplot-cells');
+    if (!gridWrap || !resultsEl) return;
+
+    if (!result || !result.grid_image) {
+        showXYPlotError(I18n.t('page.xyplot.status_failed', 'Failed'));
+        return;
+    }
+
+    const dataUrl = `data:image/png;base64,${result.grid_image}`;
+    gridWrap.innerHTML = `<img src="${dataUrl}" alt="XY Plot Grid">`;
+    if (downloadLink) {
+        downloadLink.href = dataUrl;
+        downloadLink.download = 'xy_plot.png';
+    }
+
+    if (cellsEl) cellsEl.innerHTML = '';
+    const cells = Array.isArray(result.cells) ? result.cells : [];
+    if (cellsToggleBtn && cellsEl && cells.some(c => c && c.image)) {
+        cellsToggleBtn.classList.remove('hidden');
+        cellsEl.innerHTML = cells.map(c => {
+            if (!c || !c.image) return '';
+            const label = [c.x_label, c.y_label].filter(Boolean).join(' / ');
+            return `<div class="xyplot-cell">
+                <img src="data:image/png;base64,${c.image}" alt="${escHtml(label)}">
+                <div class="xyplot-cell-label">${escHtml(label)}</div>
+            </div>`;
+        }).join('');
+    } else if (cellsToggleBtn) {
+        cellsToggleBtn.classList.add('hidden');
+    }
+
+    resultsEl.classList.remove('hidden');
+}
+
+async function runXYPlot() {
+    if (_xyPlotRunning) return;
+
+    const positive = document.getElementById('xyplot-positive').value.trim();
+    if (!positive) { toast(I18n.t('page.xyplot.no_positive', 'Please enter a positive prompt'), 'error'); return; }
+
+    const xType = document.getElementById('xyplot-x-type').value;
+    const xValues = _xyplotParseValues('xyplot-x-values');
+    if (!xValues.length) { toast(I18n.t('page.xyplot.no_x_values', 'Please enter at least one X value'), 'error'); return; }
+
+    const yType = document.getElementById('xyplot-y-type').value;
+    let yValues = [];
+    if (yType !== 'none') {
+        yValues = _xyplotParseValues('xyplot-y-values');
+        if (!yValues.length) { toast(I18n.t('page.xyplot.no_y_values', 'Please enter at least one Y value'), 'error'); return; }
+    }
+
+    const cellCount = xValues.length * (yType === 'none' ? 1 : yValues.length);
+    if (cellCount > 36) {
+        toast(I18n.t('page.xyplot.cell_count_too_many', 'Too many cells (max 36). Reduce the number of X/Y values.'), 'error');
+        return;
+    }
+
+    const params = {
+        positive,
+        negative: document.getElementById('xyplot-negative').value.trim(),
+        width: parseInt(document.getElementById('xyplot-width').value),
+        height: parseInt(document.getElementById('xyplot-height').value),
+        steps: parseInt(document.getElementById('xyplot-steps').value),
+        cfg_scale: parseFloat(document.getElementById('xyplot-cfg').value),
+        sampler: document.getElementById('xyplot-sampler').value,
+        seed: parseInt(document.getElementById('xyplot-seed').value),
+        model: document.getElementById('xyplot-model').value,
+        loras: document.getElementById('xyplot-loras').value.trim(),
+        x_axis: { type: xType, values: xValues },
+        y_axis: { type: yType, values: yValues },
+        draw_legend: document.getElementById('xyplot-draw-legend').checked,
+        include_cell_images: document.getElementById('xyplot-include-cells').checked,
+    };
+
+    saveLastParams('xyplot', params);
+
+    _xyPlotRunning = true;
+    const btn = document.getElementById('xyplot-run-btn');
+    if (btn) btn.disabled = true;
+    resetXYPlotUI();
+    document.getElementById('xyplot-loading')?.classList.remove('hidden');
+    document.getElementById('xyplot-cancel-btn')?.classList.remove('hidden');
+    setXYPlotProgress(0, I18n.t('page.xyplot.status_pending', 'Queued...'));
+
+    try {
+        const r = await fetch('/api/jobs/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_type: 'xy_plot', params })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.success) {
+            throw new Error(d.detail || d.message || I18n.t('page.xyplot.submit_failed', 'Failed to submit XY plot job'));
+        }
+        _xyPlotJobId = d.job.id;
+        connectXYPlotWs(_xyPlotJobId);
+    } catch (e) {
+        showXYPlotError(e.message);
+        toast(e.message || I18n.t('page.xyplot.submit_failed', 'Failed to submit XY plot job'), 'error');
+        finishXYPlotRun();
+    }
+}
+
+async function cancelXYPlotJob() {
+    if (!_xyPlotJobId) return;
+    try {
+        await fetch(`/api/jobs/${_xyPlotJobId}/cancel`, { method: 'POST' });
+    } catch (e) {
+        console.error('[XYPLOT] Failed to cancel job:', e);
+        toast(I18n.t('page.xyplot.cancel_failed', 'Failed to cancel job'), 'error');
+    }
 }
 
 /* =====================================================================

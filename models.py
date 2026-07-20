@@ -44,6 +44,28 @@ class SDMultiModelRequest(BaseModel):
     hr_denoising_strength: float = Field(0.7, ge=0.0, le=1.0)
 
 
+class XYPlotAxis(BaseModel):
+    type: str = Field(..., description="Axis type: steps, cfg_scale, sampler, seed, model, prompt_sr, or none")
+    values: List[str] = Field(default_factory=list, description="Raw axis values (coerced per axis type)")
+
+
+class XYPlotRequest(BaseModel):
+    positive: str = Field(..., min_length=1, description="Positive prompt")
+    negative: str = Field("", description="Negative prompt")
+    width: int = Field(512, ge=64, le=2048, description="Image width")
+    height: int = Field(512, ge=64, le=2048, description="Image height")
+    steps: int = Field(20, ge=1, le=150, description="Sampling steps")
+    cfg_scale: float = Field(7.0, ge=1.0, le=30.0, description="CFG scale")
+    sampler: str = Field("Euler a", description="Sampler name")
+    seed: int = Field(-1, description="Random seed (-1 for random)")
+    model: str = Field("", description="Model checkpoint name")
+    loras: str = Field("", description="LoRA specification")
+    x_axis: XYPlotAxis = Field(..., description="X axis definition")
+    y_axis: XYPlotAxis = Field(default_factory=lambda: XYPlotAxis(type="none"), description="Y axis definition")
+    draw_legend: bool = Field(True, description="Draw axis labels on the composed grid image")
+    include_cell_images: bool = Field(False, description="Include each cell's base64 image in the result")
+
+
 class TextPromptRequest(BaseModel):
     description: str = Field(..., min_length=1, max_length=5000)
     style: str = Field("")
