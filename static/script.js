@@ -3132,25 +3132,37 @@ function renderXYPlotResult(result) {
         return;
     }
 
+    // innerHTML へのテンプレート埋め込みはXSSになるため、DOM APIで構築する
     const dataUrl = `data:image/png;base64,${result.grid_image}`;
-    gridWrap.innerHTML = `<img src="${dataUrl}" alt="XY Plot Grid">`;
+    gridWrap.textContent = '';
+    const gridImg = document.createElement('img');
+    gridImg.src = dataUrl;
+    gridImg.alt = 'XY Plot Grid';
+    gridWrap.appendChild(gridImg);
     if (downloadLink) {
         downloadLink.href = dataUrl;
         downloadLink.download = 'xy_plot.png';
     }
 
-    if (cellsEl) cellsEl.innerHTML = '';
+    if (cellsEl) cellsEl.textContent = '';
     const cells = Array.isArray(result.cells) ? result.cells : [];
     if (cellsToggleBtn && cellsEl && cells.some(c => c && c.image)) {
         cellsToggleBtn.classList.remove('hidden');
-        cellsEl.innerHTML = cells.map(c => {
-            if (!c || !c.image) return '';
+        cells.forEach(c => {
+            if (!c || !c.image) return;
             const label = [c.x_label, c.y_label].filter(Boolean).join(' / ');
-            return `<div class="xyplot-cell">
-                <img src="data:image/png;base64,${c.image}" alt="${escHtml(label)}">
-                <div class="xyplot-cell-label">${escHtml(label)}</div>
-            </div>`;
-        }).join('');
+            const cellDiv = document.createElement('div');
+            cellDiv.className = 'xyplot-cell';
+            const cellImg = document.createElement('img');
+            cellImg.src = `data:image/png;base64,${c.image}`;
+            cellImg.alt = label;
+            const labelDiv = document.createElement('div');
+            labelDiv.className = 'xyplot-cell-label';
+            labelDiv.textContent = label;
+            cellDiv.appendChild(cellImg);
+            cellDiv.appendChild(labelDiv);
+            cellsEl.appendChild(cellDiv);
+        });
     } else if (cellsToggleBtn) {
         cellsToggleBtn.classList.add('hidden');
     }
