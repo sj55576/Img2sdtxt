@@ -1,3 +1,4 @@
+import json
 import logging
 import sqlite3
 from datetime import datetime
@@ -45,6 +46,16 @@ def init_db():
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tags_tag ON prompt_tags(tag)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ab_comparisons (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                config_a TEXT NOT NULL,
+                config_b TEXT NOT NULL,
+                winner TEXT,
+                note TEXT
+            )
+        """)
         conn.commit()
 
 
@@ -375,3 +386,54 @@ def toggle_favorite(item_id: int) -> Optional[Dict]:
         conn.commit()
         updated = conn.execute("SELECT * FROM prompt_history WHERE id = ?", (item_id,)).fetchone()
         return dict(updated) if updated else None
+
+
+# ------------------------------------------------------------------ #
+# A/B テスト比較
+# ------------------------------------------------------------------ #
+
+
+def save_ab_comparison(config_a: Dict, config_b: Dict) -> int:
+    """A/B比較の設定を保存し、新規レコードのIDを返す"""
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.execute(
+            """INSERT INTO ab_comparisons (created_at, config_a, config_b, winner, note)
+               VALUES (?, ?, ?, NULL, '')""",
+            (
+                datetime.now().isoformat(),
+                json.dumps(config_a, ensure_ascii=False),
+                json.dumps(config_b, ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+        return cursor.lastrowid or 0
+
+
+def set_ab_winner(comparison_id: int, winner: str, note: str = "") -> bool:
+    """A/B比較の勝者を記録する。winner は 'a' または 'b'。対象レコードがなければ False"""
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        result = conn.execute(
+            "UPDATE ab_comparisons SET winner = ?, note = ? WHERE id = ?",
+            (winner, note, comparison_id),
+        )
+        conn.commit()
+        return result.rowcount > 0
+
+
+def get_ab_comparisons(limit: int = 50) -> List[Dict]:
+    """A/B比較履歴を新しい順に取得する（config_a/config_bはdictにパースして返す）"""
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM ab_comparisons ORDER BY created_at DESC, id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        items = []
+        for r in rows:
+            item = dict(r)
+            item["config_a"] = json.loads(item["config_a"])
+            item["config_b"] = json.loads(item["config_b"])
+            items.append(item)
+        return items

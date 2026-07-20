@@ -26,6 +26,7 @@
                 <button class="nav-btn" data-page="img2img" data-i18n="sidebar.nav.img2img">🔄 Img2Img</button>
                 <button class="nav-btn" data-page="inpaint" data-i18n="sidebar.nav.inpaint">🖌️ Inpaint</button>
                 <button class="nav-btn" data-page="xyplot" data-i18n="sidebar.nav.xyplot">📈 XY Plot</button>
+                <button class="nav-btn" data-page="compare" data-i18n="sidebar.nav.compare">🆚 Compare</button>
                 <button class="nav-btn" data-page="gallery" data-i18n="sidebar.nav.gallery">🗃️ Gallery</button>
                 <button class="nav-btn" data-page="pnginfo" data-i18n="sidebar.nav.pnginfo">🏷️ PNG Info</button>
                 <button class="nav-btn" data-page="wildcards" data-i18n="sidebar.nav.wildcards">🃏 Wildcards</button>
@@ -1232,6 +1233,151 @@
                     </div>
                 </div>
             </section>
+            <!-- ======================== COMPARE PAGE ======================== -->
+            <section id="page-compare" class="page">
+                <div class="page-header">
+                    <h2 data-i18n="page.compare.title">Compare</h2>
+                    <p data-i18n="page.compare.subtitle">プロンプトのA/Bテストと複数バリエーション比較</p>
+                    <div id="compare-api-badge" class="badge badge-gray">Checking...</div>
+                </div>
+                <div class="inner-tabs">
+                    <button class="inner-tab active" data-inner="compare-tab-prompt" data-i18n="page.compare.tab_prompt">🆚 プロンプト比較</button>
+                    <button class="inner-tab" data-inner="compare-tab-ab" data-i18n="page.compare.tab_ab">🅰️🅱️ A/Bテスト</button>
+                </div>
+
+                <!-- ==== Prompt Comparison ==== -->
+                <div id="compare-tab-prompt" class="inner-content active">
+                    <div class="page-body two-col">
+                        <div class="col">
+                            <div class="customization-panel">
+                                <h3 data-i18n="page.compare.image_title">📸 画像</h3>
+                                <div class="upload-area" id="compare-upload-area">
+                                    <div class="upload-icon">📸</div>
+                                    <p data-i18n="page.compare.upload_text">クリックまたはドラッグ&ドロップ</p>
+                                    <small data-i18n="page.compare.upload_hint">JPG, PNG, WebP, GIF (最大 10MB)</small>
+                                </div>
+                                <input type="file" id="compare-image-input" accept="image/*" hidden>
+                                <div id="compare-preview-wrap" class="preview-wrap hidden">
+                                    <img id="compare-preview-image" src="" alt="Preview">
+                                    <button id="compare-clear-image-btn" class="btn btn-sm btn-ghost" data-i18n="page.compare.clear_image">✕ クリア</button>
+                                </div>
+                            </div>
+
+                            <div class="customization-panel">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <h3 style="margin-bottom:0;" data-i18n="page.compare.variants_title">🧪 バリエーション（2〜4）</h3>
+                                    <button id="compare-add-variant-btn" class="btn btn-sm btn-secondary" data-i18n="page.compare.add_variant_btn">＋ 追加</button>
+                                </div>
+                                <div id="compare-variants-list"></div>
+                            </div>
+
+                            <button id="compare-generate-btn" class="btn btn-primary btn-block" data-i18n="page.compare.generate_btn">
+                                🆚 比較生成
+                            </button>
+                        </div>
+
+                        <div class="col">
+                            <div id="compare-loading" class="loading-box hidden">
+                                <div class="spinner"></div>
+                                <p data-i18n="page.compare.loading">比較生成中...</p>
+                            </div>
+                            <div id="compare-error" class="hidden xyplot-error"></div>
+                            <div id="compare-results" class="compare-results-grid hidden"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==== A/B Test ==== -->
+                <div id="compare-tab-ab" class="inner-content">
+                    <div class="customization-panel">
+                        <h3 data-i18n="page.compare.ab_shared_title">⚙️ 共通設定</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Steps</label>
+                                <input type="number" id="ab-steps" value="20" min="5" max="150">
+                            </div>
+                            <div class="form-group">
+                                <label>CFG Scale</label>
+                                <input type="number" id="ab-cfg" value="7" min="1" max="30" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Sampler</label>
+                                <select id="ab-sampler">
+                                    <option>Euler a</option>
+                                    <option>Euler</option>
+                                    <option>DPM++ 2M Karras</option>
+                                    <option>DDIM</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Width</label>
+                                <select id="ab-width">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Height</label>
+                                <select id="ab-height">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="page.compare.ab_seed_label">Seed (-1=random)</label>
+                                <input type="number" id="ab-seed" value="-1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="page-body two-col">
+                        <div class="col">
+                            <div class="customization-panel">
+                                <h3 data-i18n="page.compare.ab_config_a_title">🅰️ 設定 A</h3>
+                                <div class="form-group">
+                                    <label data-i18n="page.compare.positive_label">Positive Prompt</label>
+                                    <textarea id="ab-a-positive" rows="4"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="page.compare.negative_label">Negative Prompt</label>
+                                    <textarea id="ab-a-negative" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="customization-panel">
+                                <h3 data-i18n="page.compare.ab_config_b_title">🅱️ 設定 B</h3>
+                                <div class="form-group">
+                                    <label data-i18n="page.compare.positive_label">Positive Prompt</label>
+                                    <textarea id="ab-b-positive" rows="4"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="page.compare.negative_label">Negative Prompt</label>
+                                    <textarea id="ab-b-negative" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button id="ab-generate-btn" class="btn btn-primary btn-block" data-i18n="page.compare.ab_generate_btn">
+                        🅰️🅱️ A/B生成
+                    </button>
+
+                    <div id="ab-loading" class="loading-box hidden">
+                        <div class="spinner"></div>
+                        <p data-i18n="page.compare.ab_loading">A/Bテスト画像を生成中...</p>
+                    </div>
+                    <div id="ab-error" class="hidden xyplot-error"></div>
+                    <div id="ab-results" class="ab-results-wrap hidden"></div>
+
+                    <div class="customization-panel" style="margin-top:16px;">
+                        <button id="ab-history-toggle-btn" class="btn btn-ghost btn-block" data-i18n="page.compare.ab_history_toggle">🕘 A/B履歴</button>
+                        <div id="ab-history-list" class="ab-history-list hidden"></div>
+                    </div>
+                </div>
+            </section>
             <!-- ======================== GALLERY PAGE ======================== -->
             <section id="page-gallery" class="page">
                 <div class="page-header">
@@ -1543,6 +1689,7 @@
         <button class="mobile-nav-btn" data-page="img2img">🔄<span data-i18n="mobile_nav.img2img">Img2Img</span></button>
         <button class="mobile-nav-btn" data-page="inpaint">🖌️<span data-i18n="mobile_nav.inpaint">Inpaint</span></button>
         <button class="mobile-nav-btn" data-page="xyplot">📈<span data-i18n="mobile_nav.xyplot">XY Plot</span></button>
+        <button class="mobile-nav-btn" data-page="compare">🆚<span data-i18n="mobile_nav.compare">Compare</span></button>
         <button class="mobile-nav-btn" data-page="gallery">🗃️<span data-i18n="mobile_nav.gallery">Gallery</span></button>
         <button class="mobile-nav-btn" data-page="pnginfo">🏷️<span data-i18n="mobile_nav.pnginfo">PNG Info</span></button>
         <button class="mobile-nav-btn" data-page="wildcards">🃏<span data-i18n="mobile_nav.wildcards">Wildcards</span></button>
