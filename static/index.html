@@ -25,6 +25,7 @@
                 <button class="nav-btn" data-page="sd" data-i18n="sidebar.nav.sd">🖼️ SD Generate</button>
                 <button class="nav-btn" data-page="img2img" data-i18n="sidebar.nav.img2img">🔄 Img2Img</button>
                 <button class="nav-btn" data-page="inpaint" data-i18n="sidebar.nav.inpaint">🖌️ Inpaint</button>
+                <button class="nav-btn" data-page="xyplot" data-i18n="sidebar.nav.xyplot">📈 XY Plot</button>
                 <button class="nav-btn" data-page="gallery" data-i18n="sidebar.nav.gallery">🗃️ Gallery</button>
                 <button class="nav-btn" data-page="pnginfo" data-i18n="sidebar.nav.pnginfo">🏷️ PNG Info</button>
                 <button class="nav-btn" data-page="wildcards" data-i18n="sidebar.nav.wildcards">🃏 Wildcards</button>
@@ -1079,6 +1080,158 @@
                     </div>
                 </div>
             </section>
+            <!-- ======================== XY PLOT PAGE ======================== -->
+            <section id="page-xyplot" class="page">
+                <div class="page-header">
+                    <h2 data-i18n="page.xyplot.title">XY Plot</h2>
+                    <p data-i18n="page.xyplot.subtitle">2軸のパラメータを変化させたグリッド画像を生成</p>
+                    <div id="xyplot-api-badge" class="badge badge-gray">Checking...</div>
+                </div>
+                <div class="page-body two-col">
+                    <!-- Left: Settings -->
+                    <div class="col">
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.xyplot.base_settings_title">🎯 基本設定</h3>
+                            <div class="form-group">
+                                <label data-i18n="page.xyplot.positive_label">Positive Prompt</label>
+                                <textarea id="xyplot-positive" rows="4" data-i18n-placeholder="page.xyplot.positive_placeholder" placeholder="ポジティブプロンプト..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="page.xyplot.negative_label">Negative Prompt</label>
+                                <textarea id="xyplot-negative" rows="3" data-i18n-placeholder="page.xyplot.negative_placeholder" placeholder="ネガティブプロンプト..."></textarea>
+                            </div>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Width</label>
+                                    <select id="xyplot-width">
+                                        <option value="512" selected>512</option>
+                                        <option value="768">768</option>
+                                        <option value="1024">1024</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Height</label>
+                                    <select id="xyplot-height">
+                                        <option value="512" selected>512</option>
+                                        <option value="768">768</option>
+                                        <option value="1024">1024</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Steps</label>
+                                    <input type="number" id="xyplot-steps" value="20" min="5" max="150">
+                                </div>
+                                <div class="form-group">
+                                    <label>CFG Scale</label>
+                                    <input type="number" id="xyplot-cfg" value="7" min="1" max="30" step="0.5">
+                                </div>
+                                <div class="form-group">
+                                    <label>Sampler</label>
+                                    <select id="xyplot-sampler">
+                                        <option>Euler a</option>
+                                        <option>Euler</option>
+                                        <option>DPM++ 2M Karras</option>
+                                        <option>DDIM</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="page.xyplot.seed_label">Seed (-1=random)</label>
+                                    <input type="number" id="xyplot-seed" value="-1">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="page.xyplot.model_label">Model</label>
+                                    <select id="xyplot-model">
+                                        <option value="" data-i18n="page.xyplot.model_default">-- Current --</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="page.xyplot.loras_label">LoRA</label>
+                                <input type="text" id="xyplot-loras" placeholder="&lt;lora:name:1.0&gt; ...">
+                            </div>
+                        </div>
+
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.xyplot.axes_title">📊 XY 軸設定</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label data-i18n="page.xyplot.x_type_label">X Axis Type</label>
+                                    <select id="xyplot-x-type">
+                                        <option value="steps" data-i18n="page.xyplot.axis_type_steps">Steps</option>
+                                        <option value="cfg_scale" selected data-i18n="page.xyplot.axis_type_cfg_scale">CFG Scale</option>
+                                        <option value="sampler" data-i18n="page.xyplot.axis_type_sampler">Sampler</option>
+                                        <option value="seed" data-i18n="page.xyplot.axis_type_seed">Seed</option>
+                                        <option value="model" data-i18n="page.xyplot.axis_type_model">Model</option>
+                                        <option value="prompt_sr" data-i18n="page.xyplot.axis_type_prompt_sr">Prompt S/R</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="page.xyplot.x_values_label">X Values (comma-separated)</label>
+                                    <input type="text" id="xyplot-x-values" data-i18n-placeholder="page.xyplot.x_values_placeholder" placeholder="5, 7, 9" value="5, 7, 9">
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="page.xyplot.y_type_label">Y Axis Type</label>
+                                    <select id="xyplot-y-type">
+                                        <option value="steps" selected data-i18n="page.xyplot.axis_type_steps">Steps</option>
+                                        <option value="cfg_scale" data-i18n="page.xyplot.axis_type_cfg_scale">CFG Scale</option>
+                                        <option value="sampler" data-i18n="page.xyplot.axis_type_sampler">Sampler</option>
+                                        <option value="seed" data-i18n="page.xyplot.axis_type_seed">Seed</option>
+                                        <option value="model" data-i18n="page.xyplot.axis_type_model">Model</option>
+                                        <option value="prompt_sr" data-i18n="page.xyplot.axis_type_prompt_sr">Prompt S/R</option>
+                                        <option value="none" data-i18n="page.xyplot.axis_type_none">None</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="xyplot-y-values-group">
+                                    <label data-i18n="page.xyplot.y_values_label">Y Values (comma-separated)</label>
+                                    <input type="text" id="xyplot-y-values" data-i18n-placeholder="page.xyplot.y_values_placeholder" placeholder="20, 30" value="20, 30">
+                                </div>
+                            </div>
+                            <small data-i18n="page.xyplot.prompt_sr_hint">For "Prompt S/R": first value is the search text in the positive prompt, each value is a replacement (first cell = original).</small>
+                            <div id="xyplot-cell-count" class="xyplot-cell-count"></div>
+                        </div>
+
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.xyplot.options_title">⚙️ オプション</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="xyplot-draw-legend" checked>
+                                    <span data-i18n="page.xyplot.draw_legend_label">Draw legend labels on the grid</span>
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="xyplot-include-cells">
+                                    <span data-i18n="page.xyplot.include_cells_label">Include individual cell images in the result</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button id="xyplot-run-btn" class="btn btn-accent btn-block" data-i18n="page.xyplot.run_btn">
+                            📈 Generate XY Plot
+                        </button>
+                        <button id="xyplot-cancel-btn" class="btn btn-danger btn-block hidden" style="margin-top:8px;" data-i18n="page.xyplot.cancel_btn">
+                            ✖ Cancel
+                        </button>
+                    </div>
+
+                    <!-- Right: Output -->
+                    <div class="col">
+                        <div id="xyplot-loading" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p id="xyplot-loading-text" data-i18n="page.xyplot.loading">Generating XY plot...</p>
+                            <div id="xyplot-progress-wrap" class="sd-progress-bar-wrap"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
+                        </div>
+                        <div id="xyplot-error" class="hidden xyplot-error"></div>
+                        <div id="xyplot-results" class="sd-results hidden">
+                            <h3 data-i18n="page.xyplot.results_title">Grid Result</h3>
+                            <div id="xyplot-grid-wrap" class="xyplot-grid-wrap"></div>
+                            <a id="xyplot-download-link" class="btn btn-secondary" download="xy_plot.png" data-i18n="page.xyplot.download_btn">⬇ Download Grid</a>
+                            <button id="xyplot-cells-toggle-btn" class="btn btn-ghost hidden" data-i18n="page.xyplot.show_cells_btn">🔍 Show Individual Cells</button>
+                            <div id="xyplot-cells" class="xyplot-cells hidden"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
             <!-- ======================== GALLERY PAGE ======================== -->
             <section id="page-gallery" class="page">
                 <div class="page-header">
@@ -1389,6 +1542,7 @@
         <button class="mobile-nav-btn" data-page="sd">🖼️<span data-i18n="mobile_nav.sd">SD</span></button>
         <button class="mobile-nav-btn" data-page="img2img">🔄<span data-i18n="mobile_nav.img2img">Img2Img</span></button>
         <button class="mobile-nav-btn" data-page="inpaint">🖌️<span data-i18n="mobile_nav.inpaint">Inpaint</span></button>
+        <button class="mobile-nav-btn" data-page="xyplot">📈<span data-i18n="mobile_nav.xyplot">XY Plot</span></button>
         <button class="mobile-nav-btn" data-page="gallery">🗃️<span data-i18n="mobile_nav.gallery">Gallery</span></button>
         <button class="mobile-nav-btn" data-page="pnginfo">🏷️<span data-i18n="mobile_nav.pnginfo">PNG Info</span></button>
         <button class="mobile-nav-btn" data-page="wildcards">🃏<span data-i18n="mobile_nav.wildcards">Wildcards</span></button>

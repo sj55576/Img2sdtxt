@@ -250,7 +250,7 @@ def list_outputs(
 
 _DATA_DIR = Path(__file__).parent.parent / "data"
 _LAST_PARAMS_FILE = _DATA_DIR / "last_params.json"
-_VALID_FEATURES = {"generate", "sd", "img2img", "inpaint", "multi_model"}
+_VALID_FEATURES = {"generate", "sd", "img2img", "inpaint", "multi_model", "xyplot"}
 _last_params_lock = threading.Lock()
 
 

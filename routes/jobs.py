@@ -7,9 +7,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
+import xy_plot
 from deps import sd_client
 from job_queue import JobStatus, job_queue, register_job_handler
-from models import SDGenerateRequest, SDMultiModelRequest
+from models import SDGenerateRequest, SDMultiModelRequest, XYPlotRequest
 
 logger = logging.getLogger("img2sdtxt.jobs")
 
@@ -124,6 +125,11 @@ async def handle_multi_model(job, update_progress):
     return {"results": results, "total_models": len(models)}
 
 
+@register_job_handler("xy_plot")
+async def handle_xy_plot(job, update_progress):
+    return await xy_plot.run_xy_plot(job, update_progress)
+
+
 # ------------------------------------------------------------------ #
 # REST endpoints
 # ------------------------------------------------------------------ #
@@ -155,7 +161,7 @@ async def submit_job(request_data: dict):
 
     if not job_type:
         raise HTTPException(status_code=400, detail="job_type is required")
-    if job_type not in ("txt2img", "multi_model"):
+    if job_type not in ("txt2img", "multi_model", "xy_plot"):
         raise HTTPException(status_code=400, detail=f"Unknown job_type: {job_type}")
 
     try:
@@ -163,8 +169,22 @@ async def submit_job(request_data: dict):
             params = _model_dump(_model_validate(SDGenerateRequest, params))
         elif job_type == "multi_model":
             params = _model_dump(_model_validate(SDMultiModelRequest, params))
+        elif job_type == "xy_plot":
+            params = _model_dump(_model_validate(XYPlotRequest, params))
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+    if job_type == "xy_plot":
+        try:
+            x_axis = params["x_axis"]
+            y_axis = params.get("y_axis") or {"type": "none", "values": []}
+            if x_axis["type"] == "none":
+                raise ValueError("x_axis type cannot be 'none' (only y_axis may be 'none')")
+            x_values = xy_plot.parse_axis_values(x_axis["type"], x_axis.get("values", []))
+            y_values = xy_plot.parse_axis_values(y_axis["type"], y_axis.get("values", []))
+            xy_plot.validate_cell_count(x_values, y_values)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
 
     job = await job_queue.submit(job_type, params, priority=priority)
     return {"success": True, "job": job_queue.job_info(job)}
