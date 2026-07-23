@@ -541,7 +541,7 @@ async function checkSDStatus() {
                             if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
                         }
                         await loadLoras('sd', d.loras || []);
-                        if (d.models?.length) populateMultiModelList(d.models);
+                        if (d.models?.length) await populateMultiModelList(d.models);
                         _modelsLoaded.sd = true;
                     } else {
                         // タブ切り替え時は選択を復元するのみ
@@ -742,17 +742,30 @@ function setupGeneratePage() {
 }
 
 function handleSingleImageSelect(file) {
-    if (!file || !file.type.startsWith('image/')) { toast('画像ファイルを選択してください', 'error'); return; }
-    if (file.size > 10 * 1024 * 1024) { toast('ファイルサイズが10MBを超えています', 'error'); return; }
+    if (!file || !file.type.startsWith('image/')) {
+        toast('画像ファイルを選択してください', 'error');
+        return Promise.resolve(false);
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        toast('ファイルサイズが10MBを超えています', 'error');
+        return Promise.resolve(false);
+    }
     selectedImage = file;
-    const reader = new FileReader();
-    reader.onload = e => {
-        document.getElementById('preview-image').src = e.target.result;
-        document.getElementById('preview-wrap').classList.remove('hidden');
-        document.getElementById('upload-area').classList.add('hidden');
-        updateGenerateBtn();
-    };
-    reader.readAsDataURL(file);
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('preview-image').src = e.target.result;
+            document.getElementById('preview-wrap').classList.remove('hidden');
+            document.getElementById('upload-area').classList.add('hidden');
+            updateGenerateBtn();
+            resolve(true);
+        };
+        reader.onerror = () => {
+            toast('画像の読み込みに失敗しました', 'error');
+            resolve(false);
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 function clearSingleImage() {
@@ -1800,7 +1813,7 @@ function downloadImage(base64, index) {
 /* =====================================================================
    Multi-model Generation
    ===================================================================== */
-function populateMultiModelList(models) {
+async function populateMultiModelList(models) {
     const list = document.getElementById('sd-multi-model-list');
     if (!list) return;
     if (!models || !models.length) {
@@ -1817,7 +1830,7 @@ function populateMultiModelList(models) {
     }).join('');
     updateMultiModelCount();
     // Restore saved model selections after populating
-    loadMultiModelSelection();
+    await loadMultiModelSelection();
 }
 
 function updateMultiModelCount() {
@@ -3302,14 +3315,13 @@ async function runFolderBatchAutoRun(files, n) {
     const autoBtn = document.getElementById('random-folder-auto-btn');
     if (autoBtn) autoBtn.disabled = true;
 
-    // Short delay to allow the image preview to render before processing
-    const IMAGE_PREVIEW_RENDER_DELAY = 100;
-
     try {
         for (let i = 0; i < images.length; i++) {
             toast(`[${i + 1}/${images.length}] ${images[i].name} を処理中...`, 'info');
-            handleSingleImageSelect(images[i]);
-            await new Promise(r => setTimeout(r, IMAGE_PREVIEW_RENDER_DELAY));
+            // The previous iteration ends on the SD page. Return to Generate so
+            // every image starts from the same UI state.
+            document.querySelector('[data-page="generate"]').click();
+            if (!await handleSingleImageSelect(images[i])) continue;
             await generatePrompt();
             const resultBox = document.getElementById('result-box');
             if (resultBox && !resultBox.classList.contains('hidden')) {
