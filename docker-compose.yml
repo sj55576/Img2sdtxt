@@ -1,0 +1,84 @@
+services:
+  img2sdtxt:
+    build: .
+    image: img2sdtxt:latest
+    container_name: img2sdtxt
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+      - ./ssl:/app/ssl
+    restart: unless-stopped
+    # Lets the container reach LM Studio / A1111 running on the host as
+    # http://host.docker.internal:<port>. Required on Linux; harmless on
+    # Docker Desktop, where the name already resolves.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - img2sdtxt-net
+    # Uncomment if you run the "ollama" service below and want to reach it
+    # by name instead of relying on the shared network's default DNS:
+    # depends_on:
+    #   - ollama
+
+  # ------------------------------------------------------------------ #
+  # Optional: run Ollama in a container as your LLM server.
+  # Start with:  docker compose --profile ollama up -d
+  # Then set in your .env:  LLM_SERVER_URL=http://ollama:11434/v1
+  # ------------------------------------------------------------------ #
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - img2sdtxt-net
+    # Uncomment to give the container access to NVIDIA GPU(s).
+    # Requires the NVIDIA Container Toolkit installed on the host.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ------------------------------------------------------------------ #
+  # Optional: AUTOMATIC1111 Stable Diffusion WebUI.
+  # Most users run A1111 directly on the host (it benefits from direct
+  # GPU access and is easier to update there), and point SD_API_URL at
+  # http://host.docker.internal:7860 (see README "Docker" section).
+  # This service definition is provided for reference if you prefer to
+  # containerize it yourself; it does not build/pull an image by default.
+  # Start with:  docker compose --profile sd-webui up -d
+  # ------------------------------------------------------------------ #
+  # sd-webui:
+  #   image: your-a1111-image:latest
+  #   container_name: sd-webui
+  #   profiles: ["sd-webui"]
+  #   command: ["--api", "--listen"]
+  #   ports:
+  #     - "7860:7860"
+  #   networks:
+  #     - img2sdtxt-net
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: all
+  #   #           capabilities: [gpu]
+
+networks:
+  img2sdtxt-net:
+    driver: bridge
+
+volumes:
+  ollama-data:

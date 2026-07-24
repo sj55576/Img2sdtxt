@@ -101,6 +101,140 @@ Open <http://localhost:8000> in your browser.
 
 ---
 
+## Docker
+
+### Quick start
+
+```bash
+cp .env.example .env
+# Edit .env as needed (see below)
+docker compose up -d
+```
+
+Open <http://localhost:8000> in your browser. Logs: `docker compose logs -f img2sdtxt`.
+
+The image is built from the included `Dockerfile` (Python 3.12-slim, non-root
+user, `HEALTHCHECK` on `/health`) and `docker-compose.yml` mounts `./data`,
+`./outputs`, and `./ssl` as volumes so history, generated images, and TLS
+certificates persist across container restarts/rebuilds.
+
+### Connecting to your LLM server
+
+#### Option A — Ollama in a container
+
+Start Ollama alongside the app using the `ollama` Compose profile:
+
+```bash
+docker compose --profile ollama up -d
+```
+
+In `.env`, point the app at the Ollama service by its container name (both
+services share the `img2sdtxt-net` Docker network):
+
+```env
+LLM_SERVER_URL=http://ollama:11434/v1
+LLM_PROVIDER=openai_compatible
+```
+
+Then pull a vision-capable model into the running container, e.g.:
+
+```bash
+docker compose exec ollama ollama pull llava
+```
+
+#### Option B — LM Studio / A1111 / Ollama running on the host
+
+If your LLM server (or A1111) runs directly on the host machine rather than
+in a container, use `host.docker.internal` to reach it:
+
+```env
+LLM_SERVER_URL=http://host.docker.internal:1234/v1
+SD_API_URL=http://host.docker.internal:7860
+```
+
+- **Docker Desktop (Mac/Windows)**: `host.docker.internal` resolves
+  automatically — no extra configuration needed.
+- **Linux**: `host.docker.internal` is not resolved by default, so the
+  `img2sdtxt` service in `docker-compose.yml` ships with:
+  ```yaml
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
+  ```
+  If you run the image without Compose (`docker run`), pass
+  `--add-host=host.docker.internal:host-gateway`, or use the host's
+  LAN/Docker-bridge IP directly (e.g. `http://172.17.0.1:1234/v1`).
+
+### Stable Diffusion WebUI (A1111)
+
+Most users run A1111 on the host for direct GPU access and easier updates,
+and point `SD_API_URL` at it as shown above (`--api` flag required). A
+minimal, commented-out `sd-webui` service is included in
+`docker-compose.yml` (behind the `sd-webui` profile) if you'd rather
+containerize it yourself.
+
+### GPU usage
+
+To give the containerized `ollama` (or `sd-webui`) service access to an
+NVIDIA GPU, install the [NVIDIA Container
+Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+on the host, then uncomment the `deploy.resources.reservations.devices`
+block under the relevant service in `docker-compose.yml`:
+
+```yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+```
+
+### Volumes / persistence
+
+| Host path | Container path | Contents |
+|-----------|-----------------|----------|
+| `./data` | `/app/data` | SQLite history DB, presets, last-used parameters |
+| `./outputs` | `/app/outputs` | Generated images and metadata |
+| `./ssl` | `/app/ssl` | Auto-generated or provided TLS certificate/key |
+| `ollama-data` (named volume) | `/root/.ollama` | Downloaded Ollama models (only with the `ollama` profile) |
+
+### Reverse proxy
+
+Example Nginx server block terminating TLS in front of the container:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Equivalent Caddyfile:
+
+```
+example.com {
+    reverse_proxy 127.0.0.1:8000
+}
+```
+
+When running behind a reverse proxy, set `TRUST_PROXY_HEADERS=true` in
+`.env` so rate limiting sees the real client IP, and leave `HTTPS_ENABLED=false`
+on the container itself (the proxy handles TLS termination).
+
+---
+
 ## Environment Variables
 
 | Variable | Default | Description |
