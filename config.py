@@ -80,3 +80,10 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")  # empty disables webhook notificatio
 WEBHOOK_EVENTS = os.getenv("WEBHOOK_EVENTS", "job_completed,job_failed,batch_completed")
 WEBHOOK_FORMAT = os.getenv("WEBHOOK_FORMAT", "generic")  # generic, discord, or slack
 WEBHOOK_TIMEOUT = int(os.getenv("WEBHOOK_TIMEOUT", "5"))
+
+# Backup / Restore
+BACKUP_DIR = Path(os.getenv("BACKUP_DIR", str(Path(__file__).parent / "data" / "backups")))
+AUTO_BACKUP_ENABLED = os.getenv("AUTO_BACKUP_ENABLED", "false").lower() == "true"
+AUTO_BACKUP_RETENTION = int(os.getenv("AUTO_BACKUP_RETENTION", "7"))
+AUTO_BACKUP_INTERVAL_HOURS = int(os.getenv("AUTO_BACKUP_INTERVAL_HOURS", "24"))
+MAX_BACKUP_UPLOAD_SIZE = int(os.getenv("MAX_BACKUP_UPLOAD_SIZE", str(2 * 1024 * 1024 * 1024)))

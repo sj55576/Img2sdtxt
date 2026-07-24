@@ -203,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     _setup('pnginfo', setupPngInfoPage);
     _setup('stats', setupStatsPage);
     _setup('wildcards', setupWildcardsPage);
+    _setup('backup', setupBackupPage);
     _setup('weightEditors', setupWeightEditors);
     checkStatus();
     loadProviders();
@@ -354,6 +355,7 @@ function setupNavigation() {
         if (page === 'compare') checkCompareStatus();
         if (page === 'gallery') { loadGallery(); loadGalleryFilters(); }
         if (page === 'stats') loadStats();
+        if (page === 'backup') loadBackups();
     }
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -4843,4 +4845,213 @@ async function loadABHistory() {
         err.textContent = I18n.t('page.compare.ab_history_load_failed', 'A/B履歴の読み込みに失敗しました');
         list.appendChild(err);
     }
+}
+
+/* =====================================================================
+   Backup Page (Data backup / restore - issue #97)
+   ===================================================================== */
+let _backupsCache = [];
+
+function setupBackupPage() {
+    document.getElementById('backup-create-btn')?.addEventListener('click', createBackup);
+    document.getElementById('refresh-backups-btn')?.addEventListener('click', loadBackups);
+    document.getElementById('backup-restore-notice-dismiss')?.addEventListener('click', () => {
+        document.getElementById('backup-restore-notice').classList.add('hidden');
+    });
+
+    const confirmCb = document.getElementById('backup-restore-confirm-checkbox');
+    const fileInput = document.getElementById('backup-restore-file-input');
+    const uploadBtn = document.getElementById('backup-restore-upload-btn');
+    const updateUploadBtnState = () => {
+        uploadBtn.disabled = !(confirmCb?.checked && fileInput?.files?.length);
+    };
+    confirmCb?.addEventListener('change', updateUploadBtnState);
+    fileInput?.addEventListener('change', updateUploadBtnState);
+    uploadBtn?.addEventListener('click', restoreFromUpload);
+}
+
+function _formatBackupSize(bytes) {
+    if (bytes === null || bytes === undefined) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+async function loadBackups() {
+    const loading = document.getElementById('backup-loading');
+    const empty = document.getElementById('backup-empty');
+    const list = document.getElementById('backup-list');
+    if (!list) return;
+    loading.classList.remove('hidden');
+    empty.classList.add('hidden');
+    list.innerHTML = '';
+
+    try {
+        const r = await fetch('/api/backup/list');
+        if (!r.ok) throw new Error((await r.json()).detail);
+        const d = await r.json();
+        _backupsCache = d.backups || [];
+
+        if (!_backupsCache.length) {
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        list.innerHTML = _backupsCache.map(b => {
+            const created = b.created_at ? new Date(b.created_at).toLocaleString() : '';
+            const invalid = b.valid === false;
+            const badges = `
+                ${b.include_outputs ? `<span class="badge badge-green">${escHtml(I18n.t('page.backup.badge_outputs_included', 'Outputs included'))}</span>` : ''}
+                ${invalid ? `<span class="badge badge-red">${escHtml(I18n.t('page.backup.badge_invalid', 'Invalid'))}</span>` : ''}
+            `;
+            const actions = invalid
+                ? `<button class="btn btn-sm btn-ghost" onclick="deleteBackup('${b.id}')">🗑️ ${escHtml(I18n.t('common.delete', 'Delete'))}</button>`
+                : `
+                    <button class="btn btn-sm btn-secondary" onclick="downloadBackup('${b.id}', '${escHtml(b.filename)}')" title="${escHtml(I18n.t('page.backup.download_btn', 'Download'))}">⬇</button>
+                    <button class="btn btn-sm btn-secondary" onclick="restoreBackupById('${b.id}')" title="${escHtml(I18n.t('page.backup.restore_btn', 'Restore'))}">♻️</button>
+                    <button class="btn btn-sm btn-ghost" onclick="deleteBackup('${b.id}')" title="${escHtml(I18n.t('common.delete', 'Delete'))}">🗑️</button>
+                `;
+            return `
+                <div class="history-item ${invalid ? 'backup-item-invalid' : ''}" data-id="${b.id}">
+                    <div class="history-item-header">
+                        <div class="history-item-meta">
+                            <span class="image-name">${escHtml(b.filename)}</span><br>
+                            <span>${escHtml(created)}</span> ·
+                            <span>${escHtml(_formatBackupSize(b.size))}</span> ·
+                            <span>${b.file_count ?? 0} ${escHtml(I18n.t('page.backup.file_count_unit', 'files'))}</span>
+                            ${badges}
+                        </div>
+                        <div class="history-item-actions">
+                            ${actions}
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+    } catch (e) {
+        toast(e.message || I18n.t('toast.backup_list_failed', 'バックアップ一覧の読み込みに失敗しました'), 'error');
+    } finally {
+        loading.classList.add('hidden');
+    }
+}
+
+async function createBackup() {
+    const btn = document.getElementById('backup-create-btn');
+    if (!btn || btn.disabled) return;
+    const includeOutputs = document.getElementById('backup-include-outputs')?.checked || false;
+
+    btn.disabled = true;
+    const origText = btn.textContent;
+    btn.textContent = I18n.t('page.backup.creating', '作成中...');
+
+    try {
+        const r = await fetch('/api/backup/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ include_outputs: includeOutputs })
+        });
+        if (!r.ok) throw new Error((await r.json()).detail);
+        toast(I18n.t('toast.backup_create_success', 'バックアップを作成しました'), 'success');
+        loadBackups();
+    } catch (e) {
+        toast(e.message || I18n.t('toast.backup_create_failed', 'バックアップの作成に失敗しました'), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
+function downloadBackup(id, filename) {
+    const a = document.createElement('a');
+    a.href = `/api/backup/download/${id}`;
+    a.download = filename || `backup_${id}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+async function deleteBackup(id) {
+    if (!confirm(I18n.t('page.backup.confirm_delete', 'このバックアップを削除しますか？'))) return;
+    try {
+        const r = await fetch(`/api/backup/${id}`, { method: 'DELETE' });
+        if (!r.ok) throw new Error((await r.json()).detail);
+        toast(I18n.t('toast.deleted', 'Deleted'), 'success');
+        loadBackups();
+    } catch (e) {
+        toast(e.message || I18n.t('toast.delete_failed', 'Failed to delete'), 'error');
+    }
+}
+
+async function restoreBackupById(id) {
+    if (!confirm(I18n.t('page.backup.confirm_restore', '既存のデータが上書きされます。復元を続行しますか？（復元前に安全バックアップを作成します）'))) return;
+    // サーバー上に既にあるバックアップはサーバー側で復元する
+    // （ZIPをブラウザ経由でダウンロード＋再アップロードしない）
+    try {
+        const r = await fetch(`/api/backup/restore/${encodeURIComponent(id)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: true, create_safety_backup: true })
+        });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail);
+        const d = await r.json();
+        toast(I18n.t('toast.backup_restore_success', '復元が完了しました'), 'success');
+        showRestoreNotice(d);
+        loadBackups();
+    } catch (e) {
+        toast(e.message || I18n.t('toast.backup_restore_failed', '復元に失敗しました'), 'error');
+    }
+}
+
+async function restoreFromUpload() {
+    const fileInput = document.getElementById('backup-restore-file-input');
+    const confirmCb = document.getElementById('backup-restore-confirm-checkbox');
+    const safetyCb = document.getElementById('backup-restore-safety-checkbox');
+    const file = fileInput?.files?.[0];
+    if (!file) { toast(I18n.t('toast.backup_file_required', 'バックアップZIPファイルを選択してください'), 'error'); return; }
+    if (!confirmCb?.checked) { toast(I18n.t('toast.backup_confirm_required', '上書き確認のチェックが必要です'), 'error'); return; }
+    if (!confirm(I18n.t('page.backup.confirm_restore', '既存のデータが上書きされます。復元を続行しますか？（復元前に安全バックアップを作成します）'))) return;
+
+    const btn = document.getElementById('backup-restore-upload-btn');
+    if (btn) btn.disabled = true;
+    try {
+        await performRestore(file, file.name, safetyCb?.checked ?? true);
+        fileInput.value = '';
+        confirmCb.checked = false;
+    } finally {
+        if (btn) btn.disabled = !(confirmCb?.checked && fileInput?.files?.length);
+    }
+}
+
+async function performRestore(fileBlob, filename, createSafetyBackup) {
+    const fd = new FormData();
+    fd.append('file', fileBlob, filename);
+    fd.append('confirm', 'true');
+    fd.append('create_safety_backup', createSafetyBackup ? 'true' : 'false');
+
+    try {
+        const r = await fetch('/api/backup/restore', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error((await r.json()).detail);
+        const d = await r.json();
+        toast(I18n.t('toast.backup_restore_success', '復元が完了しました'), 'success');
+        showRestoreNotice(d);
+        loadBackups();
+    } catch (e) {
+        toast(e.message || I18n.t('toast.backup_restore_failed', '復元に失敗しました'), 'error');
+    }
+}
+
+function showRestoreNotice(result) {
+    const notice = document.getElementById('backup-restore-notice');
+    const safetyLine = document.getElementById('backup-restore-safety-line');
+    if (!notice) return;
+    if (safetyLine) {
+        if (result && result.safety_backup_id) {
+            safetyLine.textContent = `${I18n.t('page.backup.safety_backup_id_label', 'Safety backup ID')}: ${result.safety_backup_id}`;
+            safetyLine.classList.remove('hidden');
+        } else {
+            safetyLine.classList.add('hidden');
+        }
+    }
+    notice.classList.remove('hidden');
+    notice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }

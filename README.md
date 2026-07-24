@@ -398,6 +398,46 @@ reading partially-written files.
 
 ---
 
+## Backup & Restore
+
+Everything under `data/` — prompt history, LLM cache, rate-limit state,
+presets, and wildcards — can be archived into a single timestamped ZIP.
+
+**From the UI:** open the **💾 Backup** page to create a backup, download or
+delete existing ones, and restore either a stored backup or an uploaded ZIP.
+
+**From the CLI:**
+
+```bash
+python main.py --backup ./backups/            # create (data/ only)
+python main.py --backup ./backups/ --include-outputs   # also archive outputs/
+python main.py --restore ./backups/img2sdtxt-backup-20260724-120000.zip
+```
+
+**Automatic backups** — set in `.env`:
+
+```env
+AUTO_BACKUP_ENABLED=true
+AUTO_BACKUP_INTERVAL_HOURS=24
+AUTO_BACKUP_RETENTION=7      # older backups beyond this are rotated out
+#BACKUP_DIR=/path/to/backups # default: data/backups
+```
+
+Notes:
+
+- SQLite databases are snapshotted with SQLite's online backup API, so an
+  archive is consistent even if it is taken while the app is running.
+- A restore creates a safety backup of the current data first (unless you
+  opt out), and never deletes files that are absent from the archive.
+- **Restart the server after a restore.** Modules hold their own open SQLite
+  connections and keep serving pre-restore data until the process restarts.
+- The backup endpoints are unauthenticated, like the rest of the API. A
+  backup archive contains your full history — do not expose the app to an
+  untrusted network without putting authentication in front of it (see the
+  reverse-proxy example in the Docker section).
+
+---
+
 ## Project Structure
 
 ```

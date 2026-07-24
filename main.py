@@ -25,6 +25,7 @@ from config import (
 )
 from job_queue import job_queue
 from rate_limit import RateLimitMiddleware
+from routes.backup import router as backup_router
 from routes.compare import router as compare_router
 from routes.gallery import router as gallery_router
 from routes.history import router as history_router
@@ -95,8 +96,24 @@ app.include_router(png_info_router)
 app.include_router(stats_router)
 app.include_router(wildcards_router)
 app.include_router(compare_router)
+app.include_router(backup_router)
 
 job_queue.add_listener(webhook_notifier.job_listener)
+
+_auto_backup_scheduler = None
+
+
+@app.on_event("startup")
+async def _start_auto_backup() -> None:
+    """Start the background auto-backup scheduler when enabled via config."""
+    global _auto_backup_scheduler
+    if config.AUTO_BACKUP_ENABLED:
+        import backup as backup_mgr
+
+        _auto_backup_scheduler = backup_mgr.start_auto_backup(
+            interval_hours=config.AUTO_BACKUP_INTERVAL_HOURS,
+            retention=config.AUTO_BACKUP_RETENTION,
+        )
 
 
 # ------------------------------------------------------------------ #
@@ -221,8 +238,52 @@ def _run_batch_cli() -> None:
         action="store_true",
         help="Skip images that already have an output file.",
     )
+    parser.add_argument(
+        "--backup",
+        dest="backup_dir",
+        metavar="PATH",
+        default=None,
+        help="Create a backup archive in PATH and exit.",
+    )
+    parser.add_argument(
+        "--include-outputs",
+        dest="include_outputs",
+        action="store_true",
+        help="Include the outputs/ directory when creating a backup (used with --backup).",
+    )
+    parser.add_argument(
+        "--restore",
+        dest="restore_zip",
+        metavar="PATH.zip",
+        default=None,
+        help="Restore application data from a backup zip archive and exit.",
+    )
 
     args, _unknown = parser.parse_known_args()
+
+    if args.backup_dir is not None:
+        import backup as backup_mgr
+
+        result = backup_mgr.create_backup(include_outputs=args.include_outputs, backup_dir=Path(args.backup_dir))
+        print(f"[INFO] Backup created: {result['filename']} ({result['size']} bytes, {result['file_count']} files)")
+        print(f"[INFO] Location: {result['path']}")
+        return
+
+    if args.restore_zip is not None:
+        import backup as backup_mgr
+
+        restore_path = Path(args.restore_zip)
+        if not restore_path.is_file():
+            parser.error(f"--restore '{restore_path}' is not a valid file.")
+        try:
+            result = backup_mgr.restore_backup(restore_path)
+        except ValueError as exc:
+            print(f"[ERROR] Restore failed: {exc}")
+            raise SystemExit(1) from exc
+        print(f"[INFO] Restored {result['restored_files']} file(s) from {restore_path}")
+        print(f"[INFO] Safety backup id: {result['safety_backup_id']}")
+        print("[INFO] A server restart is recommended so all modules reload the restored data.")
+        return
 
     if args.input_dirs is None:
         # No --input-dir → start the web server

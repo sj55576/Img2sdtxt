@@ -15,7 +15,8 @@
       "compare": "🆚 比較",
       "gallery": "🗃️ Gallery",
       "pnginfo": "🏷️ PNG Info",
-      "stats": "📊 Stats"
+      "stats": "📊 Stats",
+      "backup": "💾 バックアップ"
     },
     "theme": {
       "dark": "🌙 Dark",
@@ -475,6 +476,33 @@
       "activity_title": "日別生成アクティビティ（直近30日）",
       "weekly_title": "週別集計",
       "no_data": "データがありません"
+    },
+    "backup": {
+      "title": "バックアップ",
+      "subtitle": "アプリケーションデータのバックアップと復元",
+      "refresh_btn": "🔄 更新",
+      "restore_notice_title": "⚠️ サーバーの再起動が必要です",
+      "restore_notice_body": "復元を完全に反映するには、サーバーを再起動してください。",
+      "create_title": "📦 新しいバックアップを作成",
+      "include_outputs_label": "生成画像（outputs）を含める",
+      "include_outputs_warning": "⚠️ 生成画像を含めるとバックアップサイズが大きくなる場合があります",
+      "create_btn": "💾 バックアップを作成",
+      "creating": "作成中...",
+      "list_title": "🗂️ バックアップ一覧",
+      "loading": "読み込み中...",
+      "empty": "まだバックアップがありません",
+      "restore_title": "📤 ファイルから復元",
+      "restore_file_label": "バックアップZIPファイル",
+      "safety_backup_label": "復元前に現在のデータの安全バックアップを作成する",
+      "confirm_overwrite_label": "既存のデータが上書きされることを理解しました",
+      "restore_btn": "♻️ 復元を実行",
+      "download_btn": "ダウンロード",
+      "badge_outputs_included": "画像を含む",
+      "badge_invalid": "不正なファイル",
+      "file_count_unit": "ファイル",
+      "confirm_delete": "このバックアップを削除しますか？",
+      "confirm_restore": "既存のデータが上書きされます。復元を続行しますか？（復元前に安全バックアップを作成します）",
+      "safety_backup_id_label": "安全バックアップID"
     }
   },
   "common": {
@@ -564,7 +592,8 @@
     "compare": "比較",
     "gallery": "Gallery",
     "pnginfo": "PNG Info",
-    "stats": "Stats"
+    "stats": "Stats",
+    "backup": "バックアップ"
   },
   "toast": {
     "template_inserted": "テンプレートを挿入しました",
@@ -630,6 +659,13 @@
     "pnginfo_sent_to_img2img": "img2imgにパラメータを送りました",
     "stats_load_failed": "統計の読み込みに失敗しました",
     "generation_cancelled": "生成をキャンセルしました",
-    "stream_incomplete": "ストリーミングが完了しませんでした"
+    "stream_incomplete": "ストリーミングが完了しませんでした",
+    "backup_list_failed": "バックアップ一覧の読み込みに失敗しました",
+    "backup_create_success": "バックアップを作成しました",
+    "backup_create_failed": "バックアップの作成に失敗しました",
+    "backup_restore_success": "復元が完了しました",
+    "backup_restore_failed": "復元に失敗しました",
+    "backup_file_required": "バックアップZIPファイルを選択してください",
+    "backup_confirm_required": "上書き確認のチェックが必要です"
   }
 }
