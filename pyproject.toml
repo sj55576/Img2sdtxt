@@ -23,7 +23,7 @@ known-first-party = [
     "config", "deps", "models", "llm_client", "llm_provider",
     "sd_client", "prompt_generator", "cache", "history", "presets",
     "job_queue", "rate_limit", "retry", "batch_processor", "webhook",
-    "xy_plot",
+    "xy_plot", "backup",
 ]
 
 [tool.mypy]

@@ -1562,3 +1562,16 @@ kbd {
 .ab-history-item-prompt { word-break: break-word; }
 .ab-history-empty { color: var(--text-muted); font-size: 0.85rem; }
 @media (max-width: 700px) { .ab-result-cols { grid-template-columns: 1fr; } }
+
+/* ================================================================== */
+/* Backup Page (#97)                                                  */
+/* ================================================================== */
+.backup-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.backup-hint { display: block; margin-top: 4px; color: var(--text-muted); font-size: 0.75rem; }
+.backup-item-invalid { opacity: 0.7; border-color: rgba(239,68,68,0.4) !important; }
+.backup-restore-notice { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.4); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.backup-restore-notice.hidden { display: none; }
+.backup-restore-notice strong { display: block; margin-bottom: 4px; color: var(--warning, #f59e0b); }
+.backup-restore-notice p { margin: 4px 0; font-size: 0.85rem; }
+.backup-restore-safety-line { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); }
+.backup-restore-safety-line.hidden { display: none; }

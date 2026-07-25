@@ -99,6 +99,140 @@ python main.py
 
 ---
 
+## Docker
+
+### クイックスタート
+
+```bash
+cp .env.example .env
+# 必要に応じて .env を編集（詳細は下記）
+docker compose up -d
+```
+
+ブラウザで <http://localhost:8000> を開きます。ログ確認: `docker compose logs -f img2sdtxt`。
+
+このイメージは同梱の `Dockerfile`（Python 3.12-slim、非rootユーザー、`/health` への
+`HEALTHCHECK`）からビルドされ、`docker-compose.yml` は `./data`・`./outputs`・`./ssl`
+をボリュームとしてマウントするため、履歴・生成画像・TLS証明書はコンテナの
+再起動/再ビルドをまたいで保持されます。
+
+### LLMサーバーへの接続
+
+#### オプションA — コンテナ内でOllamaを実行
+
+`ollama` プロファイルを使ってアプリと一緒にOllamaを起動します:
+
+```bash
+docker compose --profile ollama up -d
+```
+
+`.env` では、コンテナ名でOllamaサービスを指定します（両サービスは
+`img2sdtxt-net` Dockerネットワークを共有しています）:
+
+```env
+LLM_SERVER_URL=http://ollama:11434/v1
+LLM_PROVIDER=openai_compatible
+```
+
+その後、起動中のコンテナにビジョン対応モデルをpullします:
+
+```bash
+docker compose exec ollama ollama pull llava
+```
+
+#### オプションB — ホスト上で動作するLM Studio / A1111 / Ollama
+
+LLMサーバー（またはA1111）がコンテナではなくホストマシン上で直接動作している
+場合は、`host.docker.internal` を使ってアクセスします:
+
+```env
+LLM_SERVER_URL=http://host.docker.internal:1234/v1
+SD_API_URL=http://host.docker.internal:7860
+```
+
+- **Docker Desktop（Mac/Windows）**: `host.docker.internal` は自動的に解決される
+  ため追加設定は不要です。
+- **Linux**: `host.docker.internal` はデフォルトでは解決されないため、
+  `docker-compose.yml` の `img2sdtxt` サービスには以下を同梱済みです:
+  ```yaml
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
+  ```
+  Compose を使わず `docker run` で起動する場合は
+  `--add-host=host.docker.internal:host-gateway` を付けるか、
+  ホストのLAN/DockerブリッジIP（例: `http://172.17.0.1:1234/v1`）を
+  直接指定してください。
+
+### Stable Diffusion WebUI（A1111）
+
+ほとんどのユーザーはGPUへの直接アクセスと更新の容易さのためA1111をホスト上で
+実行し、上記のように `SD_API_URL` をそこに向けます（`--api` フラグが必要）。
+自分でコンテナ化したい場合のために、コメントアウトされた最小限の `sd-webui`
+サービス定義を `docker-compose.yml`（`sd-webui` プロファイル配下）に用意しています。
+
+### GPU利用
+
+コンテナ化された `ollama`（または `sd-webui`）サービスにNVIDIA GPUへのアクセスを
+与えるには、ホストに [NVIDIA Container
+Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+をインストールし、`docker-compose.yml` の該当サービス内の
+`deploy.resources.reservations.devices` ブロックのコメントを解除します:
+
+```yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+```
+
+### ボリューム / 永続化
+
+| ホスト側パス | コンテナ側パス | 内容 |
+|-------------|----------------|------|
+| `./data` | `/app/data` | SQLite履歴DB、プリセット、最後に使用したパラメータ |
+| `./outputs` | `/app/outputs` | 生成された画像とメタデータ |
+| `./ssl` | `/app/ssl` | 自動生成または指定したTLS証明書・秘密鍵 |
+| `ollama-data`（名前付きボリューム） | `/root/.ollama` | ダウンロード済みOllamaモデル（`ollama` プロファイル使用時のみ） |
+
+### リバースプロキシ
+
+コンテナの前段でTLSを終端するNginxの設定例:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+同等のCaddyfile:
+
+```
+example.com {
+    reverse_proxy 127.0.0.1:8000
+}
+```
+
+リバースプロキシ配下で運用する場合は、レート制限が実際のクライアントIPを
+認識できるよう `.env` で `TRUST_PROXY_HEADERS=true` を設定し、コンテナ自体では
+`HTTPS_ENABLED=false` のままにしてください（TLS終端はプロキシ側が担当します）。
+
+---
+
 ## 環境変数
 
 | 変数 | デフォルト | 説明 |
@@ -195,6 +329,45 @@ openssl req -x509 -newkey rsa:4096 \
 | Natural Light Portrait | 黄金時間の屋外自然光ポートレート |
 
 **プリセット**ページから独自のカスタムプリセットを作成・保存することもできます。
+
+---
+
+## バックアップ / リストア
+
+`data/` 配下（プロンプト履歴・LLMキャッシュ・レートリミット状態・プリセット・
+ワイルドカード）を、タイムスタンプ付きの単一ZIPにまとめて保存できます。
+
+**UIから:** **💾 Backup** ページでバックアップの作成、ダウンロード、削除、
+および保存済みバックアップ／アップロードしたZIPからの復元が行えます。
+
+**CLIから:**
+
+```bash
+python main.py --backup ./backups/            # data/ のみをバックアップ
+python main.py --backup ./backups/ --include-outputs   # outputs/ も含める
+python main.py --restore ./backups/img2sdtxt-backup-20260724-120000.zip
+```
+
+**自動バックアップ** — `.env` で設定します:
+
+```env
+AUTO_BACKUP_ENABLED=true
+AUTO_BACKUP_INTERVAL_HOURS=24
+AUTO_BACKUP_RETENTION=7      # これを超えた古い世代は自動削除
+#BACKUP_DIR=/path/to/backups # 既定値: data/backups
+```
+
+補足:
+
+- SQLite データベースはオンラインバックアップAPIでスナップショットするため、
+  アプリ稼働中に取得しても内容が壊れません。
+- 復元時は（明示的に無効化しない限り）現在のデータを安全バックアップとして
+  先に退避します。アーカイブに含まれないファイルが削除されることはありません。
+- **復元後はサーバーを再起動してください。** 各モジュールは独自のSQLite接続を
+  保持しており、再起動するまで復元前のデータを参照し続けます。
+- バックアップ用エンドポイントは他のAPIと同様に認証がありません。アーカイブには
+  全履歴が含まれるため、信頼できないネットワークに公開する場合は必ず前段に
+  認証を置いてください（Dockerセクションのリバースプロキシ例を参照）。
 
 ---
 

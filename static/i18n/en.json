@@ -15,7 +15,8 @@
       "compare": "🆚 Compare",
       "gallery": "🗃️ Gallery",
       "pnginfo": "🏷️ PNG Info",
-      "stats": "📊 Stats"
+      "stats": "📊 Stats",
+      "backup": "💾 Backup"
     },
     "theme": {
       "dark": "🌙 Dark",
@@ -475,6 +476,33 @@
       "activity_title": "Daily Generation Activity (last 30 days)",
       "weekly_title": "Weekly Summary",
       "no_data": "No data available"
+    },
+    "backup": {
+      "title": "Backup",
+      "subtitle": "Backup and restore application data",
+      "refresh_btn": "🔄 Refresh",
+      "restore_notice_title": "⚠️ Server restart required",
+      "restore_notice_body": "Restart the server for the restore to take full effect.",
+      "create_title": "📦 Create a new backup",
+      "include_outputs_label": "Include generated images (outputs)",
+      "include_outputs_warning": "⚠️ Including generated images can make the backup file much larger",
+      "create_btn": "💾 Create backup",
+      "creating": "Creating...",
+      "list_title": "🗂️ Backups",
+      "loading": "Loading...",
+      "empty": "No backups yet",
+      "restore_title": "📤 Restore from file",
+      "restore_file_label": "Backup ZIP file",
+      "safety_backup_label": "Create a safety backup of current data before restoring",
+      "confirm_overwrite_label": "I understand existing data will be overwritten",
+      "restore_btn": "♻️ Restore",
+      "download_btn": "Download",
+      "badge_outputs_included": "Outputs included",
+      "badge_invalid": "Invalid",
+      "file_count_unit": "files",
+      "confirm_delete": "Delete this backup?",
+      "confirm_restore": "Existing data will be overwritten. Continue with restore? (a safety backup will be created first)",
+      "safety_backup_id_label": "Safety backup ID"
     }
   },
   "common": {
@@ -564,7 +592,8 @@
     "compare": "Compare",
     "gallery": "Gallery",
     "pnginfo": "PNG Info",
-    "stats": "Stats"
+    "stats": "Stats",
+    "backup": "Backup"
   },
   "toast": {
     "template_inserted": "Template inserted",
@@ -630,6 +659,13 @@
     "pnginfo_sent_to_img2img": "Sent parameters to img2img",
     "stats_load_failed": "Failed to load statistics",
     "generation_cancelled": "Generation cancelled",
-    "stream_incomplete": "Streaming did not complete"
+    "stream_incomplete": "Streaming did not complete",
+    "backup_list_failed": "Failed to load backups",
+    "backup_create_success": "Backup created",
+    "backup_create_failed": "Failed to create backup",
+    "backup_restore_success": "Restore complete",
+    "backup_restore_failed": "Restore failed",
+    "backup_file_required": "Please select a backup ZIP file",
+    "backup_confirm_required": "You must check the overwrite confirmation"
   }
 }

@@ -1,0 +1,50 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+venv/
+.venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data / outputs (mounted as volumes at runtime).
+# data/wildcards/*.txt ships with the repo and is kept in the image so a
+# plain `docker run` without a bind mount still has the default wildcards.
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/presets.json
+data/backups/
+outputs/
+ssl/
+
+# Docs / misc
+docs/
+RUN_GUIDE.md
+README.md
+README-ja.md
+LICENSE
+tests/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
