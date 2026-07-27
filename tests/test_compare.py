@@ -102,6 +102,51 @@ def test_compare_too_many_variants_returns_400(client):
     assert resp.status_code == 400
 
 
+def test_compare_invalid_style_returns_400(client):
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    items = [
+        {"style": "not_a_style", "tone": "", "quality": "high"},
+        {"style": "anime", "tone": "", "quality": "high"},
+    ]
+    data = {"variants": _variants_json(items), "save_history": "false"}
+    resp = client.post("/api/generate-prompts-compare", files=files, data=data)
+    assert resp.status_code == 400
+
+
+def test_compare_invalid_tone_returns_400(client):
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    items = [
+        {"style": "anime", "tone": "not_a_tone", "quality": "high"},
+        {"style": "photorealistic", "tone": "", "quality": "high"},
+    ]
+    data = {"variants": _variants_json(items), "save_history": "false"}
+    resp = client.post("/api/generate-prompts-compare", files=files, data=data)
+    assert resp.status_code == 400
+
+
+def test_compare_invalid_quality_returns_400(client):
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    items = [
+        {"style": "anime", "tone": "", "quality": "not_a_quality"},
+        {"style": "photorealistic", "tone": "", "quality": "high"},
+    ]
+    data = {"variants": _variants_json(items), "save_history": "false"}
+    resp = client.post("/api/generate-prompts-compare", files=files, data=data)
+    assert resp.status_code == 400
+
+
+def test_compare_empty_style_tone_allowed(client):
+    """Empty string means 'unspecified' and must remain valid."""
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    items = [
+        {"style": "", "tone": "", "quality": ""},
+        {"style": "anime", "tone": "vibrant", "quality": "high"},
+    ]
+    data = {"variants": _variants_json(items), "save_history": "false"}
+    resp = client.post("/api/generate-prompts-compare", files=files, data=data)
+    assert resp.status_code == 200
+
+
 # ------------------------------------------------------------------ #
 # generate-prompts-compare: 正常系 / 部分失敗
 # ------------------------------------------------------------------ #
@@ -111,7 +156,7 @@ def test_compare_success(client):
     files = {"file": ("test.png", _make_png_bytes(), "image/png")}
     items = [
         {"style": "anime", "tone": "vibrant", "quality": "high"},
-        {"style": "realistic", "tone": "muted", "quality": "medium"},
+        {"style": "photorealistic", "tone": "soft", "quality": "standard"},
     ]
     data = {"variants": _variants_json(items), "save_history": "true"}
     resp = client.post("/api/generate-prompts-compare", files=files, data=data)
@@ -135,7 +180,7 @@ def test_compare_per_variant_failure_isolated(client):
     files = {"file": ("test.png", _make_png_bytes(), "image/png")}
     items = [
         {"style": "anime", "tone": "", "quality": "high"},
-        {"style": "realistic", "tone": "", "quality": "high"},
+        {"style": "photorealistic", "tone": "", "quality": "high"},
     ]
     data = {"variants": _variants_json(items), "save_history": "false"}
     resp = client.post("/api/generate-prompts-compare", files=files, data=data)
@@ -153,7 +198,7 @@ def test_compare_cache_hit_skips_generation(client):
     files = {"file": ("test.png", _make_png_bytes(), "image/png")}
     items = [
         {"style": "anime", "tone": "", "quality": "high"},
-        {"style": "realistic", "tone": "", "quality": "high"},
+        {"style": "photorealistic", "tone": "", "quality": "high"},
     ]
     data = {"variants": _variants_json(items), "save_history": "false"}
     resp = client.post("/api/generate-prompts-compare", files=files, data=data)

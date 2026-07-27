@@ -13,6 +13,7 @@ import history as hist
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import _validate_image_bytes
 from models import ABGenerateRequest, ABVoteRequest
+from validators import validate_quality, validate_style, validate_tone
 
 logger = logging.getLogger("img2sdtxt.compare")
 
@@ -45,6 +46,12 @@ async def generate_prompts_compare(
         raise HTTPException(
             status_code=400, detail=f"variants must contain between {MIN_VARIANTS} and {MAX_VARIANTS} items."
         )
+
+    for variant in parsed_variants:
+        # 明示的な null は「未指定」として扱う（str(None) == "None" で弾かれないように）
+        validate_style(str(variant.get("style") or ""))
+        validate_tone(str(variant.get("tone") or ""))
+        validate_quality(str(variant.get("quality") or ""))
 
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")

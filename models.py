@@ -1,8 +1,18 @@
 """Pydantic request models for API endpoints."""
 
+import re
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from validators import (
+    QUALITY_ERROR,
+    STYLE_ERROR,
+    TONE_ERROR,
+    is_valid_quality,
+    is_valid_style,
+    is_valid_tone,
+)
 
 
 class SDGenerateRequest(BaseModel):
@@ -74,6 +84,27 @@ class TextPromptRequest(BaseModel):
     preset_id: str = Field("")
     save_history: bool = Field(True)
 
+    @field_validator("style")
+    @classmethod
+    def _validate_style(cls, v: str) -> str:
+        if not is_valid_style(v):
+            raise ValueError(STYLE_ERROR)
+        return v
+
+    @field_validator("tone")
+    @classmethod
+    def _validate_tone(cls, v: str) -> str:
+        if not is_valid_tone(v):
+            raise ValueError(TONE_ERROR)
+        return v
+
+    @field_validator("quality")
+    @classmethod
+    def _validate_quality(cls, v: str) -> str:
+        if not is_valid_quality(v):
+            raise ValueError(QUALITY_ERROR)
+        return v
+
 
 class RefinePromptRequest(BaseModel):
     positive: str = Field(..., min_length=1, max_length=10000)
@@ -83,6 +114,27 @@ class RefinePromptRequest(BaseModel):
     tone: str = Field("")
     quality: str = Field("high")
     parent_id: Optional[int] = Field(None, description="Parent history item ID for version tracking")
+
+    @field_validator("style")
+    @classmethod
+    def _validate_style(cls, v: str) -> str:
+        if not is_valid_style(v):
+            raise ValueError(STYLE_ERROR)
+        return v
+
+    @field_validator("tone")
+    @classmethod
+    def _validate_tone(cls, v: str) -> str:
+        if not is_valid_tone(v):
+            raise ValueError(TONE_ERROR)
+        return v
+
+    @field_validator("quality")
+    @classmethod
+    def _validate_quality(cls, v: str) -> str:
+        if not is_valid_quality(v):
+            raise ValueError(QUALITY_ERROR)
+        return v
 
 
 class SwitchProviderRequest(BaseModel):
@@ -127,3 +179,65 @@ class ExpandPromptRequest(BaseModel):
     count: int = Field(5, ge=1, le=100)
     seed: Optional[int] = Field(None)
     max_combinations: int = Field(100, ge=1, le=1000)
+
+
+_PRESET_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+class PresetCreateRequest(BaseModel):
+    """Payload for ``POST /api/presets``.
+
+    Field set intentionally mirrors what ``presets.py`` actually reads
+    (``get_preset``/``add_preset``/the default presets): ``id``, ``name``,
+    ``description``, ``positive_suffix``, ``negative_suffix``, ``style``,
+    ``tone``, ``quality``. ``is_default`` is deliberately NOT exposed here —
+    ``presets.add_preset`` always forces it to ``False`` for user-created
+    presets, so accepting it from the client would be misleading.
+
+    Extra/unknown fields are rejected (422) rather than silently persisted,
+    since the previous ``dict``-typed endpoint persisted whatever the client
+    sent verbatim to ``data/presets.json``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field("", max_length=64, description="Optional explicit preset id")
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = Field("", max_length=500)
+    positive_suffix: str = Field(..., min_length=1, max_length=2000)
+    negative_suffix: str = Field(..., min_length=1, max_length=2000)
+    style: str = Field("")
+    tone: str = Field("")
+    quality: str = Field("")
+
+    @field_validator("id")
+    @classmethod
+    def _validate_id(cls, v: str) -> str:
+        if v == "":
+            return v
+        if not _PRESET_ID_RE.match(v):
+            raise ValueError(
+                "Preset id must be 1-64 characters and contain only letters, numbers, hyphens, or underscores."
+            )
+        return v
+
+    @field_validator("style")
+    @classmethod
+    def _validate_style(cls, v: str) -> str:
+        if not is_valid_style(v):
+            raise ValueError(STYLE_ERROR)
+        return v
+
+    @field_validator("tone")
+    @classmethod
+    def _validate_tone(cls, v: str) -> str:
+        if not is_valid_tone(v):
+            raise ValueError(TONE_ERROR)
+        return v
+
+    @field_validator("quality")
+    @classmethod
+    def _validate_quality(cls, v: str) -> str:
+        if not is_valid_quality(v):
+            raise ValueError(QUALITY_ERROR)
+        return v

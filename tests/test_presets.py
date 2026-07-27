@@ -165,3 +165,92 @@ def test_get_preset_by_id():
 def test_get_preset_not_found():
     p = preset_mgr.get_preset("nonexistent")
     assert p is None
+
+
+# ------------------------------------------------------------------ #
+# ルート (routes/presets.py) — Pydantic モデルによる入力検証
+# ------------------------------------------------------------------ #
+
+
+@pytest.fixture
+def client(temp_presets):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from routes.presets import router
+
+    app = FastAPI()
+    app.include_router(router)
+    return TestClient(app)
+
+
+def _valid_payload(**overrides):
+    payload = {
+        "name": "My Preset",
+        "positive_suffix": "detailed, sharp focus",
+        "negative_suffix": "blurry, low quality",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_create_preset_valid_payload_accepted(client):
+    resp = client.post("/api/presets", json=_valid_payload(style="anime", tone="vibrant", quality="high"))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["preset"]["name"] == "My Preset"
+    assert body["preset"]["is_default"] is False
+
+
+def test_create_preset_missing_required_field_returns_422(client):
+    payload = _valid_payload()
+    del payload["positive_suffix"]
+    resp = client.post("/api/presets", json=payload)
+    assert resp.status_code == 422
+
+
+def test_create_preset_rejects_unknown_field(client):
+    resp = client.post("/api/presets", json=_valid_payload(is_default=True))
+    assert resp.status_code == 422
+
+
+def test_create_preset_rejects_oversized_name(client):
+    resp = client.post("/api/presets", json=_valid_payload(name="x" * 101))
+    assert resp.status_code == 422
+
+
+def test_create_preset_rejects_oversized_positive_suffix(client):
+    resp = client.post("/api/presets", json=_valid_payload(positive_suffix="x" * 2001))
+    assert resp.status_code == 422
+
+
+def test_create_preset_rejects_invalid_style(client):
+    resp = client.post("/api/presets", json=_valid_payload(style="not_a_style"))
+    assert resp.status_code == 422
+
+
+def test_create_preset_rejects_invalid_tone(client):
+    resp = client.post("/api/presets", json=_valid_payload(tone="not_a_tone"))
+    assert resp.status_code == 422
+
+
+def test_create_preset_rejects_invalid_quality(client):
+    resp = client.post("/api/presets", json=_valid_payload(quality="not_a_quality"))
+    assert resp.status_code == 422
+
+
+def test_create_preset_rejects_invalid_id(client):
+    resp = client.post("/api/presets", json=_valid_payload(id="bad id!"))
+    assert resp.status_code == 422
+
+
+def test_create_preset_accepts_valid_explicit_id(client):
+    resp = client.post("/api/presets", json=_valid_payload(id="my_custom_id_2"))
+    assert resp.status_code == 200
+    assert resp.json()["preset"]["id"] == "my_custom_id_2"
+
+
+def test_create_preset_duplicate_id_returns_400(client):
+    resp = client.post("/api/presets", json=_valid_payload(id="anime"))
+    assert resp.status_code == 400
