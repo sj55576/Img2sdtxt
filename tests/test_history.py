@@ -289,3 +289,117 @@ def test_export_xlsx_empty_history_returns_valid_workbook(client):
     ws = wb["History"]
     assert ws.max_row == 1
     assert ws["A1"].value is None
+
+
+# ------------------------------------------------------------------ #
+# GET /api/history — limit/offset validation
+# ------------------------------------------------------------------ #
+
+
+def test_get_history_negative_limit_returns_422(client):
+    response = client.get("/api/history", params={"limit": -1})
+    assert response.status_code == 422
+
+
+def test_get_history_zero_limit_returns_422(client):
+    response = client.get("/api/history", params={"limit": 0})
+    assert response.status_code == 422
+
+
+def test_get_history_too_large_limit_returns_422(client):
+    response = client.get("/api/history", params={"limit": 100000})
+    assert response.status_code == 422
+
+
+def test_get_history_negative_offset_returns_422(client):
+    response = client.get("/api/history", params={"offset": -1})
+    assert response.status_code == 422
+
+
+def test_get_history_valid_limit_and_offset_paginates(client):
+    for i in range(5):
+        hist.save_history(positive=f"item {i}", negative="n")
+    response = client.get("/api/history", params={"limit": 2, "offset": 0})
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == 5
+
+    response2 = client.get("/api/history", params={"limit": 2, "offset": 2})
+    assert response2.status_code == 200
+    data2 = response2.json()
+    assert len(data2["items"]) == 2
+    # Offset pages should not overlap
+    ids_page1 = {item["id"] for item in data["items"]}
+    ids_page2 = {item["id"] for item in data2["items"]}
+    assert ids_page1.isdisjoint(ids_page2)
+
+
+def test_get_history_max_allowed_limit_is_accepted(client):
+    response = client.get("/api/history", params={"limit": 200})
+    assert response.status_code == 200
+
+
+# ------------------------------------------------------------------ #
+# Batched tag lookup (guards against the N+1 query refactor)
+# ------------------------------------------------------------------ #
+
+
+def test_get_history_batch_tags_for_many_items():
+    """Tags are attached correctly for a batch of items, including items
+    with no tags and items with multiple tags."""
+    r1 = hist.save_history(positive="no tags here", negative="n")
+    r2 = hist.save_history(positive="one tag", negative="n")
+    r3 = hist.save_history(positive="many tags", negative="n")
+    hist.add_tags(r2, ["portrait"])
+    hist.add_tags(r3, ["zebra", "anime", "hdr"])
+
+    items = hist.get_history(limit=None)
+    by_id = {item["id"]: item for item in items}
+
+    assert by_id[r1]["tags"] == []
+    assert by_id[r2]["tags"] == ["portrait"]
+    # tags within an item are alphabetically ordered
+    assert by_id[r3]["tags"] == ["anime", "hdr", "zebra"]
+
+
+def test_get_history_batch_tags_chunking_beyond_500_ids():
+    """The tag lookup chunks IDs; verify it still returns correct tags when
+    the number of history rows exceeds the chunk size."""
+    ids = []
+    for i in range(520):
+        ids.append(hist.save_history(positive=f"p{i}", negative="n"))
+    hist.add_tags(ids[0], ["first"])
+    hist.add_tags(ids[-1], ["last"])
+
+    items = hist.get_history(limit=None)
+    by_id = {item["id"]: item for item in items}
+    assert by_id[ids[0]]["tags"] == ["first"]
+    assert by_id[ids[-1]]["tags"] == ["last"]
+    # Everything else has no tags
+    untagged = [i for i in ids[1:-1]]
+    assert all(by_id[i]["tags"] == [] for i in untagged)
+
+
+# ------------------------------------------------------------------ #
+# init_db() caching (Task 3) does not leak between monkeypatched paths
+# ------------------------------------------------------------------ #
+
+
+def test_init_db_works_against_freshly_monkeypatched_db_path(tmp_path, monkeypatch):
+    """Even though init_db() short-circuits after the first successful run for
+    a given DB_PATH, pointing DB_PATH at a brand new path must still get a
+    full initialization (tables created) rather than silently no-op-ing."""
+    other_db = tmp_path / "another_history.db"
+    monkeypatch.setattr(hist, "DB_PATH", other_db)
+
+    # DB file doesn't exist yet; init_db() must create schema so this works.
+    rowid = hist.save_history(positive="fresh db", negative="n")
+    items = hist.get_history()
+    assert len(items) == 1
+    assert items[0]["id"] == rowid
+
+    # Calling init_db() again for the same (already-initialized) path is a
+    # cheap no-op and must not raise or break anything.
+    hist.init_db()
+    assert hist.get_history() == items

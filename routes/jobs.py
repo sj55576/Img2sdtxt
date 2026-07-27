@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
 import xy_plot
@@ -204,7 +204,7 @@ async def get_job(job_id: str):
 
 
 @router.get("")
-async def list_jobs(limit: int = 20, status: str = ""):
+async def list_jobs(limit: int = Query(20, ge=1, le=200), status: str = ""):
     jobs = job_queue.list_jobs(limit=limit, status=status or None)
     return {"success": True, "jobs": jobs}
 

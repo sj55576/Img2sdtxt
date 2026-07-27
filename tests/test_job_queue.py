@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -463,3 +465,30 @@ async def test_listener_fires_on_cancel_of_pending_job(queue):
     gate.set()
     await asyncio.sleep(0.1)
     _JOB_HANDLERS.pop("test_listener_cancel_slow", None)
+
+
+# ------------------------------------------------------------------ #
+# GET /api/jobs — limit validation (routes/jobs.py)
+# ------------------------------------------------------------------ #
+
+
+@pytest.fixture
+def jobs_client():
+    """Minimal TestClient exercising just the jobs router, to check query
+    parameter validation without pulling in the full app (SD/LLM clients)."""
+    import routes.jobs as jobs_routes
+
+    app = FastAPI()
+    app.include_router(jobs_routes.router)
+    with TestClient(app) as c:
+        yield c
+
+
+def test_list_jobs_negative_limit_returns_422(jobs_client):
+    response = jobs_client.get("/api/jobs", params={"limit": -1})
+    assert response.status_code == 422
+
+
+def test_list_jobs_valid_limit_returns_200(jobs_client):
+    response = jobs_client.get("/api/jobs", params={"limit": 10})
+    assert response.status_code == 200

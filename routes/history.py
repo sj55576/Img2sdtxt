@@ -4,7 +4,7 @@ import csv
 import io as _io
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
@@ -20,8 +20,8 @@ router = APIRouter(prefix="/api", tags=["history"])
 
 @router.get("/history")
 def get_history(
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     search: str = "",
     style: str = "",
     quality: str = "",
