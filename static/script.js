@@ -1293,8 +1293,8 @@ async function loadHistory() {
                     <div class="history-item-meta">
                         <span class="image-name">${escHtml(item.image_name || 'Unknown')}</span>
                         ${item.parent_id ? '<span class="version-chain-badge" title="バージョン管理中">🌿</span>' : ''}<br>
-                        ${item.style ? `<span>${item.style}</span> · ` : ''}
-                        ${item.quality ? `<span>${item.quality}</span> · ` : ''}
+                        ${item.style ? `<span>${escHtml(item.style)}</span> · ` : ''}
+                        ${item.quality ? `<span>${escHtml(item.quality)}</span> · ` : ''}
                         ${item.created_at ? `<span>${new Date(item.created_at).toLocaleString('ja-JP')}</span>` : ''}
                     </div>
                     <div class="history-item-actions">
@@ -1317,11 +1317,18 @@ async function loadHistory() {
                     ${escHtml(item.negative)}
                 </div>
                 <div class="history-tags">
-                    ${(item.tags || []).map(t => `<span class="history-tag" onclick="removeTagFromHistory(${item.id}, '${escHtml(t)}')" title="クリックで削除">${escHtml(t)}</span>`).join('')}
+                    ${(item.tags || []).map(t => `<span class="history-tag" data-tag-action="remove" data-history-id="${item.id}" data-tag="${escHtml(t)}" title="クリックで削除">${escHtml(t)}</span>`).join('')}
                     <button class="btn-add-tag" onclick="showAddTagInput(${item.id})" title="タグを追加">+ タグ</button>
                 </div>
             </div>
         `).join('');
+
+        // タグ名はサーバー側で文字種を制限していないため、onclick="f(..., '${tag}')"
+        // 形式だと escHtml() が単引用符を通してしまい JS 文字列リテラルを脱出できる。
+        // data-* 属性 + addEventListener でバインドする。
+        list.querySelectorAll('[data-tag-action="remove"]').forEach(el => {
+            el.addEventListener('click', () => removeTagFromHistory(Number(el.dataset.historyId), el.dataset.tag));
+        });
     } catch (e) {
         toast('履歴の読み込みに失敗しました', 'error');
     } finally {
@@ -1615,18 +1622,22 @@ async function loadPresets() {
         <div class="preset-card ${p.is_default ? 'is-default' : ''}">
             <div class="preset-card-header">
                 <span class="preset-card-name">${escHtml(p.name)}</span>
-                ${!p.is_default ? `<button class="btn btn-sm btn-ghost" onclick="deletePreset('${p.id}')">🗑️</button>` : ''}
+                ${!p.is_default ? `<button class="btn btn-sm btn-ghost" data-preset-action="delete" data-preset-id="${escHtml(p.id)}">🗑️</button>` : ''}
             </div>
             <div class="preset-card-desc">${escHtml(p.description || '')}</div>
             <div class="preset-card-tags">
                 ${p.is_default ? '<span class="tag default">Built-in</span>' : ''}
-                ${p.style ? `<span class="tag">${p.style}</span>` : ''}
-                ${p.quality ? `<span class="tag">${p.quality}</span>` : ''}
+                ${p.style ? `<span class="tag">${escHtml(p.style)}</span>` : ''}
+                ${p.quality ? `<span class="tag">${escHtml(p.quality)}</span>` : ''}
             </div>
             <div class="preset-card-suffix">+ ${escHtml(p.positive_suffix)}</div>
             <div class="preset-card-suffix">- ${escHtml(p.negative_suffix)}</div>
         </div>
     `).join('');
+
+    list.querySelectorAll('[data-preset-action="delete"]').forEach(el => {
+        el.addEventListener('click', () => deletePreset(el.dataset.presetId));
+    });
 
     loadPresetsIntoSelects();
 }
@@ -1687,7 +1698,7 @@ async function savePreset() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(preset)
         });
-        if (!r.ok) throw new Error((await r.json()).detail);
+        if (!r.ok) throw new Error(errDetail(await r.json(), 'プリセットの保存に失敗しました'));
         closePresetModal();
         loadPresets();
         toast('プリセットを保存しました', 'success');
@@ -3381,6 +3392,24 @@ function escHtml(str) {
     return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * FastAPI のエラー本文 `detail` を表示可能な文字列に正規化する。
+ * HTTPException なら文字列だが、Pydantic のバリデーション失敗 (422) では
+ * `[{loc, msg, type}, ...]` の配列になるため、そのまま埋め込むと
+ * "[object Object]" になってしまう。
+ */
+function errDetail(data, fallback) {
+    const detail = data?.detail;
+    if (typeof detail === 'string' && detail) return detail;
+    if (Array.isArray(detail) && detail.length) {
+        return detail.map(e => {
+            const field = Array.isArray(e?.loc) ? e.loc[e.loc.length - 1] : '';
+            return field ? `${field}: ${e?.msg ?? ''}` : String(e?.msg ?? '');
+        }).join(' / ');
+    }
+    return fallback;
+}
+
 /* =====================================================================
    Gallery Page
    ===================================================================== */
@@ -4193,10 +4222,10 @@ async function loadWildcards() {
             return;
         }
         list.innerHTML = data.wildcards.map(w =>
-            `<div class="wc-item" data-name="${w.name}">
-                <strong>__${w.name}__</strong>
+            `<div class="wc-item" data-name="${escHtml(w.name)}">
+                <strong>__${escHtml(w.name)}__</strong>
                 <span class="wc-count">${w.count} entries</span>
-                <div class="wc-preview-tags">${w.preview.slice(0, 3).join(', ')}${w.count > 3 ? '...' : ''}</div>
+                <div class="wc-preview-tags">${escHtml(w.preview.slice(0, 3).join(', '))}${w.count > 3 ? '...' : ''}</div>
             </div>`
         ).join('');
         list.querySelectorAll('.wc-item').forEach(el => {
@@ -4287,9 +4316,9 @@ async function wcPreview() {
         const data = await r.json();
         if (r.ok) {
             results.innerHTML = `<div class="wc-combo-count">${data.combination_count} total combinations</div>`
-                + data.expanded.map((s, i) => `<div class="wc-result-item">${i+1}. ${s}</div>`).join('');
+                + data.expanded.map((s, i) => `<div class="wc-result-item">${i+1}. ${escHtml(s)}</div>`).join('');
         } else {
-            results.innerHTML = `<div class="wc-error">${data.detail || 'Error'}</div>`;
+            results.innerHTML = `<div class="wc-error">${escHtml(errDetail(data, 'Error'))}</div>`;
         }
     } catch { results.innerHTML = '<div class="wc-error">Network error</div>'; }
 }
@@ -4905,15 +4934,18 @@ async function loadBackups() {
                 ${b.include_outputs ? `<span class="badge badge-green">${escHtml(I18n.t('page.backup.badge_outputs_included', 'Outputs included'))}</span>` : ''}
                 ${invalid ? `<span class="badge badge-red">${escHtml(I18n.t('page.backup.badge_invalid', 'Invalid'))}</span>` : ''}
             `;
+            // onclick="fn('${b.id}')" は escHtml() が単引用符をエスケープしないため
+            // JS文字列リテラルをエスケープできる。id/filename は data-* 属性へ渡し、
+            // 挿入後に addEventListener でバインドする。
             const actions = invalid
-                ? `<button class="btn btn-sm btn-ghost" onclick="deleteBackup('${b.id}')">🗑️ ${escHtml(I18n.t('common.delete', 'Delete'))}</button>`
+                ? `<button class="btn btn-sm btn-ghost" data-backup-action="delete" data-backup-id="${escHtml(b.id)}">🗑️ ${escHtml(I18n.t('common.delete', 'Delete'))}</button>`
                 : `
-                    <button class="btn btn-sm btn-secondary" onclick="downloadBackup('${b.id}', '${escHtml(b.filename)}')" title="${escHtml(I18n.t('page.backup.download_btn', 'Download'))}">⬇</button>
-                    <button class="btn btn-sm btn-secondary" onclick="restoreBackupById('${b.id}')" title="${escHtml(I18n.t('page.backup.restore_btn', 'Restore'))}">♻️</button>
-                    <button class="btn btn-sm btn-ghost" onclick="deleteBackup('${b.id}')" title="${escHtml(I18n.t('common.delete', 'Delete'))}">🗑️</button>
+                    <button class="btn btn-sm btn-secondary" data-backup-action="download" data-backup-id="${escHtml(b.id)}" data-backup-filename="${escHtml(b.filename)}" title="${escHtml(I18n.t('page.backup.download_btn', 'Download'))}">⬇</button>
+                    <button class="btn btn-sm btn-secondary" data-backup-action="restore" data-backup-id="${escHtml(b.id)}" title="${escHtml(I18n.t('page.backup.restore_btn', 'Restore'))}">♻️</button>
+                    <button class="btn btn-sm btn-ghost" data-backup-action="delete" data-backup-id="${escHtml(b.id)}" title="${escHtml(I18n.t('common.delete', 'Delete'))}">🗑️</button>
                 `;
             return `
-                <div class="history-item ${invalid ? 'backup-item-invalid' : ''}" data-id="${b.id}">
+                <div class="history-item ${invalid ? 'backup-item-invalid' : ''}" data-id="${escHtml(b.id)}">
                     <div class="history-item-header">
                         <div class="history-item-meta">
                             <span class="image-name">${escHtml(b.filename)}</span><br>
@@ -4928,6 +4960,18 @@ async function loadBackups() {
                     </div>
                 </div>`;
         }).join('');
+
+        list.querySelectorAll('[data-backup-action]').forEach(el => {
+            const id = el.dataset.backupId;
+            const action = el.dataset.backupAction;
+            if (action === 'delete') {
+                el.addEventListener('click', () => deleteBackup(id));
+            } else if (action === 'download') {
+                el.addEventListener('click', () => downloadBackup(id, el.dataset.backupFilename));
+            } else if (action === 'restore') {
+                el.addEventListener('click', () => restoreBackupById(id));
+            }
+        });
     } catch (e) {
         toast(e.message || I18n.t('toast.backup_list_failed', 'バックアップ一覧の読み込みに失敗しました'), 'error');
     } finally {

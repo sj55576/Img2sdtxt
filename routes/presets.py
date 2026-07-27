@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 
 import presets as preset_mgr
+from models import PresetCreateRequest
 
 router = APIRouter(prefix="/api", tags=["presets"])
 
@@ -13,12 +14,9 @@ def get_presets():
 
 
 @router.post("/presets")
-def create_preset(preset: dict):
-    for field in ["name", "positive_suffix", "negative_suffix"]:
-        if not preset.get(field):
-            raise HTTPException(status_code=400, detail=f"Field '{field}' is required.")
+def create_preset(preset: PresetCreateRequest):
     try:
-        new_preset = preset_mgr.add_preset(preset)
+        new_preset = preset_mgr.add_preset(preset.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return {"success": True, "preset": new_preset}

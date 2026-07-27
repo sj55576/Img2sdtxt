@@ -1,6 +1,7 @@
 import json
 import logging
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -9,8 +10,24 @@ logger = logging.getLogger("img2sdtxt.history")
 
 DB_PATH = Path(__file__).parent / "data" / "history.db"
 
+# Paths for which init_db() has already run successfully. Keyed on str(DB_PATH)
+# so that tests which monkeypatch the module-level DB_PATH to a fresh tmp_path
+# per test still get a fresh initialisation for that path.
+_initialized_db_paths: set = set()
+_init_db_lock = threading.Lock()
+
+
+def _reset_init_db_cache() -> None:
+    """Forget which DB paths have been initialised (mainly useful for tests)."""
+    with _init_db_lock:
+        _initialized_db_paths.clear()
+
 
 def init_db():
+    key = str(DB_PATH)
+    with _init_db_lock:
+        if key in _initialized_db_paths:
+            return
     DB_PATH.parent.mkdir(exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
@@ -57,6 +74,8 @@ def init_db():
             )
         """)
         conn.commit()
+    with _init_db_lock:
+        _initialized_db_paths.add(key)
 
 
 def save_history(
@@ -119,25 +138,43 @@ def get_history(
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
+    # created_at 単独では同一タイムスタンプ時に順序が未定義になり、OFFSET ページングで
+    # 行の重複・欠落が起こりうる。主キーをタイブレーカーにして全順序を与える。
+    order_by = "ORDER BY prompt_history.created_at DESC, prompt_history.id DESC"
+
     if limit is None:
         # LIMIT なし — 全件取得
         params.append(offset)
-        query = f"SELECT prompt_history.* FROM prompt_history {join_clause} {where} ORDER BY created_at DESC LIMIT -1 OFFSET ?"
+        query = f"SELECT prompt_history.* FROM prompt_history {join_clause} {where} {order_by} LIMIT -1 OFFSET ?"
     else:
         params.extend([limit, offset])
-        query = f"SELECT prompt_history.* FROM prompt_history {join_clause} {where} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        query = f"SELECT prompt_history.* FROM prompt_history {join_clause} {where} {order_by} LIMIT ? OFFSET ?"
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         conn.row_factory = sqlite3.Row
         rows = conn.execute(query, params).fetchall()
         items = [dict(r) for r in rows]
-        # Attach tags to each item
-        for item in items:
+
+        # Attach tags to each item via a single batched query (chunked to stay
+        # under SQLite's bound-parameter limit), instead of one query per row.
+        ids = [item["id"] for item in items]
+        tags_by_id: Dict[int, List[str]] = {}
+        chunk_size = 500
+        for start in range(0, len(ids), chunk_size):
+            chunk = ids[start : start + chunk_size]
+            placeholders = ",".join("?" * len(chunk))
             tag_rows = conn.execute(
-                "SELECT tag FROM prompt_tags WHERE history_id = ? ORDER BY tag", (item["id"],)
+                f"SELECT history_id, tag FROM prompt_tags WHERE history_id IN ({placeholders}) "
+                "ORDER BY history_id, tag",
+                chunk,
             ).fetchall()
-            item["tags"] = [r[0] for r in tag_rows]
+            for r in tag_rows:
+                tags_by_id.setdefault(r["history_id"], []).append(r["tag"])
+
+        for item in items:
+            item["tags"] = tags_by_id.get(item["id"], [])
+
         return items
 
 

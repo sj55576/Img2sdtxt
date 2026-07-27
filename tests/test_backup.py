@@ -258,6 +258,23 @@ def test_rotate_backups_keeps_only_retention_newest(temp_dirs):
     assert set(deleted) | {b["id"] for b in remaining} == set(ids)
 
 
+def test_list_backups_skips_hostile_zip_stem(temp_dirs):
+    """A zip whose stem doesn't match BACKUP_ID_RE must be skipped, not listed."""
+    _populate_data_dir(temp_dirs["data_dir"])
+    result = backup_mgr.create_backup()
+
+    backup_dir = temp_dirs["backup_dir"]
+    hostile_path = backup_dir / "a'b.zip"
+    with zipfile.ZipFile(hostile_path, "w") as zf:
+        zf.writestr("manifest.json", json.dumps({"schema_version": 1, "created_at": "2024-01-01T00:00:00"}))
+
+    entries = backup_mgr.list_backups()
+    ids = [e["id"] for e in entries]
+    assert result["id"] in ids
+    assert "a'b" not in ids
+    assert len(entries) == 1
+
+
 # ------------------------------------------------------------------ #
 # 回帰テスト（レビュー指摘分）
 # ------------------------------------------------------------------ #

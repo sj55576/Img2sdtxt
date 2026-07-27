@@ -181,6 +181,9 @@ def list_backups(backup_dir: Optional[Path] = None) -> List[Dict]:
 
     entries: List[Dict] = []
     for zip_path in target_dir.glob("*.zip"):
+        if not BACKUP_ID_RE.match(zip_path.stem):
+            logger.warning("Skipping backup file with unsafe name: %s", zip_path.name)
+            continue
         entry: Dict = {
             "id": zip_path.stem,
             "filename": zip_path.name,

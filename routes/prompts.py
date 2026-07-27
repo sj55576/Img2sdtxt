@@ -14,6 +14,7 @@ import presets as preset_mgr
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import _validate_image_bytes
 from models import RefinePromptRequest, TextPromptRequest
+from validators import validate_quality, validate_style, validate_tone
 
 logger = logging.getLogger("img2sdtxt.prompts")
 
@@ -43,6 +44,9 @@ async def generate_prompts(
         raise HTTPException(status_code=400, detail=f"Invalid analysis_mode. Must be one of {ANALYSIS_MODES}.")
     if tagger_model not in TAGGER_MODELS:
         raise HTTPException(status_code=400, detail=f"Invalid tagger_model. Must be one of {TAGGER_MODELS}.")
+    style = validate_style(style)
+    tone = validate_tone(tone)
+    quality = validate_quality(quality)
 
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")
@@ -173,6 +177,10 @@ async def generate_prompts_stream(
     イベント: start → token* → done、エラー時は error。
     非ストリーミング対応プロバイダーは基底クラスのフォールバックにより一括1チャンクで届く。
     """
+    style = validate_style(style)
+    tone = validate_tone(tone)
+    quality = validate_quality(quality)
+
     contents: Optional[bytes] = None
     image_name = "[text input]"
     if file is not None and file.filename:
@@ -293,6 +301,9 @@ async def generate_prompts_batch(
 ):
     if len(files) > 10:
         raise HTTPException(status_code=400, detail="Maximum 10 images per batch.")
+    style = validate_style(style)
+    tone = validate_tone(tone)
+    quality = validate_quality(quality)
 
     preset = preset_mgr.get_preset(preset_id) if preset_id else None
     suffix_pos = preset.get("positive_suffix", "") if preset else ""

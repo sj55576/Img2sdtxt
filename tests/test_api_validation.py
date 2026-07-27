@@ -289,3 +289,69 @@ def test_history_with_tag_filter(client):
     r = client.get("/api/history", params={"tag": "nonexistent_tag_xyz"})
     assert r.status_code == 200
     assert r.json()["items"] == []
+
+
+# ------------------------------------------------------------------ #
+# style / tone / quality validation (Form-based prompt endpoints)
+# ------------------------------------------------------------------ #
+
+
+def test_generate_prompts_invalid_style_returns_400(client):
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    r = client.post("/api/generate-prompts", files=files, data={"style": "not_a_style"})
+    assert r.status_code == 400
+
+
+def test_generate_prompts_invalid_tone_returns_400(client):
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    r = client.post("/api/generate-prompts", files=files, data={"tone": "not_a_tone"})
+    assert r.status_code == 400
+
+
+def test_generate_prompts_invalid_quality_returns_400(client):
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    r = client.post("/api/generate-prompts", files=files, data={"quality": "not_a_quality"})
+    assert r.status_code == 400
+
+
+def test_generate_prompts_valid_style_tone_quality_accepted(client):
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    r = client.post(
+        "/api/generate-prompts",
+        files=files,
+        data={"style": "anime", "tone": "vibrant", "quality": "ultra"},
+    )
+    assert r.status_code == 200
+
+
+def test_generate_prompts_empty_style_tone_accepted(client):
+    """Empty string means 'unspecified' and must remain valid."""
+    files = {"file": ("test.png", _make_png_bytes(), "image/png")}
+    r = client.post("/api/generate-prompts", files=files, data={"style": "", "tone": "", "quality": ""})
+    assert r.status_code == 200
+
+
+def test_generate_prompts_batch_invalid_style_returns_400(client):
+    files = [("files", ("test.png", _make_png_bytes(), "image/png"))]
+    r = client.post("/api/generate-prompts-batch", files=files, data={"style": "not_a_style"})
+    assert r.status_code == 400
+
+
+def test_generate_prompts_stream_invalid_quality_returns_400(client):
+    r = client.post(
+        "/api/generate-prompts-stream",
+        data={"description": "a cat", "quality": "not_a_quality"},
+    )
+    assert r.status_code == 400
+
+
+def test_generate_prompts_text_invalid_style_returns_422(client):
+    """/api/generate-prompts-text uses a Pydantic model, so invalid style is a 422."""
+    r = client.post("/api/generate-prompts-text", json={"description": "test", "style": "not_a_style"})
+    assert r.status_code == 422
+
+
+def test_refine_prompt_invalid_tone_returns_422(client):
+    payload = {"positive": "a cat", "tone": "not_a_tone"}
+    r = client.post("/api/refine-prompt", json=payload)
+    assert r.status_code == 422
