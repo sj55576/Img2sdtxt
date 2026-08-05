@@ -544,6 +544,7 @@ async function checkSDStatus() {
                         }
                         await loadLoras('sd', d.loras || []);
                         if (d.models?.length) await populateMultiModelList(d.models);
+                        populateControlNetSelectors('sd', d.controlnet_models, d.controlnet_modules);
                         _modelsLoaded.sd = true;
                     } else {
                         // タブ切り替え時は選択を復元するのみ
@@ -1734,6 +1735,7 @@ function setupSDPage() {
     document.getElementById('sd-model').addEventListener('change', e => {
         _selectedModel.sd = e.target.value;
     });
+    setupControlNetUnit('sd');
     document.getElementById('sd-multi-generate-btn').addEventListener('click', runMultiModelGenerate);
 
     // Token counters
@@ -1756,6 +1758,14 @@ async function runSDGenerate() {
     const _sdModel = document.getElementById('sd-model').value.trim();
     if (!_sdModel) { toast('モデルを選択してください', 'error'); return; }
     if (!await confirmModel(_sdModel)) return;
+
+    let controlnetArgs;
+    try {
+        controlnetArgs = await buildControlNetArgs('sd');
+    } catch (e) {
+        toast(e.message || 'ControlNetの設定が不正です', 'error');
+        return;
+    }
 
     btn.disabled = true;
     const loading = document.getElementById('sd-loading');
@@ -1786,8 +1796,10 @@ async function runSDGenerate() {
         hr_denoising_strength: parseFloat(document.getElementById('sd-hr-denoising').value)
     };
 
-    // Save parameters for next startup
+    // Save parameters for next startup (excludes controlnet_args: may contain a large image blob)
     saveLastParams('sd', payload);
+
+    payload.controlnet_args = controlnetArgs;
 
     try {
         const r = await fetch('/api/sd/generate', {
@@ -1821,6 +1833,70 @@ function downloadImage(base64, index) {
     a.href = `data:image/png;base64,${base64}`;
     a.download = `sd_generated_${index}.png`;
     a.click();
+}
+
+/* =====================================================================
+   ControlNet (shared across SD Generate / Img2Img / Inpaint)
+   ===================================================================== */
+function setupControlNetUnit(prefix) {
+    const enableChk = document.getElementById(`${prefix}-cn-enable`);
+    const settings = document.getElementById(`${prefix}-cn-settings`);
+    if (!enableChk || !settings) return;
+    enableChk.addEventListener('change', e => {
+        settings.classList.toggle('hidden', !e.target.checked);
+    });
+}
+
+function populateControlNetSelectors(prefix, models, modules) {
+    const modelSel = document.getElementById(`${prefix}-cn-model`);
+    const moduleSel = document.getElementById(`${prefix}-cn-module`);
+    if (modelSel) {
+        const toRestore = modelSel.value;
+        modelSel.innerHTML = '<option value="">-- 選択 --</option>' +
+            (models || []).map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+        if (toRestore) modelSel.value = toRestore;
+    }
+    if (moduleSel) {
+        const toRestore = moduleSel.value;
+        const list = (modules && modules.length) ? modules : ['none'];
+        moduleSel.innerHTML = list.map(m => `<option${m === 'none' ? ' selected' : ''}>${escHtml(m)}</option>`).join('');
+        if (toRestore) moduleSel.value = toRestore;
+    }
+}
+
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
+ * Builds the controlnet_args payload for the given page prefix ('sd' | 'i2i' | 'inpaint').
+ * Returns null when ControlNet is disabled. Throws when enabled but no reference image is set.
+ */
+async function buildControlNetArgs(prefix) {
+    const enableChk = document.getElementById(`${prefix}-cn-enable`);
+    if (!enableChk || !enableChk.checked) return null;
+
+    const fileInput = document.getElementById(`${prefix}-cn-image-input`);
+    const file = fileInput?.files?.[0];
+    if (!file) {
+        throw new Error('ControlNetの参照画像を選択してください');
+    }
+    const imageB64 = await readFileAsBase64(file);
+
+    return [{
+        enabled: true,
+        image: imageB64,
+        module: document.getElementById(`${prefix}-cn-module`).value,
+        model: document.getElementById(`${prefix}-cn-model`).value,
+        weight: parseFloat(document.getElementById(`${prefix}-cn-weight`).value),
+        guidance_start: parseFloat(document.getElementById(`${prefix}-cn-guidance-start`).value),
+        guidance_end: parseFloat(document.getElementById(`${prefix}-cn-guidance-end`).value),
+    }];
 }
 
 /* =====================================================================
@@ -2040,6 +2116,7 @@ function setupImg2ImgPage() {
     document.getElementById('i2i-model').addEventListener('change', e => {
         _selectedModel.img2img = e.target.value;
     });
+    setupControlNetUnit('i2i');
 
     // Random folder load
     const i2iRandomFolderInput = document.getElementById('i2i-random-folder-input');
@@ -2164,6 +2241,7 @@ async function checkImg2ImgStatus() {
                             if (upscalerSel.dataset.pendingValue) { upscalerSel.value = upscalerSel.dataset.pendingValue; delete upscalerSel.dataset.pendingValue; }
                         }
                         await loadLoras('i2i', d.loras || []);
+                        populateControlNetSelectors('i2i', d.controlnet_models, d.controlnet_modules);
                         _modelsLoaded.img2img = true;
                     } else {
                         const modelSel = document.getElementById('i2i-model');
@@ -2194,6 +2272,14 @@ async function runImg2Img() {
     const _i2iModel = document.getElementById('i2i-model').value.trim();
     if (!_i2iModel) { toast('モデルを選択してください', 'error'); return; }
     if (!await confirmModel(_i2iModel)) return;
+
+    let controlnetArgs;
+    try {
+        controlnetArgs = await buildControlNetArgs('i2i');
+    } catch (e) {
+        toast(e.message || 'ControlNetの設定が不正です', 'error');
+        return;
+    }
 
     btn.disabled = true;
     const loading = document.getElementById('i2i-loading');
@@ -2249,6 +2335,7 @@ async function runImg2Img() {
     fd.append('hr_upscaler', i2iParams.hr_upscaler);
     fd.append('hr_second_pass_steps', i2iParams.hr_second_pass_steps);
     fd.append('hr_denoising_strength', i2iParams.hr_denoising_strength);
+    if (controlnetArgs) fd.append('controlnet_args', JSON.stringify(controlnetArgs));
 
     try {
         const r = await fetch('/api/sd/img2img', { method: 'POST', body: fd });
@@ -2396,6 +2483,7 @@ function setupInpaintPage() {
     document.getElementById('inpaint-model').addEventListener('change', e => {
         _selectedModel.inpaint = e.target.value;
     });
+    setupControlNetUnit('inpaint');
 
     drawBtn.addEventListener('click', () => {
         _inpaint.mode = 'draw';
@@ -2569,6 +2657,7 @@ async function checkInpaintStatus() {
                             if (modelSel.value) _selectedModel.inpaint = modelSel.value;
                         }
                         await loadLoras('inpaint', d.loras || []);
+                        populateControlNetSelectors('inpaint', d.controlnet_models, d.controlnet_modules);
                         _modelsLoaded.inpaint = true;
                     } else {
                         const modelSel = document.getElementById('inpaint-model');
@@ -2630,6 +2719,14 @@ async function runInpaint() {
     if (!_inpaintModel) { toast('モデルを選択してください', 'error'); return; }
     if (!await confirmModel(_inpaintModel)) return;
 
+    let controlnetArgs;
+    try {
+        controlnetArgs = await buildControlNetArgs('inpaint');
+    } catch (e) {
+        toast(e.message || 'ControlNetの設定が不正です', 'error');
+        return;
+    }
+
     btn.disabled = true;
     const maskBase64 = getMaskBase64();
 
@@ -2681,6 +2778,7 @@ async function runInpaint() {
     fd.append('inpainting_fill', params.inpainting_fill);
     fd.append('inpaint_full_res', params.inpaint_full_res ? 'true' : 'false');
     fd.append('inpaint_full_res_padding', params.inpaint_full_res_padding);
+    if (controlnetArgs) fd.append('controlnet_args', JSON.stringify(controlnetArgs));
 
     try {
         const r = await fetch('/api/sd/inpaint', { method: 'POST', body: fd });
@@ -3992,7 +4090,7 @@ let _statsData = null;
 let _statsTagKind = 'positive';
 
 function setupStatsPage() {
-    document.getElementById('refresh-stats-btn')?.addEventListener('click', loadStats);
+    document.getElementById('refresh-stats-btn')?.addEventListener('click', () => { loadStats(); loadSystemStatus(); });
     document.getElementById('stats-top-n')?.addEventListener('change', loadStats);
 
     document.getElementById('stats-tag-toggle')?.addEventListener('click', e => {
@@ -4014,6 +4112,44 @@ function setupStatsPage() {
         if (!row) return;
         goToHistoryWithSearch(row.dataset.tag || '');
     });
+
+    document.getElementById('clear-cache-btn')?.addEventListener('click', async () => {
+        try {
+            const r = await fetch('/api/cache', { method: 'DELETE' });
+            if (!r.ok) throw new Error();
+            const d = await r.json();
+            toast(`キャッシュを${d.cleared}件削除しました`, 'success');
+        } catch {
+            toast('キャッシュのクリアに失敗しました', 'error');
+        } finally {
+            loadSystemStatus();
+        }
+    });
+
+    loadSystemStatus();
+}
+
+async function loadSystemStatus() {
+    try {
+        const r = await fetch('/api/cache/stats');
+        if (r.ok) {
+            const d = await r.json();
+            document.getElementById('cache-hit-rate').textContent = `${d.hit_rate_pct}%`;
+            document.getElementById('cache-size').textContent = d.size;
+            document.getElementById('cache-hits-misses').textContent = `${d.hits} / ${d.misses}`;
+        }
+    } catch { /* leave placeholders */ }
+
+    try {
+        const r = await fetch('/api/jobs/queue/stats');
+        if (r.ok) {
+            const d = await r.json();
+            const s = d.stats || {};
+            document.getElementById('queue-pending').textContent = s.queue_size ?? '--';
+            document.getElementById('queue-running').textContent = s.running ?? '--';
+            document.getElementById('queue-total').textContent = s.total ?? '--';
+        }
+    } catch { /* leave placeholders */ }
 }
 
 async function loadStats() {
