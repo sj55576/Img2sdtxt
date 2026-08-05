@@ -9,4 +9,4 @@ ssl/
 tmpclaude-*
 venv/
 .vscode/
-.claude/
+.claude/settings.local.json
