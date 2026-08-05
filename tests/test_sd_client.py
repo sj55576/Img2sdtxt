@@ -429,6 +429,21 @@ class TestSDClientInpaint:
         with pytest.raises(TimeoutError):
             sd.inpaint(_make_png_base64(), _make_png_base64(), "a cat", "blurry")
 
+    @patch("sd_client.requests.post")
+    def test_inpaint_controlnet_args_included(self, mock_post, sd):
+        mock_post.return_value = _mock_response(json_data={"images": []})
+        cn_args = [{"module": "canny", "model": "control_canny"}]
+        sd.inpaint(_make_png_base64(), _make_png_base64(), "a cat", "blurry", controlnet_args=cn_args)
+        payload = mock_post.call_args.kwargs["json"]
+        assert payload["alwayson_scripts"]["controlnet"]["args"] == cn_args
+
+    @patch("sd_client.requests.post")
+    def test_inpaint_no_controlnet_args_key_when_none(self, mock_post, sd):
+        mock_post.return_value = _mock_response(json_data={"images": []})
+        sd.inpaint(_make_png_base64(), _make_png_base64(), "a cat", "blurry")
+        payload = mock_post.call_args.kwargs["json"]
+        assert "alwayson_scripts" not in payload
+
 
 # ------------------------------------------------------------------ #
 # interrogate

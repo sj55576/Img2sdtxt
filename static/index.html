@@ -655,6 +655,46 @@
                             </div>
                         </div>
 
+                        <!-- ControlNet Settings -->
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.sd.controlnet_title">🎮 ControlNet</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="sd-cn-enable">
+                                    <span data-i18n="page.sd.controlnet_enable">ControlNetを有効化</span>
+                                </label>
+                            </div>
+                            <div id="sd-cn-settings" class="hr-settings hidden">
+                                <div class="form-group">
+                                    <label data-i18n="page.sd.controlnet_image_label">参照画像</label>
+                                    <input type="file" id="sd-cn-image-input" accept="image/*">
+                                </div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_model_label">モデル</label>
+                                        <select id="sd-cn-model"><option value="">-- 選択 --</option></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
+                                        <select id="sd-cn-module"><option value="none">none</option></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_weight_label">Weight</label>
+                                        <input type="number" id="sd-cn-weight" value="1.0" min="0" max="2" step="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
+                                        <input type="number" id="sd-cn-guidance-start" value="0.0" min="0" max="1" step="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
+                                        <input type="number" id="sd-cn-guidance-end" value="1.0" min="0" max="1" step="0.05">
+                                    </div>
+                                </div>
+                                <small data-i18n="page.sd.controlnet_hint">SD WebUIにControlNet拡張が必要です。モデル一覧が空の場合は未導入です。</small>
+                            </div>
+                        </div>
+
                         <button id="sd-generate-btn" class="btn btn-accent btn-block" data-i18n="page.sd.generate_btn">
                             🖼️ 画像生成
                         </button>
@@ -873,6 +913,46 @@
                             </div>
                         </div>
 
+                        <!-- ControlNet Settings -->
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.sd.controlnet_title">🎮 ControlNet</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="i2i-cn-enable">
+                                    <span data-i18n="page.sd.controlnet_enable">ControlNetを有効化</span>
+                                </label>
+                            </div>
+                            <div id="i2i-cn-settings" class="hr-settings hidden">
+                                <div class="form-group">
+                                    <label data-i18n="page.sd.controlnet_image_label">参照画像</label>
+                                    <input type="file" id="i2i-cn-image-input" accept="image/*">
+                                </div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_model_label">モデル</label>
+                                        <select id="i2i-cn-model"><option value="">-- 選択 --</option></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
+                                        <select id="i2i-cn-module"><option value="none">none</option></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_weight_label">Weight</label>
+                                        <input type="number" id="i2i-cn-weight" value="1.0" min="0" max="2" step="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
+                                        <input type="number" id="i2i-cn-guidance-start" value="0.0" min="0" max="1" step="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
+                                        <input type="number" id="i2i-cn-guidance-end" value="1.0" min="0" max="1" step="0.05">
+                                    </div>
+                                </div>
+                                <small data-i18n="page.sd.controlnet_hint">SD WebUIにControlNet拡張が必要です。モデル一覧が空の場合は未導入です。</small>
+                            </div>
+                        </div>
+
                         <button id="i2i-generate-btn" class="btn btn-accent btn-block" disabled data-i18n="page.img2img.generate_btn">
                             🔄 Img2Img 生成
                         </button>
@@ -1060,6 +1140,46 @@
                             <div class="form-group" style="margin-top:8px;">
                                 <label data-i18n="page.inpaint.fullres_padding_label">パディング (px)</label>
                                 <input type="number" id="inpaint-full-res-padding" value="32" min="0" max="256">
+                            </div>
+                        </div>
+
+                        <!-- ControlNet Settings -->
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.sd.controlnet_title">🎮 ControlNet</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="inpaint-cn-enable">
+                                    <span data-i18n="page.sd.controlnet_enable">ControlNetを有効化</span>
+                                </label>
+                            </div>
+                            <div id="inpaint-cn-settings" class="hr-settings hidden">
+                                <div class="form-group">
+                                    <label data-i18n="page.sd.controlnet_image_label">参照画像</label>
+                                    <input type="file" id="inpaint-cn-image-input" accept="image/*">
+                                </div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_model_label">モデル</label>
+                                        <select id="inpaint-cn-model"><option value="">-- 選択 --</option></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
+                                        <select id="inpaint-cn-module"><option value="none">none</option></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_weight_label">Weight</label>
+                                        <input type="number" id="inpaint-cn-weight" value="1.0" min="0" max="2" step="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
+                                        <input type="number" id="inpaint-cn-guidance-start" value="0.0" min="0" max="1" step="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
+                                        <input type="number" id="inpaint-cn-guidance-end" value="1.0" min="0" max="1" step="0.05">
+                                    </div>
+                                </div>
+                                <small data-i18n="page.sd.controlnet_hint">SD WebUIにControlNet拡張が必要です。モデル一覧が空の場合は未導入です。</small>
                             </div>
                         </div>
 
@@ -1556,6 +1676,47 @@
                     </div>
                 </div>
                 <div class="page-body">
+                    <!-- System status: LLM cache / job queue -->
+                    <div class="stats-panel-row">
+                        <div class="stats-panel">
+                            <div class="stats-panel-header">
+                                <h3 data-i18n="page.stats.cache_title">LLM応答キャッシュ</h3>
+                                <button id="clear-cache-btn" class="btn btn-sm btn-secondary" data-i18n="page.stats.cache_clear_btn">🗑️ クリア</button>
+                            </div>
+                            <div class="stats-summary-grid">
+                                <div class="stats-card">
+                                    <div class="stats-card-value" id="cache-hit-rate">--</div>
+                                    <div class="stats-card-label" data-i18n="page.stats.cache_hit_rate">ヒット率</div>
+                                </div>
+                                <div class="stats-card">
+                                    <div class="stats-card-value" id="cache-size">--</div>
+                                    <div class="stats-card-label" data-i18n="page.stats.cache_size">エントリ数</div>
+                                </div>
+                                <div class="stats-card">
+                                    <div class="stats-card-value" id="cache-hits-misses">--</div>
+                                    <div class="stats-card-label" data-i18n="page.stats.cache_hits_misses">ヒット / ミス</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stats-panel">
+                            <h3 data-i18n="page.stats.queue_title">ジョブキュー</h3>
+                            <div class="stats-summary-grid">
+                                <div class="stats-card">
+                                    <div class="stats-card-value" id="queue-pending">--</div>
+                                    <div class="stats-card-label" data-i18n="page.stats.queue_pending">待機中</div>
+                                </div>
+                                <div class="stats-card">
+                                    <div class="stats-card-value" id="queue-running">--</div>
+                                    <div class="stats-card-label" data-i18n="page.stats.queue_running">実行中</div>
+                                </div>
+                                <div class="stats-card">
+                                    <div class="stats-card-value" id="queue-total">--</div>
+                                    <div class="stats-card-label" data-i18n="page.stats.queue_total">合計</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div id="stats-loading" class="loading-box hidden">
                         <div class="spinner"></div>
                         <p data-i18n="page.stats.loading">読み込み中...</p>

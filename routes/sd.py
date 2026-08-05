@@ -66,14 +66,18 @@ async def sd_status():
     models: list[Any] = []
     upscalers: list[Any] = []
     loras: list[Any] = []
+    controlnet_models: list[Any] = []
+    controlnet_modules: list[Any] = []
     if available:
         try:
-            model, samplers, models, upscalers, loras = await asyncio.gather(
+            model, samplers, models, upscalers, loras, controlnet_models, controlnet_modules = await asyncio.gather(
                 run_in_threadpool(sd_client.get_current_model),
                 run_in_threadpool(sd_client.get_samplers),
                 run_in_threadpool(sd_client.get_model_list),
                 run_in_threadpool(sd_client.get_upscalers),
                 run_in_threadpool(sd_client.get_loras),
+                run_in_threadpool(sd_client.get_controlnet_models),
+                run_in_threadpool(sd_client.get_controlnet_modules),
             )
         except Exception:
             pass
@@ -84,6 +88,8 @@ async def sd_status():
         "models": models,
         "upscalers": upscalers,
         "loras": loras,
+        "controlnet_models": controlnet_models,
+        "controlnet_modules": controlnet_modules,
     }
 
 
@@ -342,6 +348,7 @@ async def sd_inpaint(
     inpaint_full_res_padding: int = Form(32, ge=0, le=256),
     model: str = Form(""),
     loras: str = Form(""),
+    controlnet_args: str = Form(""),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid image type.")
@@ -353,6 +360,17 @@ async def sd_inpaint(
     _validate_image_bytes(contents)
 
     init_image = base64.b64encode(contents).decode("utf-8")
+
+    parsed_controlnet_args: Optional[List[dict]] = None
+    if controlnet_args:
+        try:
+            parsed_controlnet_args = json.loads(controlnet_args)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HTTPException(status_code=400, detail=f"Invalid controlnet_args JSON: {e}")
+        if not isinstance(parsed_controlnet_args, list) or not all(
+            isinstance(item, dict) for item in parsed_controlnet_args
+        ):
+            raise HTTPException(status_code=400, detail="controlnet_args must be a JSON array of objects.")
 
     try:
         images = await run_in_threadpool(
@@ -375,6 +393,7 @@ async def sd_inpaint(
             inpaint_full_res_padding=inpaint_full_res_padding,
             model=model,
             loras=loras,
+            controlnet_args=parsed_controlnet_args,
         )
 
         saved_files = await run_in_threadpool(

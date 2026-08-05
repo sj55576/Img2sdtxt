@@ -349,6 +349,7 @@ class SDClient:
         inpaint_full_res_padding: int = 32,
         model: str = "",
         loras: str = "",
+        controlnet_args: Optional[List[Dict]] = None,
     ) -> List[str]:
         """
         インペインティング（マスク領域を描き直す）を実施し、Base64エンコードされた画像リストを返す
@@ -359,6 +360,7 @@ class SDClient:
         inpainting_fill: 0=塗りつぶし, 1=元画像, 2=潜在ノイズ, 3=潜在ゼロ
         inpaint_full_res: マスク領域のみをフル解像度でインペイント
         inpaint_full_res_padding: マスク領域周囲のパディング
+        controlnet_args: ControlNet設定のリスト（None の場合は無効）
         """
         if model:
             self.set_model(model)
@@ -392,6 +394,9 @@ class SDClient:
             "restore_faces": False,
             "save_images": False,
         }
+        if controlnet_args:
+            payload["alwayson_scripts"] = {"controlnet": {"args": controlnet_args}}
+            logger.info("inpaint: controlnet enabled with %d unit(s)", len(controlnet_args))
         try:
             r = requests.post(f"{self.base_url}/sdapi/v1/img2img", json=payload, timeout=180)
             r.raise_for_status()
