@@ -17,6 +17,22 @@ logger = logging.getLogger("img2sdtxt.sd")
 
 router = APIRouter(prefix="/api/sd", tags=["sd"])
 
+
+def _generation_response(images: List[str], saved_files: List[dict]) -> dict:
+    """生成成功時のレスポンスを組み立てる。保存に一部失敗した場合は warnings を添える。"""
+    response: dict = {
+        "success": True,
+        "images": images,
+        "count": len(images),
+        "saved_files": saved_files,
+    }
+    if len(saved_files) < len(images):
+        response["warnings"] = [
+            f"{len(images) - len(saved_files)} of {len(images)} generated image(s) could not be saved to disk."
+        ]
+    return response
+
+
 # CLIP Interrogator / WD14 タガー系のモデル選択肢
 INTERROGATE_MODELS = ("clip", "deepdanbooru")
 
@@ -213,12 +229,7 @@ async def sd_generate(request: SDGenerateRequest):
             loras=request.loras,
         )
 
-        return {
-            "success": True,
-            "images": images,
-            "count": len(images),
-            "saved_files": saved_files,
-        }
+        return _generation_response(images, saved_files)
     except ConnectionError:
         raise HTTPException(status_code=503, detail="Stable Diffusion API is not available.")
     except TimeoutError:
@@ -314,12 +325,7 @@ async def sd_img2img(
             denoising_strength=denoising_strength,
         )
 
-        return {
-            "success": True,
-            "images": images,
-            "count": len(images),
-            "saved_files": saved_files,
-        }
+        return _generation_response(images, saved_files)
     except ConnectionError:
         raise HTTPException(status_code=503, detail="Stable Diffusion API is not available.")
     except TimeoutError:
@@ -413,12 +419,7 @@ async def sd_inpaint(
             denoising_strength=denoising_strength,
         )
 
-        return {
-            "success": True,
-            "images": images,
-            "count": len(images),
-            "saved_files": saved_files,
-        }
+        return _generation_response(images, saved_files)
     except ConnectionError:
         raise HTTPException(status_code=503, detail="Stable Diffusion API is not available.")
     except TimeoutError:
@@ -465,15 +466,8 @@ async def sd_generate_multi_model(request: SDMultiModelRequest):
                 model=model,
                 loras=request.loras,
             )
-            results.append(
-                {
-                    "model": model,
-                    "success": True,
-                    "images": images,
-                    "count": len(images),
-                    "saved_files": saved_files,
-                }
-            )
+            model_result = {"model": model, **_generation_response(images, saved_files)}
+            results.append(model_result)
         except Exception as e:
             results.append(
                 {

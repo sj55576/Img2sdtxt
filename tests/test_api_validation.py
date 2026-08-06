@@ -355,3 +355,28 @@ def test_refine_prompt_invalid_tone_returns_422(client):
     payload = {"positive": "a cat", "tone": "not_a_tone"}
     r = client.post("/api/refine-prompt", json=payload)
     assert r.status_code == 422
+
+
+# ------------------------------------------------------------------ #
+# Issue #107: partial image-save failures must surface, not be silent
+# ------------------------------------------------------------------ #
+
+
+def test_generation_response_success_has_no_warnings():
+    import routes.sd as sd_routes
+
+    result = sd_routes._generation_response(["img1", "img2"], [{"filename": "a"}, {"filename": "b"}])
+    assert result["success"] is True
+    assert result["count"] == 2
+    assert "warnings" not in result
+
+
+def test_generation_response_partial_save_failure_adds_warning():
+    import routes.sd as sd_routes
+
+    result = sd_routes._generation_response(["img1", "img2"], [{"filename": "a"}])
+    assert result["success"] is True  # generation itself succeeded
+    assert result["count"] == 2
+    assert result["saved_files"] == [{"filename": "a"}]
+    assert "warnings" in result
+    assert "1 of 2" in result["warnings"][0]

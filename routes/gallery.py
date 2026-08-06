@@ -2,6 +2,7 @@
 
 import io
 import json
+import logging
 import os
 import re
 import tempfile
@@ -17,6 +18,8 @@ from fastapi.responses import Response
 from PIL import Image
 
 from deps import llm_cache
+
+logger = logging.getLogger("img2sdtxt.gallery")
 
 router = APIRouter(prefix="/api", tags=["gallery"])
 
@@ -72,7 +75,7 @@ def _scan_date_dir(date_dir: Path, date_str: str) -> list:
                     pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
                 thumb_url = f"/outputs/{date_str}/thumbs/{stem}.jpg"
             except Exception as e:
-                print(f"Warning: on-demand thumbnail generation failed for {fname}: {e}")
+                logger.warning("On-demand thumbnail generation failed for %s: %s", fname, e)
                 thumb_url = None
 
         date_images.append(
