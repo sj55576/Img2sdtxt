@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from job_queue import _JOB_HANDLERS, JobQueue, JobStatus
+from job_queue import _JOB_HANDLERS, JobQueue, JobQueueFullError, JobStatus
 
 
 @pytest.fixture
@@ -28,6 +28,24 @@ def register_test_handler():
     _JOB_HANDLERS["test_echo"] = _echo
     yield
     _JOB_HANDLERS.pop("test_echo", None)
+
+
+@pytest.mark.asyncio
+async def test_submit_raises_when_queue_full():
+    # max_concurrent=0 keeps every submitted job pending (no worker drains the queue).
+    q = JobQueue(max_concurrent=0, max_history=10, max_queue_size=2)
+    await q.submit("test_echo", {"msg": "a"})
+    await q.submit("test_echo", {"msg": "b"})
+    with pytest.raises(JobQueueFullError):
+        await q.submit("test_echo", {"msg": "c"})
+
+
+@pytest.mark.asyncio
+async def test_submit_unlimited_by_default():
+    q = JobQueue(max_concurrent=0, max_history=10)
+    for i in range(5):
+        await q.submit("test_echo", {"msg": str(i)})
+    assert len(q._pending) == 5
 
 
 @pytest.mark.asyncio

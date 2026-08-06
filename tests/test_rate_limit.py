@@ -90,3 +90,43 @@ def test_rate_limit_disabled():
         r = c.get("/api/config")
         assert r.status_code == 200
     config.RATE_LIMIT_ENABLED = True
+
+
+# ------------------------------------------------------------------ #
+# _classify_path tier coverage (Issue #109)
+# ------------------------------------------------------------------ #
+
+
+class TestClassifyPath:
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/sd/generate",
+            "/api/sd/img2img",
+            "/api/sd/inpaint",
+            "/api/generate-prompts",
+            "/api/generate-prompts-compare",
+            "/api/jobs/submit",
+            "/api/compare/ab-generate",
+            "/api/interrogate",
+            "/api/refine-prompt",
+        ],
+    )
+    def test_generation_tier_paths(self, path):
+        assert _rate_limit_module._classify_path(path) == "generation"
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/api/history",
+            "/api/jobs/queue/stats",
+            "/api/jobs/abc123def456",
+            "/api/config",
+        ],
+    )
+    def test_api_tier_paths(self, path):
+        assert _rate_limit_module._classify_path(path) == "api"
+
+    def test_non_api_path_has_no_tier(self):
+        assert _rate_limit_module._classify_path("/") is None
+        assert _rate_limit_module._classify_path("/static/app.js") is None

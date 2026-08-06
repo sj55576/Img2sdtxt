@@ -75,6 +75,9 @@ DEFAULT_NEGATIVE_TAGS = "lowres, bad anatomy, bad hands, text, error, worst qual
 # XY Plot Configuration
 XY_PLOT_MAX_CELLS = int(os.getenv("XY_PLOT_MAX_CELLS", "36"))
 
+# Job Queue Configuration
+JOB_QUEUE_MAX_SIZE = int(os.getenv("JOB_QUEUE_MAX_SIZE", "20"))  # max pending (not-yet-running) jobs
+
 # Webhook Notifications
 WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")  # empty disables webhook notifications
 WEBHOOK_EVENTS = os.getenv("WEBHOOK_EVENTS", "job_completed,job_failed,batch_completed")
