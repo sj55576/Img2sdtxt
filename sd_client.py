@@ -477,51 +477,55 @@ class SDClient:
         date_dir = SD_OUTPUT_DIR / date_str
         date_dir.mkdir(parents=True, exist_ok=True)
 
-        try:
-            for idx, image_base64 in enumerate(images):
-                # ファイル名生成
-                filename = f"{prefix}_{timestamp}_{idx:03d}.png"
-                filepath = date_dir / filename
+        for idx, image_base64 in enumerate(images):
+            # ファイル名生成
+            filename = f"{prefix}_{timestamp}_{idx:03d}.png"
+            filepath = date_dir / filename
 
-                # Base64をデコードして保存
+            # Base64をデコードして保存（1枚の失敗で他の画像を巻き込まない）
+            try:
                 image_bytes = base64.b64decode(image_base64)
                 with open(filepath, "wb") as f:
                     f.write(image_bytes)
+            except Exception as e:
+                logger.error("Failed to save image %d/%d to %s: %s", idx + 1, len(images), filepath, e)
+                continue
 
-                # PNG tEXt チャンクにA1111互換メタデータを埋め込む
-                try:
-                    png_meta = PngInfo()
-                    params_text = positive
-                    if negative:
-                        params_text += f"\nNegative prompt: {negative}"
-                    params_text += f"\nSteps: {steps}, Sampler: {sampler}, CFG scale: {cfg_scale}, Seed: {seed}, Size: {width}x{height}"
-                    if model:
-                        params_text += f", Model: {model}"
-                    if loras:
-                        params_text += f", LoRA: {loras}"
-                    if mode in ("img2img", "inpaint"):
-                        params_text += f", Denoising strength: {denoising_strength}"
-                    png_meta.add_text("parameters", params_text)
-                    with Image.open(filepath) as img:
-                        img.save(filepath, "PNG", pnginfo=png_meta)
-                except Exception as e:
-                    print(f"Warning: PNG metadata embedding failed for {filename}: {e}")
+            # PNG tEXt チャンクにA1111互換メタデータを埋め込む
+            try:
+                png_meta = PngInfo()
+                params_text = positive
+                if negative:
+                    params_text += f"\nNegative prompt: {negative}"
+                params_text += f"\nSteps: {steps}, Sampler: {sampler}, CFG scale: {cfg_scale}, Seed: {seed}, Size: {width}x{height}"
+                if model:
+                    params_text += f", Model: {model}"
+                if loras:
+                    params_text += f", LoRA: {loras}"
+                if mode in ("img2img", "inpaint"):
+                    params_text += f", Denoising strength: {denoising_strength}"
+                png_meta.add_text("parameters", params_text)
+                with Image.open(filepath) as img:
+                    img.save(filepath, "PNG", pnginfo=png_meta)
+            except Exception as e:
+                logger.warning("PNG metadata embedding failed for %s: %s", filename, e)
 
-                # サムネイル生成 (200px JPEG、.jpg 拡張子)
-                try:
-                    thumbs_dir = date_dir / "thumbs"
-                    thumbs_dir.mkdir(exist_ok=True)
-                    thumb_stem = Path(filename).stem
-                    thumb_path = thumbs_dir / f"{thumb_stem}.jpg"
-                    with Image.open(filepath) as pil_img:
-                        pil_img.thumbnail((200, 200), Image.LANCZOS)
-                        pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
-                except Exception as e:
-                    print(f"Warning: thumbnail generation failed for {filename}: {e}")
+            # サムネイル生成 (200px JPEG、.jpg 拡張子)
+            try:
+                thumbs_dir = date_dir / "thumbs"
+                thumbs_dir.mkdir(exist_ok=True)
+                thumb_stem = Path(filename).stem
+                thumb_path = thumbs_dir / f"{thumb_stem}.jpg"
+                with Image.open(filepath) as pil_img:
+                    pil_img.thumbnail((200, 200), Image.LANCZOS)
+                    pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
+            except Exception as e:
+                logger.warning("Thumbnail generation failed for %s: %s", filename, e)
 
-                saved_files.append({"filename": filename, "path": str(filepath), "index": idx})
+            saved_files.append({"filename": filename, "path": str(filepath), "index": idx})
 
-            # メタデータ（生成パラメータ）をJSONで保存
+        # メタデータ（生成パラメータ）をJSONで保存（実際に保存できた分だけを記録する）
+        if saved_files:
             params = {
                 "positive_prompt": positive,
                 "negative_prompt": negative,
@@ -540,23 +544,25 @@ class SDClient:
             metadata = {
                 "timestamp": timestamp,
                 "mode": mode,
-                "image_count": len(images),
+                "image_count": len(saved_files),
                 "parameters": params,
                 "files": saved_files,
             }
 
             metadata_filename = f"{prefix}_{timestamp}_metadata.json"
             metadata_filepath = date_dir / metadata_filename
-            with open(metadata_filepath, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            try:
+                with open(metadata_filepath, "w", encoding="utf-8") as f:
+                    json.dump(metadata, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                logger.error("Failed to write metadata %s: %s", metadata_filepath, e)
 
-            print(f"✓ Saved {len(images)} image(s) to {date_dir}")
-            print(f"✓ Metadata saved to {metadata_filename}")
+        if len(saved_files) < len(images):
+            logger.warning("Only %d/%d image(s) saved to %s", len(saved_files), len(images), date_dir)
+        else:
+            logger.info("Saved %d image(s) to %s", len(images), date_dir)
 
-            return saved_files
-        except Exception as e:
-            print(f"Error saving images: {str(e)}")
-            return []
+        return saved_files
 
     def read_png_metadata(self, filepath: str) -> Optional[Dict]:
         """
@@ -571,7 +577,7 @@ class SDClient:
                 return None
             return parse_a1111_parameters(raw)
         except Exception as e:
-            print(f"Warning: could not read PNG metadata from {filepath}: {e}")
+            logger.warning("Could not read PNG metadata from %s: %s", filepath, e)
             return None
 
 

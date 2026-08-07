@@ -10,7 +10,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Deque, Dict, List, Optional
 
+import config
+
 logger = logging.getLogger("img2sdtxt.jobs")
+
+
+class JobQueueFullError(Exception):
+    """Raised by JobQueue.submit() when the pending queue is at capacity."""
 
 
 class JobStatus(str, Enum):
@@ -54,12 +60,13 @@ class Job:
 
 
 class JobQueue:
-    def __init__(self, max_concurrent: int = 1, max_history: int = 100):
+    def __init__(self, max_concurrent: int = 1, max_history: int = 100, max_queue_size: Optional[int] = None):
         self._jobs: Dict[str, Job] = {}
         self._pending: List[str] = []
         self._cond = asyncio.Condition()
         self._max_concurrent = max_concurrent
         self._max_history = max_history
+        self._max_queue_size = max_queue_size
         self._running_count = 0
         self._lock = asyncio.Lock()
         self._subscribers: Dict[str, List[asyncio.Queue]] = {}
@@ -180,6 +187,8 @@ class JobQueue:
         return update_progress
 
     async def submit(self, job_type: str, params: Dict[str, Any], priority: int = 0) -> Job:
+        if self._max_queue_size is not None and len(self._pending) >= self._max_queue_size:
+            raise JobQueueFullError(f"Job queue is full ({len(self._pending)}/{self._max_queue_size} pending jobs).")
         job_id = uuid.uuid4().hex[:12]
         job = Job(id=job_id, job_type=job_type, params=params, priority=priority)
         self._jobs[job_id] = job
@@ -322,4 +331,4 @@ def register_job_handler(job_type: str):
     return decorator
 
 
-job_queue = JobQueue()
+job_queue = JobQueue(max_queue_size=config.JOB_QUEUE_MAX_SIZE)

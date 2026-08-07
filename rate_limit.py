@@ -3,7 +3,9 @@ IP-based sliding window rate limiter middleware for FastAPI.
 
 Two tiers:
   - generation: paths starting with /api/sd/generate, /api/sd/img2img,
-                /api/sd/inpaint, /api/generate-prompts  → RATE_LIMIT_GENERATION rpm
+                /api/sd/inpaint, /api/generate-prompts, /api/jobs/submit,
+                /api/compare/ab-generate, /api/interrogate, /api/refine-prompt
+                → RATE_LIMIT_GENERATION rpm
   - api:        all other /api/* paths                  → RATE_LIMIT_API rpm
   - other:      static files, non-API paths             → no limit
 """
@@ -31,6 +33,10 @@ GENERATION_PREFIXES = (
     "/api/sd/img2img",
     "/api/sd/inpaint",
     "/api/generate-prompts",
+    "/api/jobs/submit",
+    "/api/compare/ab-generate",
+    "/api/interrogate",
+    "/api/refine-prompt",
 )
 
 DB_PATH = Path(__file__).parent / "data" / "rate_limit.db"

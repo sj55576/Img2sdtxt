@@ -380,7 +380,7 @@ async def run_xy_plot(job, update_progress) -> Dict[str, Any]:
 
     await update_progress(1.0)
 
-    return {
+    result: Dict[str, Any] = {
         "grid_image": grid_b64,
         "x_axis": x_type,
         "y_axis": y_type,
@@ -390,3 +390,6 @@ async def run_xy_plot(job, update_progress) -> Dict[str, Any]:
         "cells": cells,
         "saved_files": saved_files,
     }
+    if not saved_files:
+        result["warnings"] = ["The generated grid image could not be saved to disk."]
+    return result

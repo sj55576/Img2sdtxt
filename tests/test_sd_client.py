@@ -572,6 +572,43 @@ class TestSDClientSaveImages:
         result = sd.save_images(["not-valid-base64!!!"], positive="a cat")
         assert result == []
 
+    def test_save_images_partial_failure_keeps_earlier_successes(self, sd, tmp_path):
+        good = _make_png_base64()
+        images = [good, "not-valid-base64!!!", good]
+        saved = sd.save_images(images, positive="a cat", mode="txt2img")
+
+        # 途中の1枚が失敗しても、前後の正常な画像は保存され続ける
+        assert len(saved) == 2
+        assert saved[0]["index"] == 0
+        assert saved[1]["index"] == 2
+        for entry in saved:
+            assert Path(entry["path"]).exists()
+
+    def test_save_images_partial_failure_writes_metadata_for_saved_only(self, sd, tmp_path):
+        good = _make_png_base64()
+        images = [good, "not-valid-base64!!!"]
+        saved = sd.save_images(images, positive="a cat", mode="txt2img")
+        date_dir = Path(saved[0]["path"]).parent
+
+        metadata_files = list(date_dir.glob("sd_*_metadata.json"))
+        assert len(metadata_files) == 1
+        with open(metadata_files[0], encoding="utf-8") as f:
+            metadata = json.load(f)
+        assert metadata["image_count"] == 1
+        assert len(metadata["files"]) == 1
+
+    def test_save_images_logs_error_instead_of_swallowing_silently(self, sd, tmp_path, caplog):
+        with caplog.at_level("ERROR", logger="img2sdtxt.sd"):
+            result = sd.save_images(["not-valid-base64!!!"], positive="a cat")
+        assert result == []
+        assert any("Failed to save image" in record.message for record in caplog.records)
+
+    def test_save_images_total_failure_writes_no_metadata(self, sd, tmp_path):
+        sd.save_images(["not-valid-base64!!!"], positive="a cat", mode="txt2img")
+        date_str_dirs = list(tmp_path.iterdir())
+        assert len(date_str_dirs) == 1
+        assert list(date_str_dirs[0].glob("*_metadata.json")) == []
+
 
 # ------------------------------------------------------------------ #
 # read_png_metadata

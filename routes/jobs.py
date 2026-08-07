@@ -9,7 +9,7 @@ from fastapi.concurrency import run_in_threadpool
 
 import xy_plot
 from deps import sd_client
-from job_queue import JobStatus, job_queue, register_job_handler
+from job_queue import JobQueueFullError, JobStatus, job_queue, register_job_handler
 from models import SDGenerateRequest, SDMultiModelRequest, XYPlotRequest
 
 logger = logging.getLogger("img2sdtxt.jobs")
@@ -59,11 +59,16 @@ async def handle_txt2img(job, update_progress):
     )
     await update_progress(1.0)
 
-    return {
+    result: dict = {
         "images": images,
         "count": len(images),
         "saved_files": saved_files,
     }
+    if len(saved_files) < len(images):
+        result["warnings"] = [
+            f"{len(images) - len(saved_files)} of {len(images)} generated image(s) could not be saved to disk."
+        ]
+    return result
 
 
 @register_job_handler("multi_model")
@@ -110,15 +115,18 @@ async def handle_multi_model(job, update_progress):
                 model=model,
                 loras=p.get("loras", ""),
             )
-            results.append(
-                {
-                    "model": model,
-                    "success": True,
-                    "images": images,
-                    "count": len(images),
-                    "saved_files": saved_files,
-                }
-            )
+            model_result: dict = {
+                "model": model,
+                "success": True,
+                "images": images,
+                "count": len(images),
+                "saved_files": saved_files,
+            }
+            if len(saved_files) < len(images):
+                model_result["warnings"] = [
+                    f"{len(images) - len(saved_files)} of {len(images)} generated image(s) could not be saved to disk."
+                ]
+            results.append(model_result)
         except Exception as e:
             results.append({"model": model, "success": False, "error": str(e)})
 
@@ -186,7 +194,10 @@ async def submit_job(request_data: dict):
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 
-    job = await job_queue.submit(job_type, params, priority=priority)
+    try:
+        job = await job_queue.submit(job_type, params, priority=priority)
+    except JobQueueFullError as e:
+        raise HTTPException(status_code=429, detail=str(e))
     return {"success": True, "job": job_queue.job_info(job)}
 
 
