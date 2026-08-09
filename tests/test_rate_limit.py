@@ -3,6 +3,7 @@
 import sqlite3
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -54,6 +55,17 @@ def test_rate_limit_blocks_over_limit(client):
     assert r.status_code == 429
     assert "Rate limit exceeded" in r.json()["detail"]
     assert "Retry-After" in r.headers
+
+
+def test_check_and_record_runs_via_threadpool(client):
+    """Issue #108: the synchronous SQLite check must not run directly on the event loop."""
+    with patch("rate_limit.run_in_threadpool", wraps=_rate_limit_module.run_in_threadpool) as mock_offload:
+        r = client.get("/api/config")
+        assert r.status_code == 200
+
+    mock_offload.assert_called_once()
+    offloaded_func = mock_offload.call_args.args[0]
+    assert offloaded_func.__name__ == "_check_and_record"
 
 
 def test_static_not_rate_limited(client):

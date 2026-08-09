@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from fastapi.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -105,7 +106,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ip = _get_client_ip(request)
         limit = config.RATE_LIMIT_GENERATION if tier == "generation" else config.RATE_LIMIT_API
 
-        allowed, retry_after = self._check_and_record(ip, tier, limit)
+        # 同期SQLiteアクセスをイベントループ上で直接実行しないよう、ワーカースレッドへオフロードする
+        allowed, retry_after = await run_in_threadpool(self._check_and_record, ip, tier, limit)
 
         if not allowed:
             logger.warning(
