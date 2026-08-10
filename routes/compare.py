@@ -13,6 +13,7 @@ import history as hist
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import _validate_image_bytes
 from models import ABGenerateRequest, ABVoteRequest
+from routes.prompts import _cache_lookup, _result_identity
 from validators import validate_quality, validate_style, validate_tone
 
 logger = logging.getLogger("img2sdtxt.compare")
@@ -62,9 +63,6 @@ async def generate_prompts_compare(
 
     _validate_image_bytes(contents)
 
-    _prov = deps.llm_client.provider_name
-    _mdl = deps.llm_client.model
-
     results: List[Dict[str, Any]] = []
     for variant in parsed_variants:
         style = str(variant.get("style", ""))
@@ -72,7 +70,7 @@ async def generate_prompts_compare(
         quality = str(variant.get("quality", "high"))
 
         try:
-            cached = deps.llm_cache.get(contents, None, style, tone, quality, provider=_prov, model=_mdl)
+            cached, cache_identity = _cache_lookup(contents, None, style, tone, quality)
             if cached is not None:
                 result = cached
             else:
@@ -84,7 +82,19 @@ async def generate_prompts_compare(
                     quality=quality,
                 )
                 if result.get("status") == "success":
-                    deps.llm_cache.set(contents, None, style, tone, quality, result, provider=_prov, model=_mdl)
+                    result.setdefault("provider", cache_identity[0])
+                    result.setdefault("model", cache_identity[1])
+                    result_identity = _result_identity(result, cache_identity)
+                    deps.llm_cache.set(
+                        contents,
+                        None,
+                        style,
+                        tone,
+                        quality,
+                        result,
+                        provider=result_identity[0],
+                        model=result_identity[1],
+                    )
 
             if result.get("status") == "error":
                 results.append(
@@ -107,6 +117,8 @@ async def generate_prompts_compare(
                     style=style,
                     tone=tone,
                     quality=quality,
+                    provider=str(result.get("provider") or ""),
+                    model=str(result.get("model") or ""),
                 )
 
             results.append(
@@ -117,6 +129,8 @@ async def generate_prompts_compare(
                     "success": True,
                     "positive": result["positive"],
                     "negative": result["negative"],
+                    "provider": result.get("provider", ""),
+                    "model": result.get("model", ""),
                     "history_id": history_id,
                 }
             )

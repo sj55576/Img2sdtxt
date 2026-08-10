@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Dict, Optional
 
+from metrics import observe_cache_hit, observe_cache_miss
+
 logger = logging.getLogger("img2sdtxt.cache")
 
 DB_PATH = Path(__file__).parent / "data" / "llm_cache.db"
@@ -83,11 +85,13 @@ class LLMCache:
                 if time.time() - row[1] < self.ttl:
                     conn.execute("UPDATE cache_stats SET hits = hits + 1 WHERE id = 1")
                     conn.commit()
+                    observe_cache_hit()
                     logger.debug("Cache HIT key=%.16s", key)
                     return json.loads(row[0])
                 conn.execute("DELETE FROM cache_entries WHERE key = ?", (key,))
             conn.execute("UPDATE cache_stats SET misses = misses + 1 WHERE id = 1")
             conn.commit()
+        observe_cache_miss()
         logger.debug("Cache MISS key=%.16s", key)
         return None
 

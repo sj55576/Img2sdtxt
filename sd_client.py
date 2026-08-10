@@ -17,6 +17,7 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from config import SD_API_URL, SD_OUTPUT_DIR
+from metrics import observe_sd_request
 from retry import retry_with_backoff
 
 logger = logging.getLogger("img2sdtxt.sd")
@@ -95,19 +96,25 @@ class SDClient:
 
     def _generate(self, endpoint: str, payload: Dict[str, Any], timeout: int, model: str, operation: str) -> List[str]:
         """Serialize checkpoint selection and a generation request against A1111."""
-        with self._generation_lock:
-            actual_model = self._switch_model_and_confirm(model) if model else ""
-            try:
+        status = "error"
+        try:
+            with self._generation_lock:
+                actual_model = self._switch_model_and_confirm(model) if model else ""
                 r = requests.post(f"{self.base_url}{endpoint}", json=payload, timeout=timeout)
                 r.raise_for_status()
                 result = r.json()
+                status = "success"
                 return GeneratedImages(result.get("images", []), actual_model)
-            except requests.exceptions.ConnectionError:
-                raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
-            except requests.exceptions.Timeout:
-                raise TimeoutError(f"Stable Diffusion {operation} timed out")
-            except Exception as e:
-                raise Exception(f"SD API error: {str(e)}") from e
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
+        except requests.exceptions.Timeout:
+            raise TimeoutError(f"Stable Diffusion {operation} timed out")
+        except (RuntimeError, TimeoutError):
+            raise
+        except Exception as e:
+            raise Exception(f"SD API error: {str(e)}") from e
+        finally:
+            observe_sd_request(endpoint, status)
 
     def get_model_list(self) -> List[Dict]:
         """利用可能なモデル一覧を取得（get_models に委譲）"""

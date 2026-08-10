@@ -40,6 +40,9 @@ jobs:
       - name: Check formatting with ruff
         run: python -m ruff format --check .
 
+      - name: Check documentation consistency
+        run: python scripts/check_docs_consistency.py
+
   test:
     runs-on: ubuntu-latest
 

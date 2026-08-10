@@ -48,6 +48,21 @@ def test_save_and_get():
     assert items[0]["image_name"] == "test.png"
 
 
+def test_save_and_get_provider_model_and_template_metadata():
+    rowid = hist.save_history(
+        positive="a cat",
+        negative="blurry",
+        template="a {cat|dog}",
+        provider="gemini",
+        model="gemini-test",
+    )
+
+    item = hist.get_history_item(rowid)
+    assert item["template"] == "a {cat|dog}"
+    assert item["provider"] == "gemini"
+    assert item["model"] == "gemini-test"
+
+
 def test_get_with_limit():
     for i in range(5):
         hist.save_history(positive=f"prompt {i}", negative="neg")

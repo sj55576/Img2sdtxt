@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -13,6 +14,7 @@ import history as hist
 import presets as preset_mgr
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import _validate_image_bytes
+from metrics import observe_llm_request
 from models import RefinePromptRequest, TextPromptRequest
 from validators import validate_quality, validate_style, validate_tone
 
@@ -22,6 +24,47 @@ router = APIRouter(prefix="/api", tags=["prompts"])
 
 ANALYSIS_MODES = ("llm", "tagger", "hybrid")
 TAGGER_MODELS = ("clip", "deepdanbooru")
+
+
+def _cache_lookup(
+    image_bytes: Optional[bytes],
+    text_input: Optional[str],
+    style: str,
+    tone: str,
+    quality: str,
+    mode: str = "llm",
+    tagger_model: str = "",
+) -> tuple[Optional[dict], tuple[str, str]]:
+    """Look up concrete provider keys in fallback order and return the hit identity."""
+    identities = deps.get_llm_cache_identities()
+    fallback_identity = identities[0] if identities else ("", "")
+    for provider, model in identities:
+        cached = deps.llm_cache.get(
+            image_bytes,
+            text_input,
+            style,
+            tone,
+            quality,
+            provider=provider,
+            model=model,
+            mode=mode,
+            tagger_model=tagger_model,
+        )
+        if cached is not None:
+            cached = dict(cached)
+            cached.setdefault("provider", provider)
+            cached.setdefault("model", model)
+            return cached, (provider, model)
+    return None, fallback_identity
+
+
+def _result_identity(result: dict, fallback: tuple[str, str]) -> tuple[str, str]:
+    provider = result.get("provider") or fallback[0]
+    model = result.get("model") or fallback[1]
+    return (
+        provider if isinstance(provider, str) else fallback[0],
+        model if isinstance(model, str) else fallback[1],
+    )
 
 
 # ------------------------------------------------------------------ #
@@ -88,16 +131,12 @@ async def generate_prompts(
             preset_suffix_negative=suffix_neg,
         )
     else:
-        _prov = deps.llm_client.provider_name
-        _mdl = deps.llm_client.model
-        cached = deps.llm_cache.get(
+        cached, cache_identity = _cache_lookup(
             contents,
             None,
             eff_style,
             eff_tone,
             eff_quality,
-            provider=_prov,
-            model=_mdl,
             mode=analysis_mode,
             tagger_model=tagger_model if analysis_mode == "hybrid" else "",
         )
@@ -118,6 +157,9 @@ async def generate_prompts(
                 tagger_tags=tagger_tags,
             )
             if result.get("status") == "success":
+                result.setdefault("provider", cache_identity[0])
+                result.setdefault("model", cache_identity[1])
+                result_identity = _result_identity(result, cache_identity)
                 deps.llm_cache.set(
                     contents,
                     None,
@@ -125,8 +167,8 @@ async def generate_prompts(
                     eff_tone,
                     eff_quality,
                     result,
-                    provider=_prov,
-                    model=_mdl,
+                    provider=result_identity[0],
+                    model=result_identity[1],
                     mode=analysis_mode,
                     tagger_model=tagger_model if analysis_mode == "hybrid" else "",
                 )
@@ -143,9 +185,15 @@ async def generate_prompts(
             style=style,
             tone=tone,
             quality=quality,
+            provider=str(result.get("provider") or ""),
+            model=str(result.get("model") or ""),
         )
 
-    response = {"success": True, "data": {"positive": result["positive"], "negative": result["negative"]}}
+    data = {"positive": result["positive"], "negative": result["negative"]}
+    for key in ("provider", "model"):
+        if result.get(key):
+            data[key] = result[key]
+    response = {"success": True, "data": data}
     if history_id is not None:
         response["history_id"] = history_id
     return response
@@ -205,14 +253,17 @@ async def generate_prompts_stream(
 
     provider = deps.llm_client
     generator = deps.prompt_generator
-    prov_name = provider.provider_name
-    mdl = provider.model
 
     cache_image = contents
     cache_text = None if contents is not None else desc
-    cached = deps.llm_cache.get(
-        cache_image, cache_text, eff_style, eff_tone, eff_quality, provider=prov_name, model=mdl
+    cached, cache_identity = _cache_lookup(
+        cache_image,
+        cache_text,
+        eff_style,
+        eff_tone,
+        eff_quality,
     )
+    prov_name, mdl = cache_identity
 
     async def event_stream():
         yield _sse_event("start", {"provider": prov_name, "model": mdl, "cached": cached is not None})
@@ -228,21 +279,36 @@ async def generate_prompts_stream(
                 chunk_iter = provider.generate_response_stream(prompt)
 
             parts: List[str] = []
+            last_chunk = None
+            stream_started = time.monotonic()
             try:
                 async for chunk in iterate_in_threadpool(chunk_iter):
-                    parts.append(chunk)
+                    last_chunk = chunk
+                    parts.append(str(chunk))
                     yield _sse_event("token", {"text": chunk})
             except Exception as e:
+                observe_llm_request(prov_name, mdl, "stream", "error", time.monotonic() - stream_started)
                 logger.error("generate_prompts_stream error: %s", str(e))
                 yield _sse_event("error", {"error": str(e)})
                 return
 
+            actual_provider = getattr(last_chunk, "provider_name", prov_name)
+            actual_model = getattr(last_chunk, "model", mdl)
+            if not isinstance(actual_provider, str):
+                actual_provider = prov_name
+            if not isinstance(actual_model, str):
+                actual_model = mdl
+
             full_text = "".join(parts)
             if not full_text:
+                observe_llm_request(actual_provider, actual_model, "stream", "empty", time.monotonic() - stream_started)
                 yield _sse_event("error", {"error": "LLMからレスポンスがありません"})
                 return
 
+            observe_llm_request(actual_provider, actual_model, "stream", "success", time.monotonic() - stream_started)
             result = generator.finalize_response(full_text, suffix_pos, suffix_neg)
+            result["provider"] = actual_provider
+            result["model"] = actual_model
             if result.get("status") == "success":
                 deps.llm_cache.set(
                     cache_image,
@@ -251,8 +317,8 @@ async def generate_prompts_stream(
                     eff_tone,
                     eff_quality,
                     result,
-                    provider=prov_name,
-                    model=mdl,
+                    provider=actual_provider,
+                    model=actual_model,
                 )
 
         if result.get("status") == "error":
@@ -268,6 +334,8 @@ async def generate_prompts_stream(
                 style=style,
                 tone=tone,
                 quality=quality,
+                provider=str(result.get("provider") or ""),
+                model=str(result.get("model") or ""),
             )
 
         done: dict = {
@@ -275,6 +343,10 @@ async def generate_prompts_stream(
             "negative": result["negative"],
             "cached": cached is not None,
         }
+        if result.get("provider"):
+            done["provider"] = result["provider"]
+        if result.get("model"):
+            done["model"] = result["model"]
         if history_id is not None:
             done["history_id"] = history_id
         yield _sse_event("done", done)
@@ -347,9 +419,18 @@ async def generate_prompts_batch(
                 style=eff_style,
                 tone=eff_tone,
                 quality=eff_quality,
+                provider=str(r.get("provider") or ""),
+                model=str(r.get("model") or ""),
             )
             results.append(
-                {"filename": f.filename, "success": True, "positive": r["positive"], "negative": r["negative"]}
+                {
+                    "filename": f.filename,
+                    "success": True,
+                    "positive": r["positive"],
+                    "negative": r["negative"],
+                    "provider": r.get("provider", ""),
+                    "model": r.get("model", ""),
+                }
             )
         else:
             results.append({"filename": f.filename, "success": False, "error": r.get("error")})
@@ -379,9 +460,7 @@ def generate_prompts_text(request: TextPromptRequest):
     eff_tone = tone or (preset.get("tone", "") if preset else "")
     eff_quality = quality or (preset.get("quality", "high") if preset else "high")
 
-    _prov = deps.llm_client.provider_name
-    _mdl = deps.llm_client.model
-    cached = deps.llm_cache.get(None, description, eff_style, eff_tone, eff_quality, provider=_prov, model=_mdl)
+    cached, cache_identity = _cache_lookup(None, description, eff_style, eff_tone, eff_quality)
     if cached is not None:
         result = cached
     else:
@@ -394,7 +473,19 @@ def generate_prompts_text(request: TextPromptRequest):
             preset_suffix_negative=suffix_neg,
         )
         if result.get("status") == "success":
-            deps.llm_cache.set(None, description, eff_style, eff_tone, eff_quality, result, provider=_prov, model=_mdl)
+            result.setdefault("provider", cache_identity[0])
+            result.setdefault("model", cache_identity[1])
+            result_identity = _result_identity(result, cache_identity)
+            deps.llm_cache.set(
+                None,
+                description,
+                eff_style,
+                eff_tone,
+                eff_quality,
+                result,
+                provider=result_identity[0],
+                model=result_identity[1],
+            )
 
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("error"))
@@ -408,9 +499,15 @@ def generate_prompts_text(request: TextPromptRequest):
             style=style,
             tone=tone,
             quality=quality,
+            provider=str(result.get("provider") or ""),
+            model=str(result.get("model") or ""),
         )
 
-    response = {"success": True, "data": {"positive": result["positive"], "negative": result["negative"]}}
+    data = {"positive": result["positive"], "negative": result["negative"]}
+    for key in ("provider", "model"):
+        if result.get(key):
+            data[key] = result[key]
+    response = {"success": True, "data": data}
     if history_id is not None:
         response["history_id"] = history_id
     return response
@@ -443,10 +540,18 @@ def refine_prompt(request: RefinePromptRequest):
         tone=request.tone,
         quality=request.quality,
         parent_id=request.parent_id,
+        provider=str(result.get("provider") or ""),
+        model=str(result.get("model") or ""),
     )
 
     return {
         "success": True,
-        "data": {"positive": result["positive"], "negative": result["negative"], "changes": result.get("changes", "")},
+        "data": {
+            "positive": result["positive"],
+            "negative": result["negative"],
+            "changes": result.get("changes", ""),
+            "provider": result.get("provider", ""),
+            "model": result.get("model", ""),
+        },
         "history_id": history_id,
     }

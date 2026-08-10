@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any, Callable, Deque, Dict, List, Optional
 
 import config
+from metrics import set_job_queue_size
 
 logger = logging.getLogger("img2sdtxt.jobs")
 
@@ -312,12 +313,14 @@ class JobQueue:
         statuses: Dict[str, int] = {}
         for j in self._jobs.values():
             statuses[j.status.value] = statuses.get(j.status.value, 0) + 1
-        return {
+        stats = {
             "total": len(self._jobs),
             "queue_size": len(self._pending),
             "running": self._running_count,
             "by_status": statuses,
         }
+        set_job_queue_size(stats)
+        return stats
 
 
 _JOB_HANDLERS: Dict[str, Any] = {}

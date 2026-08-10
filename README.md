@@ -31,6 +31,13 @@ It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API*
 | 📁 **Random Folder Load** | Pick a random image from a local folder |
 | 🖥️ **CLI Batch Mode** | Process a whole directory of images from the command line |
 | 👁️ **CLI Watch Mode** | Monitor a folder and auto-process new images as they arrive |
+| 🧩 **Dynamic Prompts** | Expand `{a|b}` groups and `__wildcard__` files for prompt variants |
+| 🎛️ **ControlNet** | Configure ControlNet models, preprocessors, and reference images from the UI |
+| 🧪 **A/B Comparison & XY Plot** | Compare prompt variants and Stable Diffusion parameter grids |
+| ⏳ **Job Queue** | Queue generation jobs with priority, ETA, cancellation, and WebSocket updates |
+| 🔌 **LLM Fallback** | Automatically switch between configured providers and record the actual provider/model |
+| 📊 **Runtime Observability** | Request IDs, JSON logs, `/metrics`, cache, queue, and provider metrics |
+| 🌐 **Internationalization** | Japanese and English UI translations with keyboard shortcuts |
 
 ---
 
@@ -59,7 +66,7 @@ Set `LLM_SERVER_URL=http://localhost:8000/api/v1` in `.env`.
   ```
 - Default URL: `http://localhost:7860`
 
-### 3. Python 3.8+
+### 3. Python 3.10+
 
 ---
 
@@ -241,10 +248,21 @@ on the container itself (the proxy handles TLS termination).
 |----------|---------|-------------|
 | `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLM server endpoint |
 | `LLM_MODEL` | `gpt-3.5-turbo` | Model name to use |
+| `LLM_PROVIDER` | `openai_compatible` | Active provider (`openai_compatible`, `anthropic`, or `gemini`) |
+| `LLM_CACHE_ENABLED` | `true` | Enable the persistent LLM response cache |
+| `LLM_CACHE_TTL` | `3600` | Cache lifetime in seconds |
+| `LLM_FALLBACK_CHAIN` | *(empty)* | Comma-separated provider IDs tried after a failure |
+| `LLM_HEALTH_CHECK_INTERVAL` | `60` | Fallback-provider health check interval in seconds |
+| `ANTHROPIC_API_KEY` | *(empty)* | Anthropic API key when the provider is enabled |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | Anthropic model name |
+| `GEMINI_API_KEY` | *(empty)* | Google Gemini API key when the provider is enabled |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model name |
 | `SD_API_URL` | `http://localhost:7860` | AUTOMATIC1111 API URL |
 | `API_HOST` | `127.0.0.1` | API server bind address; set `0.0.0.0` only for an intentional network deployment |
 | `API_PORT` | `8000` | API server port |
 | `DEBUG` | `false` | Enable debug / hot-reload |
+| `LOG_LEVEL` | `INFO` | Python log level |
+| `LOG_FORMAT` | `text` | Log format: `text` or `json` (JSON includes request IDs) |
 | `CORS_ALLOWED_ORIGINS` | *(empty)* | Comma-separated allowed browser origins. Empty means same-origin only; never use `*` unless you understand the exposure |
 | `CORS_ALLOW_CREDENTIALS` | `false` | Allow credentialed CORS requests; enable only with restricted origins |
 | `API_TOKEN` | *(empty)* | Optional bearer token for backups, history export/deletion, runtime provider changes, and cache/wildcard deletion; set when exposing the API beyond localhost |
@@ -252,10 +270,43 @@ on the container itself (the proxy handles TLS termination).
 | `HTTPS_ENABLED` | `false` | Serve over HTTPS |
 | `SSL_CERTFILE` | *(auto)* | Path to TLS certificate file (PEM) |
 | `SSL_KEYFILE` | *(auto)* | Path to TLS private key file (PEM) |
+| `RATE_LIMIT_ENABLED` | `true` | Enable IP-based sliding-window rate limiting |
+| `RATE_LIMIT_GENERATION` | `10` | Generation requests per minute per client |
+| `RATE_LIMIT_API` | `60` | Other API requests per minute per client |
+| `JOB_QUEUE_MAX_SIZE` | `20` | Maximum pending generation jobs |
+| `XY_PLOT_MAX_CELLS` | `36` | Maximum XY Plot cells / safe prompt variants |
 | `WEBHOOK_URL` | *(empty)* | Webhook endpoint URL; empty disables notifications |
 | `WEBHOOK_EVENTS` | `job_completed,job_failed,batch_completed` | Comma-separated events to notify on (`job_completed`, `job_failed`, `job_cancelled`, `batch_completed`) |
 | `WEBHOOK_FORMAT` | `generic` | Payload format: `generic`, `discord`, or `slack` |
 | `WEBHOOK_TIMEOUT` | `5` | Webhook request timeout in seconds |
+| `BACKUP_DIR` | `data/backups` | Directory for backup archives |
+| `AUTO_BACKUP_ENABLED` | `false` | Enable scheduled automatic backups |
+| `AUTO_BACKUP_RETENTION` | `7` | Number of automatic backups to retain |
+| `AUTO_BACKUP_INTERVAL_HOURS` | `24` | Automatic backup interval |
+| `MAX_BACKUP_UPLOAD_SIZE` | `2147483648` | Maximum uploaded restore archive size in bytes |
+
+---
+
+## Observability
+
+Every response includes an `X-Request-ID` header. Send an existing ID in the
+same header to correlate a request with application logs; otherwise the server
+generates a UUID. Set `LOG_FORMAT=json` for JSON Lines containing `ts`,
+`level`, `logger`, `msg`, `request_id`, and request duration fields.
+
+Prometheus metrics are available at `GET /metrics` (and require
+`Authorization: Bearer <API_TOKEN>` when `API_TOKEN` is configured):
+
+```yaml
+scrape_configs:
+  - job_name: img2sdtxt
+    static_configs:
+      - targets: ["localhost:8000"]
+```
+
+The endpoint exposes HTTP, LLM provider/fallback, Stable Diffusion, cache,
+rate-limit, and job-queue counters/histograms/gauges. The Prometheus client
+is included in `requirements.txt`.
 
 ---
 
@@ -443,88 +494,137 @@ Notes:
 
 ```
 Img2sdtxt/
-├── main.py                  # FastAPI application & all API routes
-├── config.py                # App configuration & option lists
-├── llm_client.py            # LLM server communication
-├── prompt_generator.py      # Prompt generation logic
-├── sd_client.py             # Stable Diffusion API client
-├── history.py               # SQLite history management
-├── presets.py               # Preset template management
-├── requirements.txt         # Python dependencies
+├── main.py                  # FastAPI app, middleware, pages, health, metrics
+├── config.py                # Environment configuration and option lists
+├── routes/                  # API routers (prompts, SD, jobs, history, backup, etc.)
+├── providers/               # Anthropic and Gemini provider adapters
+├── llm_client.py            # OpenAI-compatible LLM communication
+├── fallback.py              # Ordered provider fallback chain
+├── prompt_generator.py      # Prompt generation and response normalization
+├── sd_client.py             # Stable Diffusion API client and output metadata
+├── history.py               # SQLite history, tags, versions, and A/B records
+├── job_queue.py             # Async generation queue and WebSocket subscriptions
+├── dynamic_prompts.py       # Wildcard / `{a|b}` expansion engine
+├── metrics.py               # Prometheus instrumentation
+├── logging_utils.py         # Request correlation and JSON log formatter
+├── tests/                   # Unit and API regression tests
+├── scripts/                 # CI checks such as documentation consistency
+├── requirements.txt         # Runtime dependencies
 ├── .env.example             # Environment variable template
 ├── run.bat / run.sh         # One-click launch scripts
 ├── setup.bat / setup.sh     # Setup-only scripts
 ├── data/                    # Runtime data (DB, presets, last params)
-│   ├── history.db
-│   ├── presets.json
-│   └── last_params.json
-├── outputs/                 # Generated images (auto-created)
-│   └── YYYY-MM-DD/
-│       ├── *.png
-│       ├── *_metadata.json
-│       └── thumbs/
-└── static/
-    ├── index.html           # Web UI
-    ├── style.css
-    └── script.js
+├── outputs/                 # Generated images and metadata (auto-created)
+└── static/                  # Web UI, CSS, JavaScript, and translations
 ```
 
 ---
 
 ## API Endpoints
 
-### Prompt Generation
+The complete interactive schema is available at `/docs` and `/openapi.json`
+when the server is running. The table below lists the public routes by area.
+
+### Prompt generation and comparison
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/generate-prompts` | Single image → prompts |
-| `POST` | `/api/generate-prompts-batch` | Up to 10 images → prompts |
+| `POST` | `/api/generate-prompts-batch` | Up to 10 images → independent prompts |
+| `POST` | `/api/generate-prompts-stream` | SSE prompt generation |
 | `POST` | `/api/generate-prompts-text` | Text description → prompts |
-| `POST` | `/api/refine-prompt` | Refine & enhance existing prompts |
+| `POST` | `/api/generate-prompts-compare` | Compare prompt variants |
+| `POST` | `/api/refine-prompt` | Refine and enhance a prompt |
+| `POST` | `/api/compare/ab-generate` | Generate two SD variants with a shared seed |
+| `GET` | `/api/compare/ab-history` | List A/B comparisons |
+| `POST` | `/api/compare/ab/{id}/vote` | Record the preferred variant |
 
-### History
+### History, tags, and versions
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/history` | List history (`limit`, `offset`, `search`, `style`, `quality`, `favorites_only`) |
-| `GET` | `/api/history/export` | Download all history as JSON, CSV, or XLSX (`format`) |
-| `PUT` | `/api/history/{id}/favorite` | Toggle favorite on a history entry |
+| `GET` | `/api/history` | List history (`limit`, `offset`, `search`, `style`, `quality`, `favorites_only`, `tag`) |
+| `GET` | `/api/history/export` | Download history as JSON, CSV, or XLSX (`format`) |
+| `GET` | `/api/history/diff` | Compare two prompt versions |
+| `GET` | `/api/history/{id}/versions` | List a version tree |
+| `POST` | `/api/history/{id}/rollback` | Create a rollback version |
+| `PUT` | `/api/history/{id}/favorite` | Toggle a favorite |
 | `DELETE` | `/api/history/{id}` | Delete one entry |
 | `DELETE` | `/api/history` | Clear all history |
-
-### Presets
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/presets` | List all presets |
-| `POST` | `/api/presets` | Create custom preset |
-| `DELETE` | `/api/presets/{id}` | Delete custom preset |
+| `GET` | `/api/tags` | List tags and usage counts |
+| `GET` | `/api/tags/suggest` | Suggest tags |
+| `GET` | `/api/tags/categories` | List tag categories |
+| `POST` | `/api/history/{id}/tags` | Add tags to a history entry |
+| `DELETE` | `/api/history/{id}/tags/{tag}` | Remove a tag |
 
 ### Stable Diffusion
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/sd/status` | Check A1111 connection |
+| `GET` | `/api/sd/status` | Check A1111 and ControlNet status |
 | `GET` | `/api/sd/models` | List available models |
 | `GET` | `/api/sd/loras` | List available LoRAs |
 | `GET` | `/api/sd/upscalers` | List available upscalers |
-| `GET` | `/api/sd/progress` | Current generation progress (for progress bar) |
+| `GET` | `/api/sd/progress` | Current generation progress |
+| `WS` | `/api/sd/progress/ws` | Stream generation progress |
+| `GET` | `/api/sd/controlnet/models` | List ControlNet models (empty when unavailable) |
+| `GET` | `/api/sd/controlnet/modules` | List ControlNet preprocessors |
 | `POST` | `/api/sd/generate` | txt2img generation |
-| `POST` | `/api/sd/generate-multi-model` | txt2img generation with multiple models sequentially |
+| `POST` | `/api/sd/generate-multi-model` | Sequential generation with multiple models |
 | `POST` | `/api/sd/img2img` | img2img generation |
-| `POST` | `/api/sd/inpaint` | Inpainting |
+| `POST` | `/api/sd/inpaint` | Inpainting with optional ControlNet units |
+| `POST` | `/api/interrogate` | CLIP Interrogator / DeepDanbooru tagging |
+| `POST` | `/api/png-info` | Read A1111 PNG metadata |
 
-### Other
+### Job queue and dynamic prompts
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/config` | App configuration |
-| `GET` | `/health` | Health check |
-| `GET` | `/api/outputs` | Gallery images (`date`, `mode`, `limit`, `offset`) |
+| `POST` | `/api/jobs/submit` | Submit `txt2img`, `multi_model`, or `xy_plot` job |
+| `GET` | `/api/jobs` | List jobs |
+| `GET` | `/api/jobs/{id}` | Get job status, queue position, and ETA |
+| `POST` | `/api/jobs/{id}/cancel` | Cancel a pending/running job |
+| `POST` | `/api/jobs/{id}/priority` | Change pending-job priority |
+| `GET` | `/api/jobs/queue/stats` | Queue counts by status |
+| `WS` | `/api/jobs/{id}/ws` | Stream job progress |
+| `GET` | `/api/wildcards/` | List wildcard files |
+| `POST` | `/api/wildcards/` | Create a wildcard file |
+| `GET` | `/api/wildcards/{name}` | Read a wildcard file |
+| `PUT` | `/api/wildcards/{name}` | Update a wildcard file |
+| `DELETE` | `/api/wildcards/{name}` | Delete a wildcard file |
+| `POST` | `/api/wildcards/expand` | Preview or enumerate prompt expansions |
+
+### Gallery, cache, backups, and providers
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/outputs` | Browse generated images (`date`, `mode`, `limit`, `offset`, filters) |
+| `GET` | `/api/outputs/filters` | List model and sampler filters |
+| `POST` | `/api/outputs/download-zip` | Download selected outputs as ZIP |
+| `GET` | `/api/cache/stats` | LLM cache hit/miss statistics |
+| `DELETE` | `/api/cache` | Clear the LLM cache (token-protected when configured) |
+| `POST` | `/api/backup/create` | Create a backup archive |
+| `GET` | `/api/backup/list` | List backup archives |
+| `GET` | `/api/backup/download/{id}` | Download a backup |
+| `POST` | `/api/backup/restore` | Upload and restore a backup |
+| `POST` | `/api/backup/restore/{id}` | Restore a listed backup |
+| `DELETE` | `/api/backup/{id}` | Delete a backup |
+| `GET` | `/api/llm/providers` | List provider configuration and fallback state |
+| `GET` | `/api/llm/health` | List provider health and response time |
+| `POST` | `/api/llm/provider` | Switch the active provider (token-protected when configured) |
+
+### Configuration and observability
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/config` | App configuration and available providers |
+| `GET` | `/api/stats` | History, gallery, tag, and activity statistics |
+| `GET` | `/metrics` | Prometheus metrics (token-protected when configured) |
+| `GET` | `/health` | LLM/SD availability and uptime |
 | `GET` | `/api/last-params/{feature}` | Restore last parameters |
 | `POST` | `/api/last-params/{feature}` | Save last parameters |
 
-Valid `feature` values: `generate`, `sd`, `img2img`, `inpaint`, `multi_model`
+Valid `feature` values: `generate`, `sd`, `img2img`, `inpaint`, `multi_model`, `xyplot`
 
 ---
 

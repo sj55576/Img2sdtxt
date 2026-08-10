@@ -39,6 +39,9 @@ def init_db():
                 style TEXT,
                 tone TEXT,
                 quality TEXT,
+                template TEXT,
+                provider TEXT,
+                model TEXT,
                 created_at TEXT NOT NULL,
                 is_favorite INTEGER NOT NULL DEFAULT 0
             )
@@ -53,6 +56,16 @@ def init_db():
             conn.execute("ALTER TABLE prompt_history ADD COLUMN parent_id INTEGER REFERENCES prompt_history(id)")
         except sqlite3.OperationalError:
             pass  # カラムが既に存在する場合はスキップ
+        # LLM fallback / dynamic prompt metadata migrations.
+        for column, definition in (
+            ("template", "TEXT"),
+            ("provider", "TEXT"),
+            ("model", "TEXT"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE prompt_history ADD COLUMN {column} {definition}")
+            except sqlite3.OperationalError:
+                pass  # カラムが既に存在する場合はスキップ
         conn.execute("""
             CREATE TABLE IF NOT EXISTS prompt_tags (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,15 +99,37 @@ def save_history(
     tone: str = "",
     quality: str = "",
     parent_id: Optional[int] = None,
+    template: str = "",
+    provider: str = "",
+    model: str = "",
 ) -> int:
-    logger.debug("save_history image_name=%s style=%s parent_id=%s", image_name, style, parent_id)
+    logger.debug(
+        "save_history image_name=%s style=%s parent_id=%s provider=%s model=%s",
+        image_name,
+        style,
+        parent_id,
+        provider,
+        model,
+    )
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.execute(
             """INSERT INTO prompt_history
-               (image_name, positive, negative, style, tone, quality, created_at, parent_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (image_name, positive, negative, style, tone, quality, datetime.now().isoformat(), parent_id),
+               (image_name, positive, negative, style, tone, quality, template, provider, model, created_at, parent_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                image_name,
+                positive,
+                negative,
+                style,
+                tone,
+                quality,
+                template,
+                provider,
+                model,
+                datetime.now().isoformat(),
+                parent_id,
+            ),
         )
         conn.commit()
         return cursor.lastrowid or 0
@@ -352,6 +387,9 @@ def rollback_to_version(source_id: int, target_id: int) -> Optional[Dict]:
         tone=target.get("tone") or "",
         quality=target.get("quality") or "",
         parent_id=source_id,
+        template=target.get("template") or "",
+        provider=target.get("provider") or "",
+        model=target.get("model") or "",
     )
     return get_history_item(new_id)
 
