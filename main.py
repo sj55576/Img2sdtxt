@@ -77,7 +77,9 @@ app = FastAPI(
 
 if CORS_ALLOWED_ORIGINS:
     if "*" in CORS_ALLOWED_ORIGINS and not config.API_TOKEN:
-        logger.warning("CORS_ALLOWED_ORIGINS=* is enabled while API_TOKEN is not configured; browser clients can access all APIs.")
+        logger.warning(
+            "CORS_ALLOWED_ORIGINS=* is enabled while API_TOKEN is not configured; browser clients can access all APIs."
+        )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=CORS_ALLOWED_ORIGINS,
