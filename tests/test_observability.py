@@ -4,10 +4,12 @@ import json
 import logging
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 import config
 import deps
+import metrics
 from logging_utils import JsonFormatter, request_id_context
 from main import app
 
@@ -62,3 +64,28 @@ def test_metrics_endpoint_is_available_and_can_be_token_protected(monkeypatch):
 
     assert response.status_code == 200
     assert "text/plain" in response.headers["content-type"]
+
+
+@pytest.mark.skipif(not metrics._PROMETHEUS_AVAILABLE, reason="prometheus-client not installed")
+def test_unmatched_paths_collapse_to_a_single_metric_label(monkeypatch):
+    """Issue: unauthenticated path scans must not create unbounded Prometheus label series."""
+    monkeypatch.setattr(config, "RATE_LIMIT_ENABLED", False)
+
+    with TestClient(app) as client:
+        for i in range(5):
+            response = client.get(f"/no-such-route-{i}")
+            assert response.status_code == 404
+
+    from prometheus_client import generate_latest
+
+    body = generate_latest(metrics._REGISTRY).decode()
+    unmatched_lines = [
+        line
+        for line in body.splitlines()
+        if line.startswith("img2sdtxt_http_requests_total") and 'path="unmatched"' in line
+    ]
+    scanned_path_lines = [line for line in body.splitlines() if "no-such-route" in line]
+
+    assert scanned_path_lines == []
+    assert len(unmatched_lines) == 1
+    assert unmatched_lines[0].strip().endswith("5.0")

@@ -109,7 +109,11 @@ async def log_requests(request: Request, call_next):
         route = request.scope.get("route")
         path = getattr(route, "path", request.url.path)
         status = response.status_code if response is not None else 500
-        observe_http(request.method, path, status, elapsed_seconds)
+        # Unmatched requests (404s, path scans) have no route template, so the raw
+        # URL path would become a new, permanent Prometheus label value per request.
+        # Collapse those to a single bounded label; keep the real path in the log line.
+        metric_path = getattr(route, "path", None) or "unmatched"
+        observe_http(request.method, metric_path, status, elapsed_seconds)
         logger.info(
             "%s %s %d %.1fms",
             request.method,
