@@ -12,12 +12,13 @@ import zipfile
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from PIL import Image
 
 from deps import llm_cache
+from auth import require_api_token
 
 logger = logging.getLogger("img2sdtxt.gallery")
 
@@ -315,6 +316,6 @@ async def cache_stats():
 
 
 @router.delete("/cache")
-async def clear_cache():
+async def clear_cache(_: None = Depends(require_api_token)):
     count = llm_cache.clear()
     return {"cleared": count}

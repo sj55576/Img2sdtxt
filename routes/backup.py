@@ -6,12 +6,13 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
 import backup as backup_mgr
 import config
+from auth import require_api_token
 
 logger = logging.getLogger("img2sdtxt.routes.backup")
 
@@ -21,7 +22,7 @@ UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1MB
 
 
 @router.post("/create")
-async def create_backup(body: Optional[dict] = None):
+async def create_backup(body: Optional[dict] = None, _: None = Depends(require_api_token)):
     include_outputs = bool((body or {}).get("include_outputs", False))
     try:
         result = await run_in_threadpool(backup_mgr.create_backup, include_outputs=include_outputs)
@@ -42,13 +43,13 @@ async def create_backup(body: Optional[dict] = None):
 
 
 @router.get("/list")
-async def list_backups():
+async def list_backups(_: None = Depends(require_api_token)):
     backups = await run_in_threadpool(backup_mgr.list_backups)
     return {"success": True, "backups": backups}
 
 
 @router.get("/download/{backup_id}")
-async def download_backup(backup_id: str):
+async def download_backup(backup_id: str, _: None = Depends(require_api_token)):
     path = await run_in_threadpool(backup_mgr.get_backup_path, backup_id)
     if path is None:
         raise HTTPException(status_code=404, detail="Backup not found.")
@@ -60,6 +61,7 @@ async def restore_backup(
     file: UploadFile = File(...),
     confirm: bool = Form(False),
     create_safety_backup: bool = Form(True),
+    _: None = Depends(require_api_token),
 ):
     if not confirm:
         raise HTTPException(status_code=400, detail="Restore requires confirm=true.")
@@ -110,7 +112,7 @@ async def restore_backup(
 
 
 @router.post("/restore/{backup_id}")
-async def restore_stored_backup(backup_id: str, body: Optional[dict] = None):
+async def restore_stored_backup(backup_id: str, body: Optional[dict] = None, _: None = Depends(require_api_token)):
     """Restore from a backup already stored on the server (no upload round trip)."""
     payload = body or {}
     if not bool(payload.get("confirm", False)):
@@ -140,7 +142,7 @@ async def restore_stored_backup(backup_id: str, body: Optional[dict] = None):
 
 
 @router.delete("/{backup_id}")
-async def delete_backup(backup_id: str):
+async def delete_backup(backup_id: str, _: None = Depends(require_api_token)):
     deleted = await run_in_threadpool(backup_mgr.delete_backup, backup_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Backup not found.")

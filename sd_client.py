@@ -6,6 +6,8 @@ import base64
 import json
 import logging
 import re
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -20,9 +22,21 @@ from retry import retry_with_backoff
 logger = logging.getLogger("img2sdtxt.sd")
 
 
+class GeneratedImages(list[str]):
+    """SD response images annotated with the checkpoint used for generation."""
+
+    def __init__(self, images: List[str], model: str):
+        super().__init__(images)
+        self.model = model
+
+
 class SDClient:
     def __init__(self, base_url: str = SD_API_URL):
         self.base_url = base_url.rstrip("/")
+        # A1111's active checkpoint is process-global.  Keep a model switch and
+        # the request that depends on it together so concurrent API calls cannot
+        # generate with a different checkpoint than the one recorded.
+        self._generation_lock = threading.RLock()
         # 出力ディレクトリを自動作成
         SD_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -65,6 +79,35 @@ class SDClient:
         except Exception as e:
             logger.error("Error switching model: %s", str(e))
             return False
+
+    def _switch_model_and_confirm(self, model_name: str) -> str:
+        """Switch checkpoint and wait until A1111 reports the requested value."""
+        if not self.set_model(model_name):
+            raise RuntimeError(f"Failed to switch Stable Diffusion model to '{model_name}'.")
+
+        deadline = time.monotonic() + 30.0
+        while time.monotonic() < deadline:
+            active_model = self.get_current_model()
+            if active_model == model_name:
+                return active_model
+            time.sleep(0.2)
+        raise TimeoutError(f"Stable Diffusion did not activate requested model '{model_name}' within 30 seconds.")
+
+    def _generate(self, endpoint: str, payload: Dict[str, Any], timeout: int, model: str, operation: str) -> List[str]:
+        """Serialize checkpoint selection and a generation request against A1111."""
+        with self._generation_lock:
+            actual_model = self._switch_model_and_confirm(model) if model else ""
+            try:
+                r = requests.post(f"{self.base_url}{endpoint}", json=payload, timeout=timeout)
+                r.raise_for_status()
+                result = r.json()
+                return GeneratedImages(result.get("images", []), actual_model)
+            except requests.exceptions.ConnectionError:
+                raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
+            except requests.exceptions.Timeout:
+                raise TimeoutError(f"Stable Diffusion {operation} timed out")
+            except Exception as e:
+                raise Exception(f"SD API error: {str(e)}") from e
 
     def get_model_list(self) -> List[Dict]:
         """利用可能なモデル一覧を取得（get_models に委譲）"""
@@ -190,10 +233,6 @@ class SDClient:
         hr_denoising_strength: Hires.fix のデノイジング強度
         controlnet_args: ControlNet設定のリスト（None の場合は無効）
         """
-        # モデルの切り替え（指定された場合）
-        if model:
-            self.set_model(model)
-
         # LoRAをプロンプトに追加
         final_positive = positive
         if loras:
@@ -230,17 +269,7 @@ class SDClient:
             logger.info("txt2img: controlnet enabled with %d unit(s)", len(controlnet_args))
 
         logger.info("txt2img start url=%s width=%d height=%d steps=%d", self.base_url, width, height, steps)
-        try:
-            r = requests.post(f"{self.base_url}/sdapi/v1/txt2img", json=payload, timeout=120)
-            r.raise_for_status()
-            result = r.json()
-            return result.get("images", [])
-        except requests.exceptions.ConnectionError:
-            raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
-        except requests.exceptions.Timeout:
-            raise TimeoutError("Stable Diffusion generation timed out")
-        except Exception as e:
-            raise Exception(f"SD API error: {str(e)}")
+        return self._generate("/sdapi/v1/txt2img", payload, 120, model, "generation")
 
     @retry_with_backoff(max_retries=2, base_delay=2.0)
     def img2img(
@@ -278,9 +307,6 @@ class SDClient:
         hr_denoising_strength: Hires.fix のデノイジング強度
         controlnet_args: ControlNet設定のリスト（None の場合は無効）
         """
-        if model:
-            self.set_model(model)
-
         # LoRAをプロンプトに追加
         final_positive = positive
         if loras:
@@ -316,17 +342,7 @@ class SDClient:
             payload["alwayson_scripts"] = {"controlnet": {"args": controlnet_args}}
             logger.info("img2img: controlnet enabled with %d unit(s)", len(controlnet_args))
 
-        try:
-            r = requests.post(f"{self.base_url}/sdapi/v1/img2img", json=payload, timeout=180)
-            r.raise_for_status()
-            result = r.json()
-            return result.get("images", [])
-        except requests.exceptions.ConnectionError:
-            raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
-        except requests.exceptions.Timeout:
-            raise TimeoutError("Stable Diffusion img2img generation timed out")
-        except Exception as e:
-            raise Exception(f"SD API error: {str(e)}")
+        return self._generate("/sdapi/v1/img2img", payload, 180, model, "img2img generation")
 
     @retry_with_backoff(max_retries=2, base_delay=2.0)
     def inpaint(
@@ -362,9 +378,6 @@ class SDClient:
         inpaint_full_res_padding: マスク領域周囲のパディング
         controlnet_args: ControlNet設定のリスト（None の場合は無効）
         """
-        if model:
-            self.set_model(model)
-
         final_positive = positive
         if loras:
             if ":" in loras and not loras.startswith("<lora:"):
@@ -397,17 +410,7 @@ class SDClient:
         if controlnet_args:
             payload["alwayson_scripts"] = {"controlnet": {"args": controlnet_args}}
             logger.info("inpaint: controlnet enabled with %d unit(s)", len(controlnet_args))
-        try:
-            r = requests.post(f"{self.base_url}/sdapi/v1/img2img", json=payload, timeout=180)
-            r.raise_for_status()
-            result = r.json()
-            return result.get("images", [])
-        except requests.exceptions.ConnectionError:
-            raise ConnectionError(f"Cannot connect to Stable Diffusion API at {self.base_url}")
-        except requests.exceptions.Timeout:
-            raise TimeoutError("Stable Diffusion inpainting timed out")
-        except Exception as e:
-            raise Exception(f"SD API error: {str(e)}")
+        return self._generate("/sdapi/v1/img2img", payload, 180, model, "inpainting")
 
     @retry_with_backoff(max_retries=1, base_delay=2.0)
     def interrogate(self, image_bytes: bytes, model: str = "clip") -> Optional[str]:

@@ -17,6 +17,10 @@ logger = logging.getLogger("img2sdtxt.jobs")
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
+def _generated_model(images: list[str], requested_model: str) -> str:
+    return getattr(images, "model", requested_model)
+
+
 @register_job_handler("txt2img")
 async def handle_txt2img(job, update_progress):
     p = job.params
@@ -54,7 +58,7 @@ async def handle_txt2img(job, update_progress):
         cfg_scale=p.get("cfg_scale", 7.0),
         sampler=p.get("sampler", "Euler a"),
         seed=p.get("seed", -1),
-        model=p.get("model", ""),
+        model=_generated_model(images, p.get("model", "")),
         loras=p.get("loras", ""),
     )
     await update_progress(1.0)
@@ -112,7 +116,7 @@ async def handle_multi_model(job, update_progress):
                 cfg_scale=p.get("cfg_scale", 7.0),
                 sampler=p.get("sampler", "Euler a"),
                 seed=p.get("seed", -1),
-                model=model,
+                model=_generated_model(images, model),
                 loras=p.get("loras", ""),
             )
             model_result: dict = {

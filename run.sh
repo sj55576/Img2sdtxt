@@ -109,7 +109,7 @@ LLM_MODEL=gpt-3.5-turbo
 SD_API_URL=http://localhost:7860
 
 # API Server Configuration
-API_HOST=0.0.0.0
+API_HOST=127.0.0.1
 API_PORT=8000
 DEBUG=false
 

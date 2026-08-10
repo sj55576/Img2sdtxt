@@ -178,7 +178,7 @@ classDiagram
 | `LLM_MODEL` | `str` | `gpt-3.5-turbo` | 使用する LLM モデル名 |
 | `SD_API_URL` | `str` | `http://localhost:7860` | Stable Diffusion Web UI の URL |
 | `SD_OUTPUT_DIR` | `Path` | `outputs/` | 生成画像の保存先ディレクトリ |
-| `API_HOST` | `str` | `0.0.0.0` | FastAPI バインドホスト |
+| `API_HOST` | `str` | `127.0.0.1` | FastAPI バインドホスト（Docker は明示的に `0.0.0.0`） |
 | `API_PORT` | `int` | `8000` | FastAPI バインドポート |
 | `DEBUG` | `bool` | `False` | デバッグモード |
 | `MAX_IMAGE_SIZE` | `int` | `10485760` (10MB) | 許容最大アップロードサイズ |
@@ -541,7 +541,7 @@ FastAPI アプリケーションのエントリポイント。全 API エンド�
 
 | 項目 | 内容 |
 |------|------|
-| **処理内容** | FastAPI インスタンスを作成し、CORS ミドルウェアを全オリジン許可で設定。`llm_client`・`prompt_generator`・`sd_client` のインスタンスを生成。`/static`・`/outputs` を静的ファイルとしてマウント。 |
+| **処理内容** | FastAPI インスタンスを作成し、CORS は明示的な許可 Origin が設定された場合のみ有効化する。`llm_client`・`prompt_generator`・`sd_client` のインスタンスを生成。`/static`・`/outputs` を静的ファイルとしてマウント。 |
 
 #### `root() → FileResponse`
 

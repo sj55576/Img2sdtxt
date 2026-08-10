@@ -84,7 +84,7 @@ if not exist ".env" (
         echo SD_API_URL=http://localhost:7860
         echo.
         echo # API Server Configuration
-        echo API_HOST=0.0.0.0
+        echo API_HOST=127.0.0.1
         echo API_PORT=8000
         echo DEBUG=false
         echo.

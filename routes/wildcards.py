@@ -4,9 +4,10 @@ import logging
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 import dynamic_prompts as dp
+from auth import require_api_token
 from models import CreateWildcardRequest, ExpandPromptRequest, UpdateWildcardRequest
 
 logger = logging.getLogger("img2sdtxt.wildcards")
@@ -76,7 +77,7 @@ def update_wildcard(name: str, request: UpdateWildcardRequest):
 
 
 @router.delete("/{name}")
-def delete_wildcard(name: str):
+def delete_wildcard(name: str, _: None = Depends(require_api_token)):
     path = _wildcard_path(name)
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Wildcard '{name}' not found.")

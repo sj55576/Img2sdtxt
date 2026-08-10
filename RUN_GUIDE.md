@@ -131,7 +131,7 @@ LLM_MODEL=gpt-3.5-turbo
 SD_API_URL=http://localhost:7860
 
 # API Server Configuration
-API_HOST=0.0.0.0
+API_HOST=127.0.0.1
 API_PORT=8000
 DEBUG=false
 ```
@@ -145,7 +145,7 @@ DEBUG=false
 | `LLM_SERVER_URL` | LLM サーバーの URL | `http://localhost:1234/v1` |
 | `LLM_MODEL` | 使用する LLM モデル | `gpt-3.5-turbo` |
 | `SD_API_URL` | Stable Diffusion API の URL | `http://localhost:7860` |
-| `API_HOST` | API サーバーのバインドアドレス | `0.0.0.0` |
+| `API_HOST` | API サーバーのバインドアドレス | `127.0.0.1` |
 | `API_PORT` | API サーバーのポート番号 | `8000` |
 | `DEBUG` | デバッグモード | `false` |
 

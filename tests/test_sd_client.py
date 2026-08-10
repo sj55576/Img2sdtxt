@@ -7,6 +7,7 @@
 import base64
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -309,15 +310,54 @@ class TestSDClientTxt2Img:
         payload = mock_post.call_args.kwargs["json"]
         assert "alwayson_scripts" not in payload
 
+    @patch("sd_client.requests.get")
     @patch("sd_client.requests.post")
-    def test_txt2img_model_switching_calls_options_then_generation(self, mock_post, sd):
+    def test_txt2img_model_switching_calls_options_then_generation(self, mock_post, mock_get, sd):
         mock_post.return_value = _mock_response(json_data={"images": []})
-        sd.txt2img("a cat", "blurry", model="newmodel")
+        mock_get.return_value = _mock_response(json_data={"sd_model_checkpoint": "newmodel"})
+        images = sd.txt2img("a cat", "blurry", model="newmodel")
         assert mock_post.call_count == 2
         first_call, second_call = mock_post.call_args_list
         assert first_call.args[0] == "http://fake-sd:7860/sdapi/v1/options"
         assert first_call.kwargs["json"] == {"sd_model_checkpoint": "newmodel"}
         assert second_call.args[0] == "http://fake-sd:7860/sdapi/v1/txt2img"
+        assert images.model == "newmodel"
+
+    def test_txt2img_does_not_generate_when_model_switch_fails(self, sd):
+        with patch.object(sd, "set_model", return_value=False), patch("sd_client.requests.post") as mock_post:
+            with pytest.raises(RuntimeError, match="Failed to switch"):
+                sd.txt2img("a cat", "blurry", model="missing-model")
+        mock_post.assert_not_called()
+
+    def test_model_switch_and_generation_are_serialized(self, sd):
+        """Issue #106: generation A must finish before another request changes A1111's global model."""
+        active_model = ""
+        calls = []
+
+        def fake_post(url, **kwargs):
+            nonlocal active_model
+            if url.endswith("/options"):
+                active_model = kwargs["json"]["sd_model_checkpoint"]
+                calls.append(("switch", active_model))
+            else:
+                calls.append(("generate", active_model))
+            return _mock_response(json_data={"images": []})
+
+        def fake_get(*_args, **_kwargs):
+            return _mock_response(json_data={"sd_model_checkpoint": active_model})
+
+        with patch("sd_client.requests.post", side_effect=fake_post), patch("sd_client.requests.get", side_effect=fake_get):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [executor.submit(sd.txt2img, "a cat", "", model=model) for model in ("model-a", "model-b")]
+                for future in futures:
+                    future.result()
+
+        assert len(calls) == 4
+        assert calls[0][0] == calls[2][0] == "switch"
+        assert calls[1][0] == calls[3][0] == "generate"
+        assert calls[0][1] == calls[1][1]
+        assert calls[2][1] == calls[3][1]
+        assert {calls[0][1], calls[2][1]} == {"model-a", "model-b"}
 
     @patch("sd_client.requests.post")
     def test_txt2img_connection_error_raises_and_retries(self, mock_post, sd):
