@@ -29,6 +29,13 @@
 | 🗃️ **ギャラリー** | 生成済み画像のブラウズ・フィルタ・ページネーション |
 | 💾 **パラメータ保持** | 最後に使用したパラメータを自動復元 |
 | 📁 **フォルダランダム読み込み** | ローカルフォルダからランダムに画像を選択 |
+| 🧩 **ダイナミックプロンプト** | `{a|b}` 構文と `__wildcard__` ファイルによる展開 |
+| 🎛️ **ControlNet** | モデル・プリプロセッサ・参照画像をUIから設定 |
+| 🧪 **A/B比較・XY Plot** | プロンプトやStable Diffusionパラメータを比較 |
+| ⏳ **ジョブキュー** | 優先度・ETA・キャンセル・WebSocket通知に対応 |
+| 🔌 **LLMフォールバック** | 実際に応答したprovider/modelを記録し自動切替 |
+| 📊 **稼働状況の可視化** | Request ID、JSONログ、`/metrics`、キャッシュ・キュー統計 |
+| 🌐 **多言語UI** | 日本語・英語の翻訳とキーボードショートカット |
 
 ---
 
@@ -57,7 +64,7 @@ lemonade-server --port 8000
   ```
 - デフォルトURL: `http://localhost:7860`
 
-### 3. Python 3.8+
+### 3. Python 3.10+
 
 ---
 
@@ -239,10 +246,21 @@ example.com {
 |------|-----------|------|
 | `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLMサーバーのURL |
 | `LLM_MODEL` | `gpt-3.5-turbo` | 使用するモデル名 |
+| `LLM_PROVIDER` | `openai_compatible` | 使用するprovider（`openai_compatible` / `anthropic` / `gemini`） |
+| `LLM_CACHE_ENABLED` | `true` | LLM応答キャッシュを有効化 |
+| `LLM_CACHE_TTL` | `3600` | キャッシュ保持秒数 |
+| `LLM_FALLBACK_CHAIN` | *(空)* | 障害時に試すprovider IDの順序（カンマ区切り） |
+| `LLM_HEALTH_CHECK_INTERVAL` | `60` | providerヘルスチェック間隔（秒） |
+| `ANTHROPIC_API_KEY` | *(空)* | Anthropic APIキー |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | Anthropicモデル名 |
+| `GEMINI_API_KEY` | *(空)* | Google Gemini APIキー |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Geminiモデル名 |
 | `SD_API_URL` | `http://localhost:7860` | AUTOMATIC1111 APIのURL |
 | `API_HOST` | `127.0.0.1` | APIサーバーのバインドアドレス。ネットワーク公開を意図する場合のみ `0.0.0.0` を指定 |
 | `API_PORT` | `8000` | APIサーバーのポート番号 |
 | `DEBUG` | `false` | デバッグモード / ホットリロード |
+| `LOG_LEVEL` | `INFO` | Pythonログレベル |
+| `LOG_FORMAT` | `text` | `text` または `json`。JSONではRequest ID等を出力 |
 | `CORS_ALLOWED_ORIGINS` | *(空)* | 許可するブラウザOrigin（カンマ区切り）。空は同一オリジンのみ。影響を理解しない限り `*` は使わない |
 | `CORS_ALLOW_CREDENTIALS` | `false` | 認証情報付きCORSリクエストを許可。Originを制限した場合のみ有効化推奨 |
 | `API_TOKEN` | *(空)* | バックアップ、履歴エクスポート/削除、実行中のプロバイダー変更、キャッシュ/ワイルドカード削除に適用する任意の Bearer トークン。localhost 外へ公開する場合は設定必須 |
@@ -250,10 +268,42 @@ example.com {
 | `HTTPS_ENABLED` | `false` | HTTPSで起動する |
 | `SSL_CERTFILE` | *(自動)* | TLS証明書ファイルのパス（PEM形式） |
 | `SSL_KEYFILE` | *(自動)* | TLS秘密鍵ファイルのパス（PEM形式） |
+| `RATE_LIMIT_ENABLED` | `true` | IPベースのレート制限を有効化 |
+| `RATE_LIMIT_GENERATION` | `10` | 生成系APIの1分あたりリクエスト数 |
+| `RATE_LIMIT_API` | `60` | その他APIの1分あたりリクエスト数 |
+| `JOB_QUEUE_MAX_SIZE` | `20` | 保留できるジョブの最大数 |
+| `XY_PLOT_MAX_CELLS` | `36` | XY Plotと安全なバリエーション数の上限 |
 | `WEBHOOK_URL` | *(空)* | Webhook送信先URL。空の場合は通知を無効化 |
 | `WEBHOOK_EVENTS` | `job_completed,job_failed,batch_completed` | 通知対象イベント（カンマ区切り）（`job_completed`, `job_failed`, `job_cancelled`, `batch_completed`） |
 | `WEBHOOK_FORMAT` | `generic` | ペイロード形式：`generic`、`discord`、`slack` のいずれか |
 | `WEBHOOK_TIMEOUT` | `5` | Webhookリクエストのタイムアウト秒数 |
+| `BACKUP_DIR` | `data/backups` | バックアップ保存先 |
+| `AUTO_BACKUP_ENABLED` | `false` | 自動バックアップを有効化 |
+| `AUTO_BACKUP_RETENTION` | `7` | 保持する自動バックアップ世代数 |
+| `AUTO_BACKUP_INTERVAL_HOURS` | `24` | 自動バックアップ間隔 |
+| `MAX_BACKUP_UPLOAD_SIZE` | `2147483648` | 復元ZIPの最大サイズ（バイト） |
+
+---
+
+## 稼働状況の可視化
+
+すべてのレスポンスに `X-Request-ID` ヘッダーが付きます。既存のIDを送ると
+ログとリクエストを関連付けられ、未指定の場合はサーバーがUUIDを発行します。
+`.env` で `LOG_FORMAT=json` を指定すると、`ts`、`level`、`logger`、`msg`、
+`request_id`、処理時間を含むJSON Lines形式でログを出力します。
+
+Prometheus用の `GET /metrics` を提供しています（`API_TOKEN` を設定している
+場合は `Authorization: Bearer <API_TOKEN>` が必要です）。
+
+```yaml
+scrape_configs:
+  - job_name: img2sdtxt
+    static_configs:
+      - targets: ["localhost:8000"]
+```
+
+HTTP、LLM provider／フォールバック、Stable Diffusion、キャッシュ、レート制限、
+ジョブキューのカウンター・ヒストグラム・ゲージを取得できます。
 
 ---
 
@@ -376,109 +426,137 @@ AUTO_BACKUP_RETENTION=7      # これを超えた古い世代は自動削除
 
 ```
 Img2sdtxt/
-├── main.py                  # FastAPIアプリケーション・全APIルート
-├── config.py                # アプリ設定・オプションリスト
-├── llm_client.py            # LLMサーバーとの通信
-├── prompt_generator.py      # プロンプト生成ロジック
-├── sd_client.py             # Stable Diffusion APIクライアント
-├── history.py               # SQLite履歴管理
-├── presets.py               # プリセットテンプレート管理
-├── requirements.txt         # Python依存パッケージ
+├── main.py                  # FastAPI、ミドルウェア、ヘルス、メトリクス
+├── config.py                # 環境変数設定とオプション一覧
+├── routes/                  # プロンプト、SD、ジョブ、履歴、バックアップ等のAPI
+├── providers/               # Anthropic / Geminiアダプター
+├── llm_client.py            # OpenAI互換LLM通信
+├── fallback.py              # providerフォールバックチェーン
+├── prompt_generator.py      # プロンプト生成と応答正規化
+├── sd_client.py             # Stable Diffusion通信と出力メタデータ
+├── history.py               # SQLite履歴・タグ・バージョン・A/B記録
+├── job_queue.py             # 非同期生成キューとWebSocket購読
+├── dynamic_prompts.py       # ワイルドカード / `{a|b}` 展開エンジン
+├── metrics.py               # Prometheus計測
+├── logging_utils.py         # Request IDとJSONログ
+├── tests/                   # ユニット・API回帰テスト
+├── scripts/                 # CI用のドキュメント整合性チェック
+├── requirements.txt         # 実行時依存パッケージ
 ├── .env.example             # 環境変数テンプレート
 ├── run.bat / run.sh         # ワンクリック起動スクリプト
 ├── setup.bat / setup.sh     # セットアップのみのスクリプト
-├── data/                    # 実行時データ（DB・プリセット・パラメータ）
-│   ├── history.db
-│   ├── presets.json
-│   └── last_params.json
-├── outputs/                 # 生成済み画像（自動作成）
-│   └── YYYY-MM-DD/
-│       ├── *.png
-│       ├── *_metadata.json
-│       └── thumbs/
-└── static/
-    ├── index.html           # WebアプリケーションUI
-    ├── style.css            # スタイルシート
-    └── script.js            # JavaScriptロジック
+├── data/                    # 実行時データ（DB・プリセット等）
+├── outputs/                 # 生成画像とメタデータ（自動作成）
+└── static/                  # UI、CSS、JavaScript、翻訳ファイル
 ```
 
 ---
 
 ## APIエンドポイント
 
-### プロンプト生成
+サーバー起動中は `/docs` と `/openapi.json` でインタラクティブな完全スキーマを
+確認できます。主な公開ルートは次のとおりです。
+
+### プロンプト生成・比較
 
 | メソッド | パス | 説明 |
 |---------|------|------|
 | `POST` | `/api/generate-prompts` | 画像1枚からプロンプト生成 |
-| `POST` | `/api/generate-prompts-batch` | 最大10枚の画像を一括処理 |
-| `POST` | `/api/generate-prompts-text` | テキスト説明からプロンプト生成 |
-| `POST` | `/api/refine-prompt` | 既存プロンプトの改善・強化 |
+| `POST` | `/api/generate-prompts-batch` | 最大10枚を独立処理 |
+| `POST` | `/api/generate-prompts-stream` | SSEストリーミング生成 |
+| `POST` | `/api/generate-prompts-text` | テキストからプロンプト生成 |
+| `POST` | `/api/generate-prompts-compare` | プロンプト候補を比較 |
+| `POST` | `/api/refine-prompt` | プロンプトの改善・強化 |
+| `POST` | `/api/compare/ab-generate` | 共通seedでA/B画像を生成 |
+| `GET` | `/api/compare/ab-history` | A/B比較履歴を取得 |
+| `POST` | `/api/compare/ab/{id}/vote` | A/Bの勝者を記録 |
 
-### 履歴
+### 履歴・タグ・バージョン
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| `GET` | `/api/history` | 履歴一覧（`limit`・`offset`・`search`・`style`・`quality`・`favorites_only`対応） |
-| `GET` | `/api/history/export` | 全履歴をJSON・CSV・XLSXとしてダウンロード（`format`） |
-| `PUT` | `/api/history/{id}/favorite` | お気に入りのトグル |
-| `DELETE` | `/api/history/{id}` | 特定エントリを削除 |
+| `GET` | `/api/history` | 履歴一覧（`limit`・`offset`・`search`・`style`・`quality`・`favorites_only`・`tag`） |
+| `GET` | `/api/history/export` | JSON・CSV・XLSXでエクスポート（`format`） |
+| `GET` | `/api/history/diff` | 2つのプロンプトを比較 |
+| `GET` | `/api/history/{id}/versions` | バージョンツリーを取得 |
+| `POST` | `/api/history/{id}/rollback` | ロールバック版を作成 |
+| `PUT` | `/api/history/{id}/favorite` | お気に入りを切替 |
+| `DELETE` | `/api/history/{id}` | 履歴を1件削除 |
 | `DELETE` | `/api/history` | 全履歴を削除 |
-
-### プリセット
-
-| メソッド | パス | 説明 |
-|---------|------|------|
-| `GET` | `/api/presets` | 全プリセット一覧 |
-| `POST` | `/api/presets` | カスタムプリセット作成 |
-| `DELETE` | `/api/presets/{id}` | カスタムプリセット削除 |
+| `GET` | `/api/tags` | タグと使用回数を取得 |
+| `GET` | `/api/tags/suggest` | タグ候補を取得 |
+| `GET` | `/api/tags/categories` | タグカテゴリを取得 |
+| `POST` | `/api/history/{id}/tags` | 履歴にタグを追加 |
+| `DELETE` | `/api/history/{id}/tags/{tag}` | タグを削除 |
 
 ### Stable Diffusion
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| `GET` | `/api/sd/status` | A1111接続確認 |
-| `GET` | `/api/sd/models` | 利用可能なモデル一覧 |
-| `GET` | `/api/sd/loras` | 利用可能なLoRA一覧 |
-| `GET` | `/api/sd/upscalers` | 利用可能なアップスケーラー一覧 |
-| `POST` | `/api/sd/generate` | txt2img（テキストから画像生成） |
-| `POST` | `/api/sd/generate-multi-model` | 複数モデルで順序に txt2img 生成 |
-| `POST` | `/api/sd/img2img` | img2img（画像から画像生成） |
-| `POST` | `/api/sd/inpaint` | インペイント |
+| `GET` | `/api/sd/status` | A1111とControlNetの状態を確認 |
+| `GET` | `/api/sd/models` | モデル一覧 |
+| `GET` | `/api/sd/loras` | LoRA一覧 |
+| `GET` | `/api/sd/upscalers` | アップスケーラー一覧 |
+| `GET` | `/api/sd/progress` | 生成進捗 |
+| `WS` | `/api/sd/progress/ws` | 生成進捗をストリーム配信 |
+| `GET` | `/api/sd/controlnet/models` | ControlNetモデル一覧（未導入時は空） |
+| `GET` | `/api/sd/controlnet/modules` | ControlNetプリプロセッサ一覧 |
+| `POST` | `/api/sd/generate` | txt2img生成 |
+| `POST` | `/api/sd/generate-multi-model` | 複数モデルで順次生成 |
+| `POST` | `/api/sd/img2img` | img2img生成 |
+| `POST` | `/api/sd/inpaint` | ControlNet対応インペイント |
+| `POST` | `/api/interrogate` | CLIP Interrogator / DeepDanbooru |
+| `POST` | `/api/png-info` | A1111 PNGメタデータ読み取り |
 
-**`/api/sd/generate` リクエスト（JSON）:**
-```json
-{
-  "positive": "プロンプト...",
-  "negative": "ネガティブプロンプト...",
-  "width": 512,
-  "height": 512,
-  "steps": 20,
-  "cfg_scale": 7.0,
-  "sampler": "Euler a",
-  "seed": -1,
-  "batch_size": 1,
-  "model": "",
-  "loras": "",
-  "enable_hr": false,
-  "hr_scale": 2.0,
-  "hr_upscaler": "R-ESRGAN 4x+",
-  "hr_second_pass_steps": 0,
-  "hr_denoising_strength": 0.7
-}
-```
-
-### その他
+### ジョブキュー・ダイナミックプロンプト
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| `GET` | `/api/config` | アプリ設定情報 |
-| `GET` | `/health` | ヘルスチェック |
-| `GET` | `/api/outputs` | ギャラリー画像一覧（`date`・`mode`・`limit`・`offset`対応） |
+| `POST` | `/api/jobs/submit` | `txt2img`・`multi_model`・`xy_plot`を投入 |
+| `GET` | `/api/jobs` | ジョブ一覧 |
+| `GET` | `/api/jobs/{id}` | 状態・キュー位置・ETAを取得 |
+| `POST` | `/api/jobs/{id}/cancel` | ジョブをキャンセル |
+| `POST` | `/api/jobs/{id}/priority` | 優先度を変更 |
+| `GET` | `/api/jobs/queue/stats` | 状態別のキュー統計 |
+| `WS` | `/api/jobs/{id}/ws` | ジョブ進捗をストリーム配信 |
+| `GET` | `/api/wildcards/` | ワイルドカード一覧 |
+| `POST` | `/api/wildcards/` | ワイルドカード作成 |
+| `GET` | `/api/wildcards/{name}` | ワイルドカード取得 |
+| `PUT` | `/api/wildcards/{name}` | ワイルドカード更新 |
+| `DELETE` | `/api/wildcards/{name}` | ワイルドカード削除 |
+| `POST` | `/api/wildcards/expand` | 展開プレビュー／全組み合わせ生成 |
+
+### ギャラリー・キャッシュ・バックアップ・LLM
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `GET` | `/api/outputs` | 生成画像一覧（各種フィルタ対応） |
+| `GET` | `/api/outputs/filters` | モデル・サンプラーのフィルタ候補 |
+| `POST` | `/api/outputs/download-zip` | 選択画像をZIPで取得 |
+| `GET` | `/api/cache/stats` | LLMキャッシュ統計 |
+| `DELETE` | `/api/cache` | LLMキャッシュを削除 |
+| `POST` | `/api/backup/create` | バックアップ作成 |
+| `GET` | `/api/backup/list` | バックアップ一覧 |
+| `GET` | `/api/backup/download/{id}` | バックアップをダウンロード |
+| `POST` | `/api/backup/restore` | バックアップをアップロードして復元 |
+| `POST` | `/api/backup/restore/{id}` | 一覧からバックアップを復元 |
+| `DELETE` | `/api/backup/{id}` | バックアップを削除 |
+| `GET` | `/api/llm/providers` | provider設定・フォールバック状態 |
+| `GET` | `/api/llm/health` | providerのヘルス・応答時間 |
+| `POST` | `/api/llm/provider` | 使用providerを切替 |
+
+### 設定・可視化
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `GET` | `/api/config` | アプリ設定とprovider一覧 |
+| `GET` | `/api/stats` | 履歴・ギャラリー・タグ・活動統計 |
+| `GET` | `/metrics` | Prometheusメトリクス |
+| `GET` | `/health` | LLM/SDの状態と稼働時間 |
 | `GET` | `/api/last-params/{feature}` | 最後のパラメータを取得 |
 | `POST` | `/api/last-params/{feature}` | 最後のパラメータを保存 |
 
-`{feature}` に指定できる値: `generate`, `sd`, `img2img`, `inpaint`, `multi_model`
+`{feature}` に指定できる値: `generate`, `sd`, `img2img`, `inpaint`, `multi_model`, `xyplot`
 
 ---
 

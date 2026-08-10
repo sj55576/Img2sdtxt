@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import deps
-from fallback import FallbackChain
+from fallback import FallbackChain, ProviderResponse
 from health_monitor import STATUS_DEGRADED, STATUS_HEALTHY, STATUS_UNAVAILABLE, HealthMonitor, HealthStatus
 from llm_provider import LLMProvider
 from main import app
@@ -143,6 +143,12 @@ class TestFallbackChainBasics:
         chain = FallbackChain([FakeProvider("a")])
         assert chain.last_used_provider is None
 
+    def test_cache_identities_follow_concrete_provider_order(self, monkeypatch):
+        chain = FallbackChain([FakeProvider("a"), FakeProvider("b")])
+        monkeypatch.setattr(deps, "llm_client", chain)
+
+        assert deps.get_llm_cache_identities() == [("a", "a-model"), ("b", "b-model")]
+
 
 class TestFallbackChainGenerateResponse:
     def test_tries_providers_in_order_and_uses_first_success(self):
@@ -153,6 +159,9 @@ class TestFallbackChainGenerateResponse:
         result = chain.generate_response("prompt")
 
         assert result == "from-a"
+        assert isinstance(result, ProviderResponse)
+        assert result.provider_name == "a"
+        assert result.model == "a-model"
         assert a.generate_calls == 1
         assert b.generate_calls == 0
         assert chain.last_used_provider == "a"
@@ -165,6 +174,8 @@ class TestFallbackChainGenerateResponse:
         result = chain.generate_response("prompt")
 
         assert result == "from-b"
+        assert result.provider_name == "b"
+        assert result.model == "b-model"
         assert a.generate_calls == 1
         assert b.generate_calls == 1
         assert chain.last_used_provider == "b"
@@ -224,6 +235,7 @@ class TestFallbackChainStreaming:
         chunks = list(chain.generate_response_stream("prompt"))
 
         assert chunks == ["a1", "a2"]
+        assert all(getattr(chunk, "provider_name", None) == "a" for chunk in chunks)
         assert a.stream_calls == 1
         assert b.stream_calls == 0
 

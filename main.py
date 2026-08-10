@@ -1,17 +1,19 @@
 import logging
 import time as _time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 import config
 import deps
+from auth import require_api_token
 from config import (
     API_HOST,
     API_PORT,
@@ -26,6 +28,8 @@ from config import (
     TONES,
 )
 from job_queue import job_queue
+from logging_utils import configure_logging, request_id_context
+from metrics import CONTENT_TYPE_LATEST, observe_http, render_prometheus
 from rate_limit import RateLimitMiddleware
 from routes.backup import router as backup_router
 from routes.compare import router as compare_router
@@ -43,11 +47,7 @@ from routes.tags import router as tags_router
 from routes.wildcards import router as wildcards_router
 from webhook import webhook_notifier
 
-logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
-    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+configure_logging(getattr(logging, config.LOG_LEVEL.upper(), logging.INFO), json_format=config.LOG_FORMAT == "json")
 logger = logging.getLogger("img2sdtxt")
 APP_START_TIME = _time.time()
 
@@ -92,11 +92,45 @@ app.add_middleware(RateLimitMiddleware)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    t0 = _time.time()
-    response = await call_next(request)
-    elapsed = (_time.time() - t0) * 1000
-    logger.info("%s %s %d %.1fms", request.method, request.url.path, response.status_code, elapsed)
-    return response
+    supplied_id = request.headers.get("X-Request-ID", "").strip()
+    if supplied_id and len(supplied_id) <= 128 and all(char.isprintable() for char in supplied_id):
+        request_id = supplied_id
+    else:
+        request_id = uuid.uuid4().hex
+
+    token = request_id_context.set(request_id)
+    started = _time.monotonic()
+    response = None
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        elapsed_seconds = _time.monotonic() - started
+        route = request.scope.get("route")
+        path = getattr(route, "path", request.url.path)
+        status = response.status_code if response is not None else 500
+        # Unmatched requests (404s, path scans) have no route template, so the raw
+        # URL path would become a new, permanent Prometheus label value per request.
+        # Collapse those to a single bounded label; keep the real path in the log line.
+        metric_path = getattr(route, "path", None) or "unmatched"
+        observe_http(request.method, metric_path, status, elapsed_seconds)
+        logger.info(
+            "%s %s %d %.1fms",
+            request.method,
+            path,
+            status,
+            elapsed_seconds * 1000,
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": path,
+                "status": status,
+                "duration_ms": round(elapsed_seconds * 1000, 3),
+            },
+        )
+        if response is not None:
+            response.headers["X-Request-ID"] = request_id
+        request_id_context.reset(token)
 
 
 static_dir = Path(__file__).parent / "static"
@@ -135,6 +169,12 @@ async def root():
     return FileResponse("static/index.html")
 
 
+@app.get("/metrics")
+async def metrics_endpoint(_: None = Depends(require_api_token)):
+    """Expose Prometheus metrics; require API_TOKEN when one is configured."""
+    return Response(content=render_prometheus(), headers={"Content-Type": CONTENT_TYPE_LATEST})
+
+
 # ------------------------------------------------------------------ #
 # Health / Config
 # ------------------------------------------------------------------ #
@@ -146,7 +186,7 @@ async def health():
     llm_ok = await run_in_threadpool(deps.llm_client.is_available)
     sd_ok = await run_in_threadpool(deps.sd_client.is_available)
 
-    overall = "ok" if llm_ok else "degraded"
+    overall = "ok" if llm_ok and sd_ok else "degraded"
 
     return {
         "status": overall,

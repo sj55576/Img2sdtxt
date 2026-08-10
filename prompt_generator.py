@@ -1,9 +1,12 @@
 import json
 import logging
-from typing import Dict
+import time
+from typing import Any, Dict
 
 from config import DEFAULT_NEGATIVE_TAGS, QUALITY_LEVELS
+from fallback import response_identity
 from llm_provider import LLMProvider
+from metrics import observe_llm_request
 
 logger = logging.getLogger("img2sdtxt.prompt")
 
@@ -53,10 +56,34 @@ class PromptGenerator:
         return "\n".join(parts)
 
     def _call_llm(self, prompt: str) -> Dict:
-        response_text = self.llm_client.generate_response(prompt)
+        response_text, provider_name, model = self._invoke_llm(self.llm_client.generate_response, "text", prompt)
         if not response_text:
             raise ValueError("LLMからレスポンスがありません")
-        return self._parse_json_response(response_text)
+        result = self._parse_json_response(response_text)
+        result["provider"] = provider_name
+        result["model"] = model
+        return result
+
+    def _invoke_llm(self, method: Any, mode: str, *args: Any, **kwargs: Any) -> tuple[Any, str, str]:
+        """Call an LLM and return response-local provider metadata.
+
+        Fallback responses are annotated by ``FallbackChain``.  The fallback
+        to the wrapper's primary provider is only used for non-chain clients,
+        so concurrent requests never read a shared ``last_used_provider``
+        value to decide which cache key or history row to use.
+        """
+        started = time.monotonic()
+        try:
+            response = method(*args, **kwargs)
+        except Exception:
+            provider_name, model = response_identity(None, self.llm_client)
+            observe_llm_request(provider_name, model, mode, "error", time.monotonic() - started)
+            raise
+
+        provider_name, model = response_identity(response, self.llm_client)
+        status = "success" if response else "empty"
+        observe_llm_request(provider_name, model, mode, status, time.monotonic() - started)
+        return response, provider_name, model
 
     def build_image_analysis_prompt(
         self, style: str = "", tone: str = "", quality: str = "high", tagger_tags: str = ""
@@ -167,11 +194,18 @@ JSON形式のみで返してください：
         logger.info("generate_prompts start style=%s tone=%s quality=%s", style, tone, quality)
         try:
             analysis_prompt = self.build_image_analysis_prompt(style, tone, quality, tagger_tags)
-            response_text = self.llm_client.generate_response_with_image(analysis_prompt, image_bytes)
+            response_text, provider_name, model = self._invoke_llm(
+                self.llm_client.generate_response_with_image,
+                "vision",
+                analysis_prompt,
+                image_bytes,
+            )
             if not response_text:
                 raise ValueError("LLMからレスポンスがありません")
 
             result = self.finalize_response(response_text, preset_suffix_positive, preset_suffix_negative)
+            result["provider"] = provider_name
+            result["model"] = model
             if result.get("status") == "success":
                 logger.info("generate_prompts done")
             return result
@@ -224,6 +258,8 @@ JSON形式のみで返してください：
                 "positive": result.get("positive", positive),
                 "negative": result.get("negative", negative),
                 "changes": result.get("changes", ""),
+                "provider": result.get("provider", ""),
+                "model": result.get("model", ""),
                 "status": "success",
             }
         except Exception as e:
@@ -242,11 +278,13 @@ JSON形式のみで返してください：
         logger.info("generate_prompts_text_only start style=%s tone=%s quality=%s", style, tone, quality)
         try:
             prompt = self.build_text_prompt(description, style, tone, quality)
-            response_text = self.llm_client.generate_response(prompt)
+            response_text, provider_name, model = self._invoke_llm(self.llm_client.generate_response, "text", prompt)
             if not response_text:
                 raise ValueError("LLMからレスポンスがありません")
 
             result = self.finalize_response(response_text, preset_suffix_positive, preset_suffix_negative)
+            result["provider"] = provider_name
+            result["model"] = model
             if result.get("status") == "success":
                 logger.info("generate_prompts_text_only done")
             return result

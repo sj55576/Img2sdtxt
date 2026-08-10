@@ -26,6 +26,7 @@ def list_providers():
             "enabled": deps.fallback_chain is not None,
             "chain": [p.provider_name for p in deps.fallback_chain.providers] if deps.fallback_chain else [],
             "last_used": deps.fallback_chain.last_used_provider if deps.fallback_chain else None,
+            "last_used_model": deps.fallback_chain.last_used_model if deps.fallback_chain else None,
         },
     }
 

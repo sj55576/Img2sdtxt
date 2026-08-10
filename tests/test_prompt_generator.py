@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from fallback import ProviderResponse
 from llm_client import LLMClient
 from prompt_generator import PromptGenerator
 
@@ -109,6 +110,20 @@ class TestGeneratePromptsFromImage:
         gen = PromptGenerator(client)
         result = gen.generate_prompts(self._make_png_bytes())
         assert result["status"] == "error"
+
+    def test_success_preserves_provider_metadata_from_fallback_response(self):
+        client = MagicMock(spec=LLMClient)
+        client.generate_response_with_image.return_value = ProviderResponse(
+            '{"positive": "landscape", "negative": "blurry"}',
+            "gemini",
+            "gemini-test",
+        )
+        gen = PromptGenerator(client)
+
+        result = gen.generate_prompts(self._make_png_bytes())
+
+        assert result["provider"] == "gemini"
+        assert result["model"] == "gemini-test"
 
 
 # ------------------------------------------------------------------ #

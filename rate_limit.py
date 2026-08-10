@@ -23,6 +23,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 import config
+from metrics import observe_rate_limit_hit
 
 logger = logging.getLogger("img2sdtxt.rate_limit")
 
@@ -110,6 +111,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         allowed, retry_after = await run_in_threadpool(self._check_and_record, ip, tier, limit)
 
         if not allowed:
+            observe_rate_limit_hit(tier)
             logger.warning(
                 "Rate limit hit: ip=%s tier=%s path=%s retry_after=%ds",
                 ip,
