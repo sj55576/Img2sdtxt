@@ -33,6 +33,11 @@ def _generation_response(images: List[str], saved_files: List[dict]) -> dict:
     return response
 
 
+def _generated_model(images: List[str], requested_model: str) -> str:
+    """Use the checkpoint confirmed by SDClient when metadata is saved."""
+    return getattr(images, "model", requested_model)
+
+
 # CLIP Interrogator / WD14 タガー系のモデル選択肢
 INTERROGATE_MODELS = ("clip", "deepdanbooru")
 
@@ -225,7 +230,7 @@ async def sd_generate(request: SDGenerateRequest):
             cfg_scale=request.cfg_scale,
             sampler=request.sampler,
             seed=request.seed,
-            model=request.model,
+            model=_generated_model(images, request.model),
             loras=request.loras,
         )
 
@@ -319,7 +324,7 @@ async def sd_img2img(
             cfg_scale=cfg_scale,
             sampler=sampler,
             seed=seed,
-            model=model,
+            model=_generated_model(images, model),
             loras=loras,
             mode="img2img",
             denoising_strength=denoising_strength,
@@ -413,7 +418,7 @@ async def sd_inpaint(
             cfg_scale=cfg_scale,
             sampler=sampler,
             seed=seed,
-            model=model,
+            model=_generated_model(images, model),
             loras=loras,
             mode="inpaint",
             denoising_strength=denoising_strength,
@@ -463,7 +468,7 @@ async def sd_generate_multi_model(request: SDMultiModelRequest):
                 cfg_scale=request.cfg_scale,
                 sampler=request.sampler,
                 seed=request.seed,
-                model=model,
+                model=_generated_model(images, model),
                 loras=request.loras,
             )
             model_result = {"model": model, **_generation_response(images, saved_files)}

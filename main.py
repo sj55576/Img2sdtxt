@@ -1,6 +1,8 @@
 import logging
 import time as _time
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
@@ -49,19 +51,42 @@ logging.basicConfig(
 logger = logging.getLogger("img2sdtxt")
 APP_START_TIME = _time.time()
 
+_auto_backup_scheduler = None
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Start optional background services using FastAPI's supported lifespan API."""
+    global _auto_backup_scheduler
+    if config.AUTO_BACKUP_ENABLED:
+        import backup as backup_mgr
+
+        _auto_backup_scheduler = backup_mgr.start_auto_backup(
+            interval_hours=config.AUTO_BACKUP_INTERVAL_HOURS,
+            retention=config.AUTO_BACKUP_RETENTION,
+        )
+    yield
+
+
 app = FastAPI(
     title="Image to Stable Diffusion Prompt",
     description="Convert images to SD prompts using local LLM",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ALLOWED_ORIGINS,
-    allow_credentials=CORS_ALLOW_CREDENTIALS,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if CORS_ALLOWED_ORIGINS:
+    if "*" in CORS_ALLOWED_ORIGINS and not config.API_TOKEN:
+        logger.warning(
+            "CORS_ALLOWED_ORIGINS=* is enabled while API_TOKEN is not configured; browser clients can access all APIs."
+        )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ALLOWED_ORIGINS,
+        allow_credentials=CORS_ALLOW_CREDENTIALS,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
 app.add_middleware(RateLimitMiddleware)
 
 
@@ -99,22 +124,6 @@ app.include_router(compare_router)
 app.include_router(backup_router)
 
 job_queue.add_listener(webhook_notifier.job_listener)
-
-_auto_backup_scheduler = None
-
-
-@app.on_event("startup")
-async def _start_auto_backup() -> None:
-    """Start the background auto-backup scheduler when enabled via config."""
-    global _auto_backup_scheduler
-    if config.AUTO_BACKUP_ENABLED:
-        import backup as backup_mgr
-
-        _auto_backup_scheduler = backup_mgr.start_auto_backup(
-            interval_hours=config.AUTO_BACKUP_INTERVAL_HOURS,
-            retention=config.AUTO_BACKUP_RETENTION,
-        )
-
 
 # ------------------------------------------------------------------ #
 # Pages

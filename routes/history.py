@@ -4,11 +4,12 @@ import csv
 import io as _io
 import json
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 
 import history as hist
+from auth import require_api_token
 
 router = APIRouter(prefix="/api", tags=["history"])
 
@@ -71,7 +72,7 @@ def _build_history_workbook(items: list) -> bytes:
 
 
 @router.get("/history/export")
-async def export_history(format: str = "json"):
+async def export_history(format: str = "json", _: None = Depends(require_api_token)):
     """Download all history as JSON, CSV, or XLSX."""
     items = await run_in_threadpool(hist.get_history, limit=None, offset=0)
 
@@ -147,7 +148,7 @@ def delete_history(item_id: int):
 
 
 @router.delete("/history")
-def clear_history():
+def clear_history(_: None = Depends(require_api_token)):
     count = hist.clear_all_history()
     return {"success": True, "deleted": count}
 

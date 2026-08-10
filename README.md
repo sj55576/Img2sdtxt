@@ -242,11 +242,12 @@ on the container itself (the proxy handles TLS termination).
 | `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLM server endpoint |
 | `LLM_MODEL` | `gpt-3.5-turbo` | Model name to use |
 | `SD_API_URL` | `http://localhost:7860` | AUTOMATIC1111 API URL |
-| `API_HOST` | `0.0.0.0` | API server bind address |
+| `API_HOST` | `127.0.0.1` | API server bind address; set `0.0.0.0` only for an intentional network deployment |
 | `API_PORT` | `8000` | API server port |
 | `DEBUG` | `false` | Enable debug / hot-reload |
-| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowed browser origins; use explicit origins in production |
+| `CORS_ALLOWED_ORIGINS` | *(empty)* | Comma-separated allowed browser origins. Empty means same-origin only; never use `*` unless you understand the exposure |
 | `CORS_ALLOW_CREDENTIALS` | `false` | Allow credentialed CORS requests; enable only with restricted origins |
+| `API_TOKEN` | *(empty)* | Optional bearer token for backups, history export/deletion, runtime provider changes, and cache/wildcard deletion; set when exposing the API beyond localhost |
 | `TRUST_PROXY_HEADERS` | `false` | Trust `X-Forwarded-For` / `X-Real-IP` only behind a trusted reverse proxy |
 | `HTTPS_ENABLED` | `false` | Serve over HTTPS |
 | `SSL_CERTFILE` | *(auto)* | Path to TLS certificate file (PEM) |
@@ -431,10 +432,10 @@ Notes:
   opt out), and never deletes files that are absent from the archive.
 - **Restart the server after a restore.** Modules hold their own open SQLite
   connections and keep serving pre-restore data until the process restarts.
-- The backup endpoints are unauthenticated, like the rest of the API. A
-  backup archive contains your full history — do not expose the app to an
-  untrusted network without putting authentication in front of it (see the
-  reverse-proxy example in the Docker section).
+- When `API_TOKEN` is set, backup endpoints require
+  `Authorization: Bearer <API_TOKEN>`. A backup archive contains your full
+  history, so always set a token and restrict access at the reverse proxy when
+  exposing the app beyond localhost.
 
 ---
 

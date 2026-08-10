@@ -1,8 +1,9 @@
 """LLM provider management endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 import deps
+from auth import require_api_token
 from deps import get_available_providers, switch_provider
 from models import SwitchProviderRequest
 
@@ -48,7 +49,7 @@ def provider_health():
 
 
 @router.post("/provider")
-def set_provider(request: SwitchProviderRequest):
+def set_provider(request: SwitchProviderRequest, _: None = Depends(require_api_token)):
     """Switch the active LLM provider at runtime."""
     if request.provider not in VALID_PROVIDERS:
         raise HTTPException(

@@ -240,11 +240,12 @@ example.com {
 | `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLMサーバーのURL |
 | `LLM_MODEL` | `gpt-3.5-turbo` | 使用するモデル名 |
 | `SD_API_URL` | `http://localhost:7860` | AUTOMATIC1111 APIのURL |
-| `API_HOST` | `0.0.0.0` | APIサーバーのバインドアドレス |
+| `API_HOST` | `127.0.0.1` | APIサーバーのバインドアドレス。ネットワーク公開を意図する場合のみ `0.0.0.0` を指定 |
 | `API_PORT` | `8000` | APIサーバーのポート番号 |
 | `DEBUG` | `false` | デバッグモード / ホットリロード |
-| `CORS_ALLOWED_ORIGINS` | `*` | 許可するブラウザOrigin（カンマ区切り）。本番環境では明示指定を推奨 |
+| `CORS_ALLOWED_ORIGINS` | *(空)* | 許可するブラウザOrigin（カンマ区切り）。空は同一オリジンのみ。影響を理解しない限り `*` は使わない |
 | `CORS_ALLOW_CREDENTIALS` | `false` | 認証情報付きCORSリクエストを許可。Originを制限した場合のみ有効化推奨 |
+| `API_TOKEN` | *(空)* | バックアップ、履歴エクスポート/削除、実行中のプロバイダー変更、キャッシュ/ワイルドカード削除に適用する任意の Bearer トークン。localhost 外へ公開する場合は設定必須 |
 | `TRUST_PROXY_HEADERS` | `false` | 信頼済みリバースプロキシ配下でのみ `X-Forwarded-For` / `X-Real-IP` を信頼 |
 | `HTTPS_ENABLED` | `false` | HTTPSで起動する |
 | `SSL_CERTFILE` | *(自動)* | TLS証明書ファイルのパス（PEM形式） |
@@ -365,9 +366,9 @@ AUTO_BACKUP_RETENTION=7      # これを超えた古い世代は自動削除
   先に退避します。アーカイブに含まれないファイルが削除されることはありません。
 - **復元後はサーバーを再起動してください。** 各モジュールは独自のSQLite接続を
   保持しており、再起動するまで復元前のデータを参照し続けます。
-- バックアップ用エンドポイントは他のAPIと同様に認証がありません。アーカイブには
-  全履歴が含まれるため、信頼できないネットワークに公開する場合は必ず前段に
-  認証を置いてください（Dockerセクションのリバースプロキシ例を参照）。
+- `API_TOKEN` を設定すると、バックアップ用エンドポイントは
+  `Authorization: Bearer <API_TOKEN>` を必須にします。アーカイブには全履歴が含まれるため、
+  信頼できないネットワークに公開する場合は必ず設定し、リバースプロキシ側でもアクセスを制限してください。
 
 ---
 
