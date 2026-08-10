@@ -17,8 +17,8 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from PIL import Image
 
-from deps import llm_cache
 from auth import require_api_token
+from deps import llm_cache
 
 logger = logging.getLogger("img2sdtxt.gallery")
 
@@ -72,7 +72,7 @@ def _scan_date_dir(date_dir: Path, date_str: str) -> list:
             try:
                 thumbs_dir.mkdir(exist_ok=True)
                 with Image.open(img_file) as pil_img:
-                    pil_img.thumbnail((200, 200), Image.LANCZOS)
+                    pil_img.thumbnail((200, 200), Image.Resampling.LANCZOS)
                     pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
                 thumb_url = f"/outputs/{date_str}/thumbs/{stem}.jpg"
             except Exception as e:
