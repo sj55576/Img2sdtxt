@@ -520,7 +520,7 @@ class SDClient:
                 thumb_stem = Path(filename).stem
                 thumb_path = thumbs_dir / f"{thumb_stem}.jpg"
                 with Image.open(filepath) as pil_img:
-                    pil_img.thumbnail((200, 200), Image.LANCZOS)
+                    pil_img.thumbnail((200, 200), Image.Resampling.LANCZOS)
                     pil_img.save(thumb_path, "JPEG", quality=80, optimize=True)
             except Exception as e:
                 logger.warning("Thumbnail generation failed for %s: %s", filename, e)
