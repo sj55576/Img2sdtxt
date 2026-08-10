@@ -346,7 +346,10 @@ class TestSDClientTxt2Img:
         def fake_get(*_args, **_kwargs):
             return _mock_response(json_data={"sd_model_checkpoint": active_model})
 
-        with patch("sd_client.requests.post", side_effect=fake_post), patch("sd_client.requests.get", side_effect=fake_get):
+        with (
+            patch("sd_client.requests.post", side_effect=fake_post),
+            patch("sd_client.requests.get", side_effect=fake_get),
+        ):
             with ThreadPoolExecutor(max_workers=2) as executor:
                 futures = [executor.submit(sd.txt2img, "a cat", "", model=model) for model in ("model-a", "model-b")]
                 for future in futures:
