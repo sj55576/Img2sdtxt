@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 35630)
-Total output lines: 2013
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -830,7 +827,319 @@ Total output lines: 2013
                         <!-- Parameters -->
                         <div class="form-grid">
                             <div class="form-group">
-                  …5630 tokens truncated… <label>Seed (-1=random)</label>
+                                <label>Denoising Strength</label>
+                                <input type="number" id="i2i-denoising" value="0.75" min="0" max="1" step="0.05">
+                                <small style="color:var(--text-muted);font-size:0.75rem;" data-i18n="page.img2img.denoising_hint">0=変化なし 1=完全変換</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Resize Mode</label>
+                                <select id="i2i-resize-mode">
+                                    <option value="0" data-i18n="page.img2img.resize_mode_direct">そのままリサイズ</option>
+                                    <option value="1" data-i18n="page.img2img.resize_mode_crop">クロップ&リサイズ</option>
+                                    <option value="2" data-i18n="page.img2img.resize_mode_fill">リサイズ&フィル</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Width</label>
+                                <select id="i2i-width">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Height</label>
+                                <select id="i2i-height">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Steps</label>
+                                <input type="number" id="i2i-steps" value="20" min="5" max="150">
+                            </div>
+                            <div class="form-group">
+                                <label>CFG Scale</label>
+                                <input type="number" id="i2i-cfg" value="7" min="1" max="30" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Sampler</label>
+                                <select id="i2i-sampler">
+                                    <option>Euler a</option>
+                                    <option>Euler</option>
+                                    <option>DPM++ 2M Karras</option>
+                                    <option>DDIM</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Batch Size</label>
+                                <input type="number" id="i2i-batch" value="1" min="1" max="4">
+                            </div>
+                            <div class="form-group">
+                                <label>Seed (-1=random)</label>
+                                <input type="number" id="i2i-seed" value="-1">
+                            </div>
+                        </div>
+
+                        <!-- Upscaling Settings (Hires.fix) -->
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.img2img.upscale_title">🔍 アップスケール設定 (Hires.fix)</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="i2i-enable-hr">
+                                    <span data-i18n="page.img2img.hires_enable">Hires.fix を有効化（高解像度アップスケール）</span>
+                                </label>
+                            </div>
+                            <div id="i2i-hr-settings" class="hr-settings hidden">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label data-i18n="page.img2img.hr_scale_label">スケール倍率</label>
+                                        <select id="i2i-hr-scale">
+                                            <option value="1.5">1.5x</option>
+                                            <option value="2" selected>2x</option>
+                                            <option value="2.5">2.5x</option>
+                                            <option value="3">3x</option>
+                                            <option value="4">4x</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.img2img.hr_upscaler_label">アップスケーラー</label>
+                                        <select id="i2i-hr-upscaler">
+                                            <option>R-ESRGAN 4x+</option>
+                                            <option>R-ESRGAN 4x+ Anime6B</option>
+                                            <option>ESRGAN_4x</option>
+                                            <option>Latent</option>
+                                            <option>Latent (bicubic)</option>
+                                            <option>SwinIR 4x</option>
+                                            <option>LDSR</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.img2img.hr_steps_label">Hiresステップ数</label>
+                                        <input type="number" id="i2i-hr-steps" value="0" min="0" max="150">
+                                        <small data-i18n="page.img2img.hr_steps_hint">0 = メインと同じステップ数</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.img2img.hr_denoising_label">デノイジング強度</label>
+                                        <input type="number" id="i2i-hr-denoising" value="0.7" min="0" max="1" step="0.05">
+                                        <small data-i18n="page.img2img.hr_denoising_hint">0=忠実に拡大, 1=大きく変化</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ControlNet Settings -->
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.sd.controlnet_title">🎮 ControlNet</h3>
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="i2i-cn-enable">
+                                    <span data-i18n="page.sd.controlnet_enable">ControlNetを有効化</span>
+                                </label>
+                            </div>
+                            <div id="i2i-cn-settings" class="hr-settings hidden">
+                                <div class="form-group">
+                                    <label data-i18n="page.sd.controlnet_image_label">参照画像</label>
+                                    <input type="file" id="i2i-cn-image-input" accept="image/*">
+                                </div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_model_label">モデル</label>
+                                        <select id="i2i-cn-model"><option value="">-- 選択 --</option></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
+                                        <select id="i2i-cn-module"><option value="none">none</option></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_weight_label">Weight</label>
+                                        <input type="number" id="i2i-cn-weight" value="1.0" min="0" max="2" step="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
+                                        <input type="number" id="i2i-cn-guidance-start" value="0.0" min="0" max="1" step="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
+                                        <input type="number" id="i2i-cn-guidance-end" value="1.0" min="0" max="1" step="0.05">
+                                    </div>
+                                </div>
+                                <small data-i18n="page.sd.controlnet_hint">SD WebUIにControlNet拡張が必要です。モデル一覧が空の場合は未導入です。</small>
+                            </div>
+                        </div>
+
+                        <button id="i2i-generate-btn" class="btn btn-accent btn-block" disabled data-i18n="page.img2img.generate_btn">
+                            🔄 Img2Img 生成
+                        </button>
+                    </div>
+
+                    <!-- Right: Output -->
+                    <div class="col">
+                        <div id="i2i-loading" class="loading-box hidden">
+                            <div class="spinner"></div>
+                            <p data-i18n="page.img2img.loading">変換生成中... (しばらくお待ちください)</p>
+                            <div id="i2i-progress-wrap" class="sd-progress-bar-wrap hidden"><div class="sd-progress-fill"></div><span class="sd-progress-text"></span></div>
+                        </div>
+                        <div id="i2i-results" class="sd-results hidden">
+                            <h3 data-i18n="page.img2img.results_title">生成された画像</h3>
+                            <div id="i2i-images" class="sd-images"></div>
+                            <div id="img2img-compare" class="image-compare hidden">
+                                <img class="compare-before" src="" alt="Before">
+                                <img class="compare-after" src="" alt="After">
+                                <div class="compare-divider"></div>
+                                <span class="compare-label label-before" data-i18n="page.img2img.compare_before">Before</span>
+                                <span class="compare-label label-after" data-i18n="page.img2img.compare_after">After</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- ======================== INPAINT PAGE ======================== -->
+            <section id="page-inpaint" class="page">
+                <div class="page-header">
+                    <h2 data-i18n="page.inpaint.title">Inpainting</h2>
+                    <p data-i18n="page.inpaint.subtitle">画像の特定領域をマスクで選択してStable Diffusionで修正・変更</p>
+                    <div id="inpaint-api-badge" class="badge badge-gray">Checking...</div>
+                </div>
+                <div class="page-body two-col">
+                    <!-- Left: Input -->
+                    <div class="col">
+                        <!-- Input Image + Canvas -->
+                        <div class="form-group" style="margin-bottom:12px;">
+                            <label data-i18n="page.inpaint.input_image_label">入力画像とマスク描画</label>
+                            <div class="upload-area" id="inpaint-upload-area">
+                                <div class="upload-icon">🖼️</div>
+                                <p data-i18n="page.inpaint.upload_text">クリックまたはドラッグ&ドロップ</p>
+                                <small data-i18n="page.inpaint.upload_hint">JPG, PNG, WebP, GIF (最大 10MB)</small>
+                            </div>
+                            <input type="file" id="inpaint-image-input" accept="image/*" hidden>
+                            <!-- Canvas editor (shown after image loaded) -->
+                            <div id="inpaint-canvas-wrap" class="inpaint-canvas-wrap hidden">
+                                <div class="inpaint-canvas-container">
+                                    <canvas id="inpaint-base-canvas"></canvas>
+                                    <canvas id="inpaint-mask-canvas"></canvas>
+                                </div>
+                                <div class="inpaint-tools">
+                                    <div class="inpaint-tool-group">
+                                        <button id="inpaint-tool-draw" class="btn btn-sm btn-primary active-tool" data-i18n="page.inpaint.tool_draw" data-i18n-title="page.inpaint.tool_draw_title" title="ブラシ（白=描き直す）">🖌️ 描画</button>
+                                        <button id="inpaint-tool-erase" class="btn btn-sm btn-secondary" data-i18n="page.inpaint.tool_erase" data-i18n-title="page.inpaint.tool_erase_title" title="消しゴム（黒=保持）">🧹 消去</button>
+                                    </div>
+                                    <div class="inpaint-tool-group">
+                                        <label class="inpaint-brush-label" data-i18n="page.inpaint.brush_size_label">ブラシサイズ</label>
+                                        <input type="range" id="inpaint-brush-size" min="5" max="100" value="30" class="inpaint-brush-slider">
+                                        <span id="inpaint-brush-size-val">30</span>px
+                                    </div>
+                                    <div class="inpaint-tool-group">
+                                        <button id="inpaint-clear-mask-btn" class="btn btn-sm btn-ghost" data-i18n="page.inpaint.clear_mask_btn">🗑️ マスククリア</button>
+                                        <button id="inpaint-fill-mask-btn" class="btn btn-sm btn-ghost" data-i18n="page.inpaint.fill_mask_btn">⬜ 全選択</button>
+                                        <button id="inpaint-clear-image-btn" class="btn btn-sm btn-ghost" data-i18n="page.inpaint.clear_image_btn">✕ 画像変更</button>
+                                    </div>
+                                </div>
+                                <div class="inpaint-opacity-row">
+                                    <label class="inpaint-brush-label" data-i18n="page.inpaint.mask_opacity_label">マスク透明度</label>
+                                    <input type="range" id="inpaint-mask-opacity" min="10" max="90" value="50" class="inpaint-brush-slider">
+                                    <span id="inpaint-mask-opacity-val">50</span>%
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Prompts -->
+                        <div class="form-group">
+                            <label>Positive Prompt</label>
+                            <textarea id="inpaint-positive" rows="4" data-i18n-placeholder="page.inpaint.positive_placeholder" placeholder="描き直す領域に生成したい内容..."></textarea>
+                            <span class="token-counter" id="inpaint-positive-tokens"></span>
+                        </div>
+                        <div class="form-group" style="margin-top:10px;">
+                            <label>Negative Prompt</label>
+                            <textarea id="inpaint-negative" rows="3" data-i18n-placeholder="page.inpaint.negative_placeholder" placeholder="ネガティブプロンプト..."></textarea>
+                            <span class="token-counter" id="inpaint-negative-tokens"></span>
+                            <select id="inpaint-neg-template" class="neg-template-select"></select>
+                        </div>
+
+                        <!-- Model & LoRA -->
+                        <div class="customization-panel">
+                            <h3 data-i18n="page.inpaint.model_lora_title">🎯 モデル・LoRA設定</h3>
+                            <div class="form-group">
+                                <label data-i18n="page.inpaint.model_label">モデル</label>
+                                <select id="inpaint-model">
+                                    <option value="">-- デフォルト --</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-top:10px;">
+                                <label data-i18n="page.inpaint.lora_label">LoRA</label>
+                                <div class="lora-add-row">
+                                    <select id="inpaint-lora-select">
+                                        <option value="">-- LoRA選択 --</option>
+                                    </select>
+                                    <input type="number" id="inpaint-lora-weight" value="1.0" min="0" max="2" step="0.05" title="Weight">
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addLora('inpaint')" data-i18n="page.inpaint.lora_add_btn">追加</button>
+                                    <button type="button" class="btn btn-sm btn-ghost" onclick="loadLoras('inpaint')" data-i18n-title="page.inpaint.lora_refresh_title" title="LoRA一覧を更新">&#8635;</button>
+                                </div>
+                                <input type="text" id="inpaint-loras" placeholder="&lt;lora:name:1.0&gt; ..." style="margin-top:6px;">
+                            </div>
+                        </div>
+
+                        <!-- Parameters -->
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Denoising Strength</label>
+                                <input type="number" id="inpaint-denoising" value="0.75" min="0" max="1" step="0.05">
+                                <small style="color:var(--text-muted);font-size:0.75rem;" data-i18n="page.inpaint.denoising_hint">0=変化なし 1=完全変換</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Mask Blur</label>
+                                <input type="number" id="inpaint-mask-blur" value="4" min="0" max="64">
+                                <small style="color:var(--text-muted);font-size:0.75rem;" data-i18n="page.inpaint.mask_blur_hint">マスクのぼかし半径</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Inpaint Fill</label>
+                                <select id="inpaint-fill-mode">
+                                    <option value="1" data-i18n="page.inpaint.inpaint_fill_original">元画像</option>
+                                    <option value="0" data-i18n="page.inpaint.inpaint_fill_fill">塗りつぶし</option>
+                                    <option value="2" data-i18n="page.inpaint.inpaint_fill_latent_noise">潜在ノイズ</option>
+                                    <option value="3" data-i18n="page.inpaint.inpaint_fill_latent_zero">潜在ゼロ</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Width</label>
+                                <select id="inpaint-width">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Height</label>
+                                <select id="inpaint-height">
+                                    <option value="512" selected>512</option>
+                                    <option value="768">768</option>
+                                    <option value="1024">1024</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Steps</label>
+                                <input type="number" id="inpaint-steps" value="20" min="5" max="150">
+                            </div>
+                            <div class="form-group">
+                                <label>CFG Scale</label>
+                                <input type="number" id="inpaint-cfg" value="7" min="1" max="30" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label>Sampler</label>
+                                <select id="inpaint-sampler">
+                                    <option>Euler a</option>
+                                    <option>Euler</option>
+                                    <option>DPM++ 2M Karras</option>
+                                    <option>DDIM</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Batch Size</label>
+                                <input type="number" id="inpaint-batch" value="1" min="1" max="4">
+                            </div>
+                            <div class="form-group">
+                                <label>Seed (-1=random)</label>
                                 <input type="number" id="inpaint-seed" value="-1">
                             </div>
                         </div>
