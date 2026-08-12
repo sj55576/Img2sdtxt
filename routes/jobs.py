@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
+import dynamic_prompts as dp
 import xy_plot
 from deps import sd_client
 from job_queue import JobQueueFullError, JobStatus, job_queue, register_job_handler
@@ -21,46 +22,62 @@ def _generated_model(images: list[str], requested_model: str) -> str:
     return getattr(images, "model", requested_model)
 
 
+def _prompt_variations(params: dict) -> list[str]:
+    """Return one dynamic-prompt expansion per generated image when enabled."""
+    if not params.get("expand_wildcards", False):
+        return [params["positive"]]
+    seed = params.get("seed", -1)
+    return dp.expand_variations(
+        params["positive"], min(params.get("batch_size", 1), 4), seed=None if seed == -1 else seed
+    )
+
+
 @register_job_handler("txt2img")
 async def handle_txt2img(job, update_progress):
     p = job.params
     await update_progress(0.05)
-
-    images = await run_in_threadpool(
-        sd_client.txt2img,
-        positive=p["positive"],
-        negative=p.get("negative", ""),
-        width=p.get("width", 512),
-        height=p.get("height", 512),
-        steps=p.get("steps", 20),
-        cfg_scale=p.get("cfg_scale", 7.0),
-        sampler=p.get("sampler", "Euler a"),
-        seed=p.get("seed", -1),
-        batch_size=min(p.get("batch_size", 1), 4),
-        model=p.get("model", ""),
-        loras=p.get("loras", ""),
-        enable_hr=p.get("enable_hr", False),
-        hr_scale=p.get("hr_scale", 2.0),
-        hr_upscaler=p.get("hr_upscaler", "R-ESRGAN 4x+"),
-        hr_second_pass_steps=p.get("hr_second_pass_steps", 0),
-        hr_denoising_strength=p.get("hr_denoising_strength", 0.7),
-    )
+    variations = _prompt_variations(p)
+    images: list[str] = []
+    saved_files: list[dict] = []
+    for positive in variations:
+        generated = await run_in_threadpool(
+            sd_client.txt2img,
+            positive=positive,
+            negative=p.get("negative", ""),
+            width=p.get("width", 512),
+            height=p.get("height", 512),
+            steps=p.get("steps", 20),
+            cfg_scale=p.get("cfg_scale", 7.0),
+            sampler=p.get("sampler", "Euler a"),
+            seed=p.get("seed", -1),
+            batch_size=1 if p.get("expand_wildcards", False) else min(p.get("batch_size", 1), 4),
+            model=p.get("model", ""),
+            loras=p.get("loras", ""),
+            enable_hr=p.get("enable_hr", False),
+            hr_scale=p.get("hr_scale", 2.0),
+            hr_upscaler=p.get("hr_upscaler", "R-ESRGAN 4x+"),
+            hr_second_pass_steps=p.get("hr_second_pass_steps", 0),
+            hr_denoising_strength=p.get("hr_denoising_strength", 0.7),
+        )
+        images.extend(generated)
+        saved_files.extend(
+            await run_in_threadpool(
+                sd_client.save_images,
+                images=generated,
+                positive=positive,
+                negative=p.get("negative", ""),
+                width=p.get("width", 512),
+                height=p.get("height", 512),
+                steps=p.get("steps", 20),
+                cfg_scale=p.get("cfg_scale", 7.0),
+                sampler=p.get("sampler", "Euler a"),
+                seed=p.get("seed", -1),
+                model=_generated_model(generated, p.get("model", "")),
+                loras=p.get("loras", ""),
+                template=p["positive"] if p.get("expand_wildcards", False) else "",
+            )
+        )
     await update_progress(0.8)
-
-    saved_files = await run_in_threadpool(
-        sd_client.save_images,
-        images=images,
-        positive=p["positive"],
-        negative=p.get("negative", ""),
-        width=p.get("width", 512),
-        height=p.get("height", 512),
-        steps=p.get("steps", 20),
-        cfg_scale=p.get("cfg_scale", 7.0),
-        sampler=p.get("sampler", "Euler a"),
-        seed=p.get("seed", -1),
-        model=_generated_model(images, p.get("model", "")),
-        loras=p.get("loras", ""),
-    )
     await update_progress(1.0)
 
     result: dict = {
@@ -72,6 +89,8 @@ async def handle_txt2img(job, update_progress):
         result["warnings"] = [
             f"{len(images) - len(saved_files)} of {len(images)} generated image(s) could not be saved to disk."
         ]
+    if p.get("expand_wildcards", False):
+        result["expanded_prompts"] = variations
     return result
 
 
@@ -83,42 +102,50 @@ async def handle_multi_model(job, update_progress):
         raise ValueError("No models specified")
 
     results = []
+    variations = _prompt_variations(p)
     for i, model in enumerate(models):
         await update_progress(i / len(models))
         try:
-            images = await run_in_threadpool(
-                sd_client.txt2img,
-                positive=p["positive"],
-                negative=p.get("negative", ""),
-                width=p.get("width", 512),
-                height=p.get("height", 512),
-                steps=p.get("steps", 20),
-                cfg_scale=p.get("cfg_scale", 7.0),
-                sampler=p.get("sampler", "Euler a"),
-                seed=p.get("seed", -1),
-                batch_size=min(p.get("batch_size", 1), 4),
-                model=model,
-                loras=p.get("loras", ""),
-                enable_hr=p.get("enable_hr", False),
-                hr_scale=p.get("hr_scale", 2.0),
-                hr_upscaler=p.get("hr_upscaler", "R-ESRGAN 4x+"),
-                hr_second_pass_steps=p.get("hr_second_pass_steps", 0),
-                hr_denoising_strength=p.get("hr_denoising_strength", 0.7),
-            )
-            saved_files = await run_in_threadpool(
-                sd_client.save_images,
-                images=images,
-                positive=p["positive"],
-                negative=p.get("negative", ""),
-                width=p.get("width", 512),
-                height=p.get("height", 512),
-                steps=p.get("steps", 20),
-                cfg_scale=p.get("cfg_scale", 7.0),
-                sampler=p.get("sampler", "Euler a"),
-                seed=p.get("seed", -1),
-                model=_generated_model(images, model),
-                loras=p.get("loras", ""),
-            )
+            images: list[str] = []
+            saved_files: list[dict] = []
+            for positive in variations:
+                generated = await run_in_threadpool(
+                    sd_client.txt2img,
+                    positive=positive,
+                    negative=p.get("negative", ""),
+                    width=p.get("width", 512),
+                    height=p.get("height", 512),
+                    steps=p.get("steps", 20),
+                    cfg_scale=p.get("cfg_scale", 7.0),
+                    sampler=p.get("sampler", "Euler a"),
+                    seed=p.get("seed", -1),
+                    batch_size=1 if p.get("expand_wildcards", False) else min(p.get("batch_size", 1), 4),
+                    model=model,
+                    loras=p.get("loras", ""),
+                    enable_hr=p.get("enable_hr", False),
+                    hr_scale=p.get("hr_scale", 2.0),
+                    hr_upscaler=p.get("hr_upscaler", "R-ESRGAN 4x+"),
+                    hr_second_pass_steps=p.get("hr_second_pass_steps", 0),
+                    hr_denoising_strength=p.get("hr_denoising_strength", 0.7),
+                )
+                images.extend(generated)
+                saved_files.extend(
+                    await run_in_threadpool(
+                        sd_client.save_images,
+                        images=generated,
+                        positive=positive,
+                        negative=p.get("negative", ""),
+                        width=p.get("width", 512),
+                        height=p.get("height", 512),
+                        steps=p.get("steps", 20),
+                        cfg_scale=p.get("cfg_scale", 7.0),
+                        sampler=p.get("sampler", "Euler a"),
+                        seed=p.get("seed", -1),
+                        model=_generated_model(generated, model),
+                        loras=p.get("loras", ""),
+                        template=p["positive"] if p.get("expand_wildcards", False) else "",
+                    )
+                )
             model_result: dict = {
                 "model": model,
                 "success": True,
@@ -130,6 +157,8 @@ async def handle_multi_model(job, update_progress):
                 model_result["warnings"] = [
                     f"{len(images) - len(saved_files)} of {len(images)} generated image(s) could not be saved to disk."
                 ]
+            if p.get("expand_wildcards", False):
+                model_result["expanded_prompts"] = variations
             results.append(model_result)
         except Exception as e:
             results.append({"model": model, "success": False, "error": str(e)})

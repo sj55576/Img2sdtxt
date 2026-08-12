@@ -203,6 +203,14 @@ def test_different_seeds_can_differ():
     assert len(results) > 1
 
 
+def test_expand_variations_is_distinct_and_seeded():
+    template = "{a|b|c|d|e|f|g|h|i|j}"
+    first = dp.expand_variations(template, count=4, seed=10)
+    second = dp.expand_variations(template, count=4, seed=10)
+    assert first == second
+    assert len(first) == 4
+
+
 def test_preview_seed_deterministic(wildcards_dir):
     _write_wildcard(wildcards_dir, "colors", ["red", "green", "blue"])
     template = "{a|b} __colors__"

@@ -9,6 +9,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
+import dynamic_prompts as dp
 from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import _validate_image_bytes, sd_client
 from models import SDGenerateRequest, SDMultiModelRequest
@@ -36,6 +37,55 @@ def _generation_response(images: List[str], saved_files: List[dict]) -> dict:
 def _generated_model(images: List[str], requested_model: str) -> str:
     """Use the checkpoint confirmed by SDClient when metadata is saved."""
     return getattr(images, "model", requested_model)
+
+
+async def _generate_wildcard_variations(request: Any, model: str) -> tuple[List[str], List[dict], List[str]]:
+    """Generate and persist one SD request per dynamic-prompt expansion."""
+    templates = dp.expand_variations(
+        request.positive, request.batch_size, seed=None if request.seed == -1 else request.seed
+    )
+    all_images: List[str] = []
+    saved_files: List[dict] = []
+    for positive in templates:
+        images = await run_in_threadpool(
+            sd_client.txt2img,
+            positive=positive,
+            negative=request.negative,
+            width=request.width,
+            height=request.height,
+            steps=request.steps,
+            cfg_scale=request.cfg_scale,
+            sampler=request.sampler,
+            seed=request.seed,
+            batch_size=1,
+            model=model,
+            loras=request.loras,
+            enable_hr=request.enable_hr,
+            hr_scale=request.hr_scale,
+            hr_upscaler=request.hr_upscaler,
+            hr_second_pass_steps=request.hr_second_pass_steps,
+            hr_denoising_strength=request.hr_denoising_strength,
+            controlnet_args=getattr(request, "controlnet_args", None),
+        )
+        all_images.extend(images)
+        saved_files.extend(
+            await run_in_threadpool(
+                sd_client.save_images,
+                images=images,
+                positive=positive,
+                negative=request.negative,
+                width=request.width,
+                height=request.height,
+                steps=request.steps,
+                cfg_scale=request.cfg_scale,
+                sampler=request.sampler,
+                seed=request.seed,
+                model=_generated_model(images, model),
+                loras=request.loras,
+                template=request.positive,
+            )
+        )
+    return all_images, saved_files, templates
 
 
 # CLIP Interrogator / WD14 タガー系のモデル選択肢
@@ -198,6 +248,13 @@ def sd_controlnet_modules():
 @router.post("/generate")
 async def sd_generate(request: SDGenerateRequest):
     try:
+        expanded_prompts: List[str] = []
+        if request.expand_wildcards:
+            images, saved_files, expanded_prompts = await _generate_wildcard_variations(request, request.model)
+            response = _generation_response(images, saved_files)
+            response["expanded_prompts"] = expanded_prompts
+            return response
+
         images = await run_in_threadpool(
             sd_client.txt2img,
             positive=request.positive,
@@ -438,6 +495,15 @@ async def sd_generate_multi_model(request: SDMultiModelRequest):
     results = []
     for model in request.models:
         try:
+            if request.expand_wildcards:
+                images, saved_files, expanded_prompts = await _generate_wildcard_variations(request, model)
+                model_result = {
+                    "model": model,
+                    **_generation_response(images, saved_files),
+                    "expanded_prompts": expanded_prompts,
+                }
+                results.append(model_result)
+                continue
             images = await run_in_threadpool(
                 sd_client.txt2img,
                 positive=request.positive,

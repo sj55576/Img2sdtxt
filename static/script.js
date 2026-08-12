@@ -14,6 +14,7 @@ let _gallerySelectedPaths = new Set();
 // Gallery modal navigation
 let _galleryImages = [];
 let _galleryCurrentIndex = -1;
+let _galleryModalTrigger = null;
 
 // PNG Info page
 let pngInfoImage = null;
@@ -657,6 +658,10 @@ function setupGeneratePage() {
             document.querySelectorAll('.inner-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.inner-content').forEach(c => c.classList.remove('active'));
             tab.classList.add('active');
+            tab.setAttribute('aria-selected', 'true');
+            document.querySelectorAll('.inner-tab').forEach(t => {
+                if (t !== tab) t.setAttribute('aria-selected', 'false');
+            });
             document.getElementById(currentTab).classList.add('active');
             updateGenerateBtn();
         });
@@ -711,6 +716,9 @@ function setupGeneratePage() {
 
     // Text input enable button
     document.getElementById('description-input').addEventListener('input', updateGenerateBtn);
+
+    const blendInput = document.getElementById('blend-image-input');
+    blendInput?.addEventListener('change', updateBlendRoles);
 
     // Generate button
     document.getElementById('generate-btn').addEventListener('click', generatePrompt);
@@ -782,7 +790,12 @@ function clearSingleImage() {
 function updateGenerateBtn() {
     const btn = document.getElementById('generate-btn');
     const multiBtn = document.getElementById('generate-and-multi-btn');
-    const enabled = currentTab === 'tab-img' ? !!selectedImage : !!document.getElementById('description-input').value.trim();
+    const blendFiles = document.getElementById('blend-image-input')?.files;
+    const enabled = currentTab === 'tab-img'
+        ? !!selectedImage
+        : currentTab === 'tab-blend'
+            ? !!blendFiles && blendFiles.length >= 2 && blendFiles.length <= 3
+            : !!document.getElementById('description-input').value.trim();
     btn.disabled = !enabled;
     if (multiBtn) multiBtn.disabled = !enabled;
 }
@@ -875,6 +888,10 @@ async function generatePromptViaStream({ isImageTab, style, tone, quality, prese
 }
 
 async function generatePrompt() {
+    if (currentTab === 'tab-blend') {
+        await generateBlendedPrompt();
+        return;
+    }
     const loading = document.getElementById('loading-generate');
     const resultBox = document.getElementById('result-box');
 
@@ -950,6 +967,69 @@ async function generatePrompt() {
         document.getElementById('stream-preview')?.classList.add('hidden');
         document.getElementById('cancel-stream-btn')?.classList.add('hidden');
         streamAbort = null;
+    }
+}
+
+function updateBlendRoles() {
+    const files = Array.from(document.getElementById('blend-image-input')?.files || []);
+    const fields = document.getElementById('blend-role-fields');
+    if (!fields) return;
+    if (files.length > 3) {
+        toast('参照画像は3枚までです', 'error');
+        document.getElementById('blend-image-input').value = '';
+        fields.replaceChildren();
+        updateGenerateBtn();
+        return;
+    }
+    const defaults = ['被写体・構図', '背景・画風', '補助要素'];
+    fields.replaceChildren();
+    files.forEach((file, index) => {
+        const label = document.createElement('label');
+        label.textContent = `${file.name} の役割`;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'blend-role-input';
+        input.maxLength = 80;
+        input.value = defaults[index];
+        input.setAttribute('aria-label', `${file.name} の役割`);
+        label.appendChild(input);
+        fields.appendChild(label);
+    });
+    updateGenerateBtn();
+}
+
+async function generateBlendedPrompt() {
+    const files = Array.from(document.getElementById('blend-image-input')?.files || []);
+    const roles = Array.from(document.querySelectorAll('.blend-role-input')).map(input => input.value.trim());
+    if (files.length < 2 || files.length > 3 || roles.some(role => !role)) {
+        toast('2〜3枚の画像と各画像の役割を指定してください', 'error');
+        return;
+    }
+    const loading = document.getElementById('loading-generate');
+    const resultBox = document.getElementById('result-box');
+    loading.classList.remove('hidden');
+    resultBox.classList.add('hidden');
+    try {
+        const fd = new FormData();
+        files.forEach(file => fd.append('files', file));
+        roles.forEach(role => fd.append('roles', role));
+        fd.append('style', document.getElementById('select-style').value);
+        fd.append('tone', document.getElementById('select-tone').value);
+        fd.append('quality', document.getElementById('select-quality').value);
+        fd.append('preset_id', document.getElementById('select-preset').value);
+        const response = await fetch('/api/generate-prompts-blend', { method: 'POST', body: fd });
+        if (!response.ok) throw new Error((await response.json()).detail || '合成に失敗しました');
+        const data = (await response.json()).data;
+        document.getElementById('pos-prompt').value = data.positive;
+        document.getElementById('neg-prompt').value = data.negative;
+        updateTokenCounter('pos-prompt', 'positive-output-tokens');
+        updateTokenCounter('neg-prompt', 'negative-output-tokens');
+        resultBox.classList.remove('hidden');
+        toast('参照画像を合成したプロンプトを生成しました', 'success');
+    } catch (e) {
+        toast(e.message || '合成に失敗しました', 'error');
+    } finally {
+        loading.classList.add('hidden');
     }
 }
 
@@ -1795,6 +1875,7 @@ async function runSDGenerate() {
         hr_upscaler: document.getElementById('sd-hr-upscaler').value,
         hr_second_pass_steps: parseInt(document.getElementById('sd-hr-steps').value),
         hr_denoising_strength: parseFloat(document.getElementById('sd-hr-denoising').value)
+        , expand_wildcards: document.getElementById('sd-expand-wildcards').checked
     };
 
     // Save parameters for next startup (excludes controlnet_args: may contain a large image blob)
@@ -1999,6 +2080,7 @@ async function runMultiModelGenerate() {
         hr_upscaler: document.getElementById('sd-hr-upscaler').value,
         hr_second_pass_steps: parseInt(document.getElementById('sd-hr-steps').value),
         hr_denoising_strength: parseFloat(document.getElementById('sd-hr-denoising').value),
+        expand_wildcards: document.getElementById('sd-expand-wildcards').checked,
     };
 
     // 全モデル分のプレースホルダーカードを事前に作成
@@ -3631,6 +3713,10 @@ async function loadGallery(offset = 0, forceRefresh = false) {
             const shortPrompt = prompt.length > 60 ? prompt.slice(0, 60) + '…' : prompt;
             const div = document.createElement('div');
             div.className = 'gallery-item';
+            div.tabIndex = 0;
+            div.setAttribute('role', _gallerySelectionMode ? 'checkbox' : 'button');
+            div.setAttribute('aria-label', `${img.filename}${shortPrompt ? `: ${shortPrompt}` : ''}`);
+            if (_gallerySelectionMode) div.setAttribute('aria-checked', String(_gallerySelectedPaths.has(img.url)));
             if (_gallerySelectionMode && _gallerySelectedPaths.has(img.url)) {
                 div.classList.add('selected');
             }
@@ -3645,6 +3731,12 @@ async function loadGallery(offset = 0, forceRefresh = false) {
                     updateGallerySelectedCount();
                 } else {
                     openGalleryModal(JSON.stringify(img));
+                }
+            });
+            div.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    div.click();
                 }
             });
             div.innerHTML = `
@@ -3686,6 +3778,7 @@ function openGalleryModal(imgJsonStr) {
     const modalTitle = document.getElementById('gallery-modal-title');
     const modalDownload = document.getElementById('gallery-modal-download');
     const modalParams = document.getElementById('gallery-modal-params');
+    if (!modal.classList.contains('hidden')) _galleryModalTrigger = document.activeElement;
 
     modalImg.src = img.url;
     modalTitle.textContent = img.filename;
@@ -3776,6 +3869,7 @@ function openGalleryModal(imgJsonStr) {
     }
 
     modal.classList.remove('hidden');
+    document.getElementById('gallery-modal-close')?.focus();
 }
 
 function galleryNavigate(direction) {
@@ -3894,6 +3988,8 @@ async function loadGalleryFilters() {
 function closeGalleryModal() {
     document.getElementById('gallery-modal').classList.add('hidden');
     document.getElementById('gallery-modal-image').src = '';
+    _galleryModalTrigger?.focus();
+    _galleryModalTrigger = null;
 }
 
 /* =====================================================================

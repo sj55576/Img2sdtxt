@@ -53,6 +53,11 @@ def client():
         "negative": "test negative",
         "status": "success",
     }
+    mock_pg.generate_blended_prompts.return_value = {
+        "positive": "blended positive",
+        "negative": "blended negative",
+        "status": "success",
+    }
     mock_pg.refine_prompt.return_value = {
         "positive": "refined",
         "negative": "refined neg",
@@ -95,6 +100,31 @@ def test_sd_generate_bad_steps_returns_422(client):
     payload = {"positive": "a cat", "steps": "not_a_number"}
     response = client.post("/api/sd/generate", json=payload)
     assert response.status_code == 422
+
+
+def test_generate_prompts_blend_accepts_two_images(client):
+    response = client.post(
+        "/api/generate-prompts-blend",
+        files=[
+            ("files", ("subject.png", _make_png_bytes(), "image/png")),
+            ("files", ("style.png", _make_png_bytes(), "image/png")),
+        ],
+        data={"roles": ["subject", "background style"]},
+    )
+    assert response.status_code == 200
+    assert response.json()["data"]["positive"] == "blended positive"
+
+
+def test_generate_prompts_blend_rejects_mismatched_roles(client):
+    response = client.post(
+        "/api/generate-prompts-blend",
+        files=[
+            ("files", ("subject.png", _make_png_bytes(), "image/png")),
+            ("files", ("style.png", _make_png_bytes(), "image/png")),
+        ],
+        data={"roles": "subject"},
+    )
+    assert response.status_code == 400
 
 
 def test_sd_generate_bad_cfg_scale_returns_422(client):

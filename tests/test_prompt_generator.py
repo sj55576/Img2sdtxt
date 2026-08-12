@@ -125,6 +125,23 @@ class TestGeneratePromptsFromImage:
         assert result["provider"] == "gemini"
         assert result["model"] == "gemini-test"
 
+    def test_blend_uses_one_contact_sheet_and_includes_roles(self):
+        response = '{"positive": "hero, watercolor", "negative": "blurry"}'
+        gen = _make_generator(response)
+        result = gen.generate_blended_prompts(
+            [self._make_png_bytes(), self._make_png_bytes()], ["subject", "background style"]
+        )
+        assert result["status"] == "success"
+        prompt, contact_sheet = gen.llm_client.generate_response_with_image.call_args.args
+        assert "subject" in prompt
+        assert "background style" in prompt
+        assert contact_sheet.startswith(b"\x89PNG")
+
+    def test_blend_requires_matching_two_to_three_references(self):
+        gen = _make_generator("{}")
+        result = gen.generate_blended_prompts([self._make_png_bytes()], ["subject"])
+        assert result["status"] == "error"
+
 
 # ------------------------------------------------------------------ #
 # refine_prompt

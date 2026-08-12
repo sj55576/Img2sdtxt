@@ -438,6 +438,74 @@ async def generate_prompts_batch(
     return {"success": True, "results": results, "total": len(files), "processed": len(results)}
 
 
+@router.post("/generate-prompts-blend")
+async def generate_prompts_blend(
+    files: List[UploadFile] = File(...),
+    roles: List[str] = Form(...),
+    style: str = Form(""),
+    tone: str = Form(""),
+    quality: str = Form("high"),
+    preset_id: str = Form(""),
+    save_history: bool = Form(True),
+):
+    """Create one prompt from 2–3 labelled reference images."""
+    if not 2 <= len(files) <= 3:
+        raise HTTPException(status_code=400, detail="Provide 2 to 3 reference images.")
+    if len(roles) != len(files):
+        raise HTTPException(status_code=400, detail="Provide one role for each reference image.")
+    cleaned_roles = [role.strip() for role in roles]
+    if any(not role or len(role) > 80 for role in cleaned_roles):
+        raise HTTPException(status_code=400, detail="Each reference role must be 1 to 80 characters.")
+
+    style = validate_style(style)
+    tone = validate_tone(tone)
+    quality = validate_quality(quality)
+    contents_list: list[bytes] = []
+    for file in files:
+        if file.content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail="Invalid image type.")
+        contents = await file.read()
+        if len(contents) > MAX_IMAGE_SIZE:
+            raise HTTPException(status_code=400, detail="Image too large (max 10MB).")
+        _validate_image_bytes(contents)
+        contents_list.append(contents)
+
+    preset = preset_mgr.get_preset(preset_id) if preset_id else None
+    result = await run_in_threadpool(
+        deps.prompt_generator.generate_blended_prompts,
+        contents_list,
+        cleaned_roles,
+        style or (preset.get("style", "") if preset else ""),
+        tone or (preset.get("tone", "") if preset else ""),
+        quality or (preset.get("quality", "high") if preset else "high"),
+        preset.get("positive_suffix", "") if preset else "",
+        preset.get("negative_suffix", "") if preset else "",
+    )
+    if result.get("status") == "error":
+        raise HTTPException(status_code=500, detail=result.get("error", "Prompt generation failed."))
+
+    history_id = None
+    if save_history:
+        history_id = hist.save_history(
+            positive=result["positive"],
+            negative=result["negative"],
+            image_name=", ".join(file.filename or "[image]" for file in files),
+            style=style,
+            tone=tone,
+            quality=quality,
+            provider=str(result.get("provider") or ""),
+            model=str(result.get("model") or ""),
+        )
+    data: dict = {"positive": result["positive"], "negative": result["negative"], "roles": cleaned_roles}
+    for key in ("provider", "model"):
+        if result.get(key):
+            data[key] = result[key]
+    response: dict = {"success": True, "data": data}
+    if history_id is not None:
+        response["history_id"] = history_id
+    return response
+
+
 # ------------------------------------------------------------------ #
 # Prompt Generation (text)
 # ------------------------------------------------------------------ #

@@ -470,6 +470,9 @@ textarea { resize: vertical; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
 .modal.hidden { display: none; }
 .modal-box { background: linear-gradient(135deg, var(--modal-bg-a), var(--modal-bg-b)); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+.blend-role-fields { display: grid; gap: 8px; }
+.blend-role-fields label { display: grid; gap: 4px; font-size: 0.85rem; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .modal-box h3 { font-size: 1.1rem; margin-bottom: 18px; }
 .modal-box .form-group { margin-bottom: 14px; }
 .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
