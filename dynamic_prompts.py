@@ -290,6 +290,18 @@ def expand_prompt(template: str, wildcards_dir: Optional[Path] = None, seed: Opt
     return _postprocess_escapes(result)
 
 
+def expand_variations(
+    template: str, count: int, wildcards_dir: Optional[Path] = None, seed: Optional[int] = None
+) -> List[str]:
+    """Expand a template once for each requested image.
+
+    A supplied seed produces a stable, distinct sequence, while ``None``
+    keeps each expansion random.  Keeping this in the expansion engine makes
+    synchronous API calls and queued jobs behave identically.
+    """
+    return [expand_prompt(template, wildcards_dir, None if seed is None else seed + index) for index in range(count)]
+
+
 def count_combinations(template: str, wildcards_dir: Optional[Path] = None) -> int:
     """Count the number of possible combinations without expanding.
 

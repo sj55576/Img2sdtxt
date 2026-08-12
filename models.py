@@ -33,6 +33,7 @@ class SDGenerateRequest(BaseModel):
     hr_second_pass_steps: int = Field(0, ge=0, le=150, description="Hires.fix second pass steps")
     hr_denoising_strength: float = Field(0.7, ge=0.0, le=1.0, description="Hires.fix denoising")
     controlnet_args: Optional[List[dict]] = Field(None, description="ControlNet unit arguments")
+    expand_wildcards: bool = Field(False, description="Expand dynamic prompt syntax once per generated image")
 
 
 class SDMultiModelRequest(BaseModel):
@@ -52,6 +53,7 @@ class SDMultiModelRequest(BaseModel):
     hr_upscaler: str = Field("R-ESRGAN 4x+")
     hr_second_pass_steps: int = Field(0, ge=0, le=150)
     hr_denoising_strength: float = Field(0.7, ge=0.0, le=1.0)
+    expand_wildcards: bool = Field(False, description="Expand dynamic prompt syntax once per generated image")
 
 
 class XYPlotAxis(BaseModel):

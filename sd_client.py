@@ -466,6 +466,7 @@ class SDClient:
         loras: str = "",
         mode: str = "txt2img",
         denoising_strength: float = 0.75,
+        template: str = "",
     ) -> List[Dict]:
         """
         生成された画像（Base64エンコード）を保存
@@ -548,6 +549,8 @@ class SDClient:
                 "model": model,
                 "loras": loras,
             }
+            if template:
+                params["template"] = template
             if mode in ("img2img", "inpaint"):
                 params["denoising_strength"] = denoising_strength
 

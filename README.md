@@ -14,6 +14,7 @@ It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API*
 | Feature | Description |
 |---------|-------------|
 | 📸 **Single Image → Prompt** | Upload one image to generate positive & negative prompts |
+| 🧩 **Blend References** | Combine 2–3 labelled reference images into one prompt |
 | 🗂️ **Batch Processing** | Upload up to 10 images and generate prompts for all at once |
 | ✍️ **Text → Prompt** | Describe an image in plain text and get SD prompts |
 | ✨ **Prompt Refinement** | Refine and enhance existing prompts with LLM (optional custom instruction) |
@@ -31,7 +32,7 @@ It also integrates directly with the **AUTOMATIC1111 Stable Diffusion WebUI API*
 | 📁 **Random Folder Load** | Pick a random image from a local folder |
 | 🖥️ **CLI Batch Mode** | Process a whole directory of images from the command line |
 | 👁️ **CLI Watch Mode** | Monitor a folder and auto-process new images as they arrive |
-| 🧩 **Dynamic Prompts** | Expand `{a|b}` groups and `__wildcard__` files for prompt variants |
+| 🧩 **Dynamic Prompts** | Expand `{a|b}` groups and `__wildcard__` files for prompt variants, including once per SD output |
 | 🎛️ **ControlNet** | Configure ControlNet models, preprocessors, and reference images from the UI |
 | 🧪 **A/B Comparison & XY Plot** | Compare prompt variants and Stable Diffusion parameter grids |
 | ⏳ **Job Queue** | Queue generation jobs with priority, ETA, cancellation, and WebSocket updates |
@@ -531,6 +532,7 @@ when the server is running. The table below lists the public routes by area.
 |--------|------|-------------|
 | `POST` | `/api/generate-prompts` | Single image → prompts |
 | `POST` | `/api/generate-prompts-batch` | Up to 10 images → independent prompts |
+| `POST` | `/api/generate-prompts-blend` | 2–3 labelled reference images → one combined prompt |
 | `POST` | `/api/generate-prompts-stream` | SSE prompt generation |
 | `POST` | `/api/generate-prompts-text` | Text description → prompts |
 | `POST` | `/api/generate-prompts-compare` | Compare prompt variants |

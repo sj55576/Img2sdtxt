@@ -1,7 +1,10 @@
 import json
 import logging
 import time
+from io import BytesIO
 from typing import Any, Dict
+
+from PIL import Image, ImageOps
 
 from config import DEFAULT_NEGATIVE_TAGS, QUALITY_LEVELS
 from fallback import response_identity
@@ -129,6 +132,51 @@ JSON形式のみで返してください：
 
 注意: JSONのみ返してください。"""
 
+    def build_blend_analysis_prompt(
+        self, roles: list[str], style: str = "", tone: str = "", quality: str = "high"
+    ) -> str:
+        """Build an analysis prompt for a labelled multi-reference contact sheet."""
+        style_instruction = self._build_style_instruction(style, tone, quality)
+        customization = f"\n\nカスタマイズ設定:\n{style_instruction}" if style_instruction else ""
+        references = "\n".join(f"- 画像 {index + 1}: {role}" for index, role in enumerate(roles))
+        return f"""提供された画像は、上から順に並べた複数の参照画像です。画像ごとの役割を守り、要素を矛盾なく組み合わせたStable Diffusion用プロンプトを生成してください。{customization}
+
+参照画像の役割:
+{references}
+
+JSON形式のみで返してください：
+{{
+  "positive": "ポジティブプロンプト (英語のカンマ区切りタグ形式)",
+  "negative": "ネガティブプロンプト (英語のカンマ区切りタグ形式)"
+}}
+
+ポジティブには各役割に対応する要素、スタイルタグ、品質タグを含め、ネガティブには lowres, bad anatomy, bad hands, text, error, worst quality, low quality, blurry を含めてください。
+注意: JSONのみ返してください。"""
+
+    @staticmethod
+    def _make_reference_contact_sheet(images: list[bytes]) -> bytes:
+        """Place reference images in a bounded vertical sheet for vision APIs."""
+        rendered: list[Image.Image] = []
+        try:
+            for data in images:
+                with Image.open(BytesIO(data)) as source:
+                    image = ImageOps.exif_transpose(source).convert("RGB")
+                    image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+                    rendered.append(image.copy())
+            width = max(image.width for image in rendered)
+            height = sum(image.height for image in rendered) + 8 * (len(rendered) - 1)
+            sheet = Image.new("RGB", (width, height), "white")
+            y = 0
+            for image in rendered:
+                sheet.paste(image, ((width - image.width) // 2, y))
+                y += image.height + 8
+            output = BytesIO()
+            sheet.save(output, format="PNG", optimize=True)
+            return output.getvalue()
+        finally:
+            for image in rendered:
+                image.close()
+
     def finalize_response(
         self,
         response_text: str,
@@ -212,6 +260,40 @@ JSON形式のみで返してください：
 
         except Exception as e:
             logger.error("generate_prompts error: %s", str(e))
+            return {"positive": "", "negative": "", "error": str(e), "status": "error"}
+
+    def generate_blended_prompts(
+        self,
+        images: list[bytes],
+        roles: list[str],
+        style: str = "",
+        tone: str = "",
+        quality: str = "high",
+        preset_suffix_positive: str = "",
+        preset_suffix_negative: str = "",
+    ) -> Dict[str, str]:
+        """Generate one prompt from 2–3 labelled image references."""
+        if len(images) < 2 or len(images) > 3 or len(images) != len(roles):
+            return {
+                "positive": "",
+                "negative": "",
+                "error": "Provide 2 to 3 images and matching roles.",
+                "status": "error",
+            }
+        try:
+            prompt = self.build_blend_analysis_prompt(roles, style, tone, quality)
+            sheet = self._make_reference_contact_sheet(images)
+            response_text, provider_name, model = self._invoke_llm(
+                self.llm_client.generate_response_with_image, "vision_blend", prompt, sheet
+            )
+            if not response_text:
+                raise ValueError("LLMからレスポンスがありません")
+            result = self.finalize_response(response_text, preset_suffix_positive, preset_suffix_negative)
+            result["provider"] = provider_name
+            result["model"] = model
+            return result
+        except Exception as e:
+            logger.error("generate_blended_prompts error: %s", str(e))
             return {"positive": "", "negative": "", "error": str(e), "status": "error"}
 
     def refine_prompt(
