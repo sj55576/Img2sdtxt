@@ -1296,6 +1296,7 @@ async function loadHistory() {
                         ${item.parent_id ? '<span class="version-chain-badge" title="バージョン管理中">🌿</span>' : ''}<br>
                         ${item.style ? `<span>${escHtml(item.style)}</span> · ` : ''}
                         ${item.quality ? `<span>${escHtml(item.quality)}</span> · ` : ''}
+                        ${item.provider ? `<span class="history-item-provider" title="生成に使用したプロバイダー / モデル">🤖 ${escHtml(item.provider)}${item.model ? ` (${escHtml(item.model)})` : ''}</span> · ` : ''}
                         ${item.created_at ? `<span>${new Date(item.created_at).toLocaleString('ja-JP')}</span>` : ''}
                     </div>
                     <div class="history-item-actions">
