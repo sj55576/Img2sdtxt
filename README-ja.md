@@ -89,7 +89,7 @@ bash run.sh
 
 ```bash
 # 1. リポジトリをクローン
-git clone https://github.com/sj55576/Img2sdtxt.git
+git clone https://github.com/kumakumapon/Img2sdtxt.git
 cd Img2sdtxt
 
 # 2. 依存パッケージをインストール

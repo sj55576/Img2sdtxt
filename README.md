@@ -91,7 +91,7 @@ Both scripts automatically create a virtual environment, install dependencies, g
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/sj55576/Img2sdtxt.git
+git clone https://github.com/kumakumapon/Img2sdtxt.git
 cd Img2sdtxt
 
 # 2. Install dependencies
