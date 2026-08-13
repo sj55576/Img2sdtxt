@@ -45,6 +45,19 @@ class TestParseJsonResponse:
         result = gen._parse_json_response(raw)
         assert result["positive"] == "sky"
 
+    def test_json_with_surrounding_prose(self):
+        """小型モデルが JSON の前後に説明文を付けても抽出できる"""
+        gen = _make_generator("")
+        raw = 'はい、生成しました。\n{"positive": "forest", "negative": "blurry"}\nご確認ください。'
+        result = gen._parse_json_response(raw)
+        assert result["positive"] == "forest"
+
+    def test_json_in_unclosed_fence_with_prose(self):
+        gen = _make_generator("")
+        raw = 'Here you go:\n```json\n{"positive": "city, {night}", "negative": "text"}\nEnjoy!'
+        result = gen._parse_json_response(raw)
+        assert result["positive"] == "city, {night}"
+
     def test_malformed_json_raises(self):
         gen = _make_generator("")
         import pytest

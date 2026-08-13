@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from io import BytesIO
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from PIL import Image, ImageOps
 
@@ -18,13 +18,54 @@ class PromptGenerator:
     def __init__(self, llm_client: LLMProvider):
         self.llm_client = llm_client
 
+    @staticmethod
+    def _extract_first_json_object(text: str) -> Optional[str]:
+        """最初の ``{`` から対応する ``}`` までを切り出す（文字列リテラル内の括弧は無視）"""
+        start = text.find("{")
+        if start == -1:
+            return None
+        depth = 0
+        in_string = False
+        escaped = False
+        for index in range(start, len(text)):
+            char = text[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start : index + 1]
+        return None
+
     def _parse_json_response(self, text: str) -> Dict:
-        """LLMのレスポンスからJSONを抽出"""
+        """LLMのレスポンスからJSONを抽出
+
+        小型ローカルモデルは JSON の前後に説明文を付けたり、コードフェンスを閉じ忘れたり
+        することがあるため、そのままパースできない場合は最初のJSONオブジェクトを
+        切り出して再試行する。
+        """
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
         elif "```" in text:
             text = text.split("```")[1].split("```")[0]
-        return json.loads(text.strip())
+        text = text.strip()
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            candidate = self._extract_first_json_object(text)
+            if candidate is None:
+                raise
+            return json.loads(candidate)
 
     def _build_style_instruction(self, style: str, tone: str, quality: str) -> str:
         """カスタマイズ設定をプロンプト指示文に変換"""

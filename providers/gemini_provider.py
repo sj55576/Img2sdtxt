@@ -8,6 +8,7 @@ from typing import Iterator, Optional
 import google.generativeai as genai
 from PIL import Image
 
+from config import LLM_MAX_TOKENS
 from llm_provider import LLMProvider
 from retry import retry_with_backoff
 
@@ -55,7 +56,7 @@ class GeminiProvider(LLMProvider):
             return False
 
     @retry_with_backoff(max_retries=2, base_delay=1.0)
-    def generate_response(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
+    def generate_response(self, prompt: str, max_tokens: int = LLM_MAX_TOKENS) -> Optional[str]:
         """Send a text prompt to Gemini and return the generated text."""
         logger.debug("generate_response model=%s", self._model_name)
         t0 = time.time()
@@ -87,7 +88,7 @@ class GeminiProvider(LLMProvider):
         self,
         prompt: str,
         image_bytes: bytes,
-        max_tokens: int = 500,
+        max_tokens: int = LLM_MAX_TOKENS,
     ) -> Optional[str]:
         """Send a prompt with an image to Gemini and return the generated text."""
         logger.debug(
@@ -158,12 +159,12 @@ class GeminiProvider(LLMProvider):
             logger.error("Gemini API streaming error: %s", str(e))
             raise Exception(f"Gemini API error: {str(e)}")
 
-    def generate_response_stream(self, prompt: str, max_tokens: int = 500) -> Iterator[str]:
+    def generate_response_stream(self, prompt: str, max_tokens: int = LLM_MAX_TOKENS) -> Iterator[str]:
         logger.debug("generate_response_stream model=%s", self._model_name)
         yield from self._stream_content(prompt, max_tokens)
 
     def generate_response_with_image_stream(
-        self, prompt: str, image_bytes: bytes, max_tokens: int = 500
+        self, prompt: str, image_bytes: bytes, max_tokens: int = LLM_MAX_TOKENS
     ) -> Iterator[str]:
         logger.debug(
             "generate_response_with_image_stream model=%s image_bytes=%d",
