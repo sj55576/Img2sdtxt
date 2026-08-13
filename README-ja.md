@@ -247,6 +247,7 @@ example.com {
 |------|-----------|------|
 | `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLMサーバーのURL |
 | `LLM_MODEL` | `gpt-3.5-turbo` | 使用するモデル名 |
+| `LLM_MAX_TOKENS` | `1500` | 1応答あたりの生成トークン上限。推論（reasoning）モデルは思考トークンもこの上限を消費するため、小さすぎるとJSONが途中で切れる |
 | `LLM_PROVIDER` | `openai_compatible` | 使用するprovider（`openai_compatible` / `anthropic` / `gemini`） |
 | `LLM_CACHE_ENABLED` | `true` | LLM応答キャッシュを有効化 |
 | `LLM_CACHE_TTL` | `3600` | キャッシュ保持秒数 |

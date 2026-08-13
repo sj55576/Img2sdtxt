@@ -4,6 +4,7 @@ import logging
 import threading
 from typing import Iterator, List, Optional
 
+from config import LLM_MAX_TOKENS
 from llm_provider import LLMProvider
 from metrics import observe_fallback_switch
 
@@ -110,13 +111,15 @@ class FallbackChain(LLMProvider):
         assert last_exc is not None
         raise last_exc
 
-    def generate_response(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
+    def generate_response(self, prompt: str, max_tokens: int = LLM_MAX_TOKENS) -> Optional[str]:
         return self._try_providers(
             self.providers,
             lambda p: p.generate_response(prompt, max_tokens=max_tokens),
         )
 
-    def generate_response_with_image(self, prompt: str, image_bytes: bytes, max_tokens: int = 500) -> Optional[str]:
+    def generate_response_with_image(
+        self, prompt: str, image_bytes: bytes, max_tokens: int = LLM_MAX_TOKENS
+    ) -> Optional[str]:
         return self._try_providers(
             self._vision_providers(),
             lambda p: p.generate_response_with_image(prompt, image_bytes, max_tokens=max_tokens),
@@ -128,7 +131,7 @@ class FallbackChain(LLMProvider):
                 return provider
         return None
 
-    def generate_response_stream(self, prompt: str, max_tokens: int = 500) -> Iterator[str]:
+    def generate_response_stream(self, prompt: str, max_tokens: int = LLM_MAX_TOKENS) -> Iterator[str]:
         provider = self._first_streaming_provider(self.providers)
         if provider is None:
             text = self.generate_response(prompt, max_tokens=max_tokens)
@@ -157,7 +160,7 @@ class FallbackChain(LLMProvider):
                 yield text
 
     def generate_response_with_image_stream(
-        self, prompt: str, image_bytes: bytes, max_tokens: int = 500
+        self, prompt: str, image_bytes: bytes, max_tokens: int = LLM_MAX_TOKENS
     ) -> Iterator[str]:
         vision_providers = self._vision_providers()
         provider = self._first_streaming_provider(vision_providers)

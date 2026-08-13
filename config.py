@@ -8,6 +8,9 @@ load_dotenv()
 # LLM Server Configuration
 LLM_SERVER_URL = os.getenv("LLM_SERVER_URL", "http://localhost:1234/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-3.5-turbo")
+# 1レスポンスあたりの生成トークン上限。推論（reasoning）を行うモデルでは思考トークンも
+# この上限を消費するため、JSON が途中で切れないよう十分な余裕を持たせる。
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "1500"))
 
 # Stable Diffusion API Configuration
 SD_API_URL = os.getenv("SD_API_URL", "http://localhost:7860")
