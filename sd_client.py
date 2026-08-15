@@ -97,6 +97,7 @@ class SDClient:
     def _generate(self, endpoint: str, payload: Dict[str, Any], timeout: int, model: str, operation: str) -> List[str]:
         """Serialize checkpoint selection and a generation request against A1111."""
         status = "error"
+        started = time.monotonic()
         try:
             with self._generation_lock:
                 actual_model = self._switch_model_and_confirm(model) if model else ""
@@ -114,7 +115,7 @@ class SDClient:
         except Exception as e:
             raise Exception(f"SD API error: {str(e)}") from e
         finally:
-            observe_sd_request(endpoint, status)
+            observe_sd_request(endpoint, status, time.monotonic() - started)
 
     def get_model_list(self) -> List[Dict]:
         """利用可能なモデル一覧を取得（get_models に委譲）"""

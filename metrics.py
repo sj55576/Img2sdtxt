@@ -9,7 +9,9 @@ production install ``prometheus-client``.
 
 from __future__ import annotations
 
-from typing import Any
+import threading
+from collections import defaultdict, deque
+from typing import Any, Optional
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, Gauge, Histogram, generate_latest
@@ -76,6 +78,43 @@ def _label(value: Any, default: str = "unknown") -> str:
     return text or default
 
 
+# Recent-outcome tracking for `/health`.  Kept independent of the optional
+# prometheus_client backend (Histograms/Counters are cumulative and don't
+# answer "how is this provider doing right now"), and bounded so it never
+# grows unbounded in a long-running process.
+_RECENT_WINDOW = 50
+_recent_lock = threading.Lock()
+_recent_llm: dict[str, deque[tuple[bool, float]]] = defaultdict(lambda: deque(maxlen=_RECENT_WINDOW))
+_recent_sd: deque[tuple[bool, float]] = deque(maxlen=_RECENT_WINDOW)
+
+
+def _summarize_recent(samples: deque[tuple[bool, float]]) -> dict[str, Any]:
+    if not samples:
+        return {"requests": 0, "success_rate": None, "avg_latency_ms": None}
+    successes = sum(1 for ok, _ in samples if ok)
+    total_latency = sum(duration for _, duration in samples)
+    return {
+        "requests": len(samples),
+        "success_rate": round(successes / len(samples), 4),
+        "avg_latency_ms": round((total_latency / len(samples)) * 1000, 1),
+    }
+
+
+def get_llm_health_stats(provider: str) -> dict[str, Any]:
+    """Recent request count / success rate / avg latency for one LLM provider."""
+    key = _label(provider)
+    with _recent_lock:
+        samples = deque(_recent_llm[key]) if key in _recent_llm else deque()
+    return _summarize_recent(samples)
+
+
+def get_sd_health_stats() -> dict[str, Any]:
+    """Recent request count / success rate / avg latency for the Stable Diffusion API."""
+    with _recent_lock:
+        samples = deque(_recent_sd)
+    return _summarize_recent(samples)
+
+
 def observe_http(method: str, path: str, status: int, duration_seconds: float) -> None:
     if not _PROMETHEUS_AVAILABLE:
         return
@@ -91,15 +130,20 @@ def observe_llm_request(
     status: str,
     duration_seconds: float,
 ) -> None:
-    if not _PROMETHEUS_AVAILABLE:
-        return
     provider_label = _label(provider)
     model_label = _label(model)
+    with _recent_lock:
+        _recent_llm[provider_label].append((status == "success", max(duration_seconds, 0.0)))
+    if not _PROMETHEUS_AVAILABLE:
+        return
     _LLM_REQUESTS.labels(provider_label, model_label, _label(mode), _label(status)).inc()
     _LLM_DURATION.labels(provider_label, model_label).observe(max(duration_seconds, 0.0))
 
 
-def observe_sd_request(endpoint: str, status: str) -> None:
+def observe_sd_request(endpoint: str, status: str, duration_seconds: Optional[float] = None) -> None:
+    if duration_seconds is not None:
+        with _recent_lock:
+            _recent_sd.append((status == "success", max(duration_seconds, 0.0)))
     if _PROMETHEUS_AVAILABLE:
         _SD_REQUESTS.labels(_label(endpoint, "/unknown"), _label(status)).inc()
 

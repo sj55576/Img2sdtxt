@@ -36,6 +36,77 @@ def test_json_formatter_contains_request_id_and_structured_fields():
     assert payload["duration_ms"] == 12.5
 
 
+def _reset_recent_health_metrics():
+    with metrics._recent_lock:
+        metrics._recent_llm.clear()
+        metrics._recent_sd.clear()
+
+
+def test_llm_health_stats_default_to_no_data():
+    _reset_recent_health_metrics()
+    assert metrics.get_llm_health_stats("unused-provider") == {
+        "requests": 0,
+        "success_rate": None,
+        "avg_latency_ms": None,
+    }
+
+
+def test_llm_health_stats_reflect_recent_requests():
+    _reset_recent_health_metrics()
+    metrics.observe_llm_request("acme", "model-1", "vision", "success", 0.2)
+    metrics.observe_llm_request("acme", "model-1", "vision", "success", 0.4)
+    metrics.observe_llm_request("acme", "model-1", "vision", "error", 0.6)
+
+    stats = metrics.get_llm_health_stats("acme")
+
+    assert stats["requests"] == 3
+    assert stats["success_rate"] == pytest.approx(2 / 3, abs=1e-4)
+    assert stats["avg_latency_ms"] == pytest.approx(400.0)
+
+
+def test_sd_health_stats_only_record_when_duration_is_known():
+    _reset_recent_health_metrics()
+    metrics.observe_sd_request("/sdapi/v1/txt2img", "success", 0.5)
+    metrics.observe_sd_request("/sdapi/v1/txt2img", "error", 1.5)
+    metrics.observe_sd_request("/sdapi/v1/interrogate", "success")  # no duration -> not counted
+
+    stats = metrics.get_sd_health_stats()
+
+    assert stats["requests"] == 2
+    assert stats["success_rate"] == pytest.approx(0.5)
+    assert stats["avg_latency_ms"] == pytest.approx(1000.0)
+
+
+def test_health_endpoint_includes_recent_llm_and_sd_stats(monkeypatch):
+    monkeypatch.setattr(config, "RATE_LIMIT_ENABLED", False)
+    _reset_recent_health_metrics()
+    metrics.observe_llm_request("test", "test-model", "vision", "success", 0.1)
+    metrics.observe_sd_request("/sdapi/v1/txt2img", "success", 0.2)
+
+    llm = MagicMock()
+    llm.is_available.return_value = True
+    llm.provider_name = "test"
+    llm.model = "test-model"
+    sd = MagicMock()
+    sd.is_available.return_value = True
+
+    with patch.object(deps, "llm_client", llm), patch.object(deps, "sd_client", sd):
+        with TestClient(app) as client:
+            response = client.get("/health")
+
+    body = response.json()
+    assert body["components"]["llm"]["recent"] == {
+        "requests": 1,
+        "success_rate": 1.0,
+        "avg_latency_ms": 100.0,
+    }
+    assert body["components"]["sd_api"]["recent"] == {
+        "requests": 1,
+        "success_rate": 1.0,
+        "avg_latency_ms": 200.0,
+    }
+
+
 def test_request_id_is_returned_and_health_reflects_sd_failure(monkeypatch):
     monkeypatch.setattr(config, "RATE_LIMIT_ENABLED", False)
     llm = MagicMock()

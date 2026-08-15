@@ -29,7 +29,7 @@ from config import (
 )
 from job_queue import job_queue
 from logging_utils import configure_logging, request_id_context
-from metrics import CONTENT_TYPE_LATEST, observe_http, render_prometheus
+from metrics import CONTENT_TYPE_LATEST, get_llm_health_stats, get_sd_health_stats, observe_http, render_prometheus
 from rate_limit import RateLimitMiddleware
 from routes.backup import router as backup_router
 from routes.compare import router as compare_router
@@ -196,10 +196,12 @@ async def health():
                 "provider": deps.llm_client.provider_name,
                 "model": deps.llm_client.model,
                 "url": config.LLM_SERVER_URL,
+                "recent": get_llm_health_stats(deps.llm_client.provider_name),
             },
             "sd_api": {
                 "available": sd_ok,
                 "url": config.SD_API_URL,
+                "recent": get_sd_health_stats(),
             },
         },
         "uptime_seconds": int(_time.time() - APP_START_TIME),
