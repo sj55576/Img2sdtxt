@@ -45,6 +45,7 @@ from routes.sd import router as sd_router
 from routes.stats import router as stats_router
 from routes.tags import router as tags_router
 from routes.wildcards import router as wildcards_router
+from tracing import configure_tracing
 from webhook import webhook_notifier
 
 configure_logging(getattr(logging, config.LOG_LEVEL.upper(), logging.INFO), json_format=config.LOG_FORMAT == "json")
@@ -74,6 +75,8 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+configure_tracing(app, config.OTEL_SERVICE_NAME, config.OTEL_EXPORTER_OTLP_ENDPOINT)
 
 if CORS_ALLOWED_ORIGINS:
     if "*" in CORS_ALLOWED_ORIGINS and not config.API_TOKEN:

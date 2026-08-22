@@ -3781,6 +3781,7 @@ function openGalleryModal(imgJsonStr) {
     if (!modal.classList.contains('hidden')) _galleryModalTrigger = document.activeElement;
 
     modalImg.src = img.url;
+    modalImg.alt = img.parameters?.positive_prompt || img.filename;
     modalTitle.textContent = img.filename;
     modalDownload.href = img.url;
     modalDownload.download = img.filename;
@@ -4439,6 +4440,7 @@ function setupWildcardsPage() {
     document.getElementById('wc-delete-btn')?.addEventListener('click', wcDelete);
     document.getElementById('wc-preview-btn')?.addEventListener('click', wcPreview);
     document.getElementById('wc-count-btn')?.addEventListener('click', wcCount);
+    document.getElementById('wc-generate-all-btn')?.addEventListener('click', wcGenerateAll);
     document.getElementById('sd-expand-btn')?.addEventListener('click', sdExpandPrompt);
     loadWildcards();
 }
@@ -4571,6 +4573,65 @@ async function wcCount() {
             results.innerHTML = `<div class="wc-combo-count">${data.combination_count} total combinations</div>`;
         }
     } catch {}
+}
+
+async function wcGenerateAll() {
+    const template = document.getElementById('wc-expand-template')?.value?.trim();
+    if (!template) return;
+    const results = document.getElementById('wc-expand-results');
+    const btn = document.getElementById('wc-generate-all-btn');
+    if (btn) btn.disabled = true;
+    results.innerHTML = `<div class="wc-combo-count">${I18n.t('page.wildcards.generating', 'Generating...')}</div>`;
+
+    try {
+        const r = await fetch('/api/jobs/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_type: 'wildcard_batch', params: { positive: template } })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.success) {
+            throw new Error(errDetail(d, I18n.t('page.wildcards.generate_all_failed', 'Failed to submit job')));
+        }
+        await wcPollGenerateAllJob(d.job.id, results);
+    } catch (e) {
+        results.innerHTML = `<div class="wc-error">${escHtml(e.message)}</div>`;
+        toast(e.message, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+async function wcPollGenerateAllJob(jobId, results) {
+    const MAX_POLLS = 200; // ~5 minutes at 1.5s intervals
+    for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        const r = await fetch(`/api/jobs/${jobId}`);
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.success) throw new Error(I18n.t('page.wildcards.generate_all_failed', 'Failed to submit job'));
+        const job = d.job;
+        if (job.status === 'completed') {
+            const result = job.result || {};
+            const images = result.images || [];
+            const prompts = result.expanded_prompts || [];
+            results.innerHTML = `<div class="wc-combo-count">${images.length} image(s) generated</div>`
+                + `<div class="wc-generate-all-grid">${images.map((b64, i) => `
+                    <figure class="wc-generate-all-item">
+                        <img src="data:image/png;base64,${b64}" alt="${escHtml(prompts[i] || '')}">
+                        <figcaption>${escHtml(prompts[i] || '')}</figcaption>
+                    </figure>`).join('')}</div>`;
+            return;
+        }
+        if (job.status === 'failed') {
+            throw new Error(job.error || I18n.t('page.wildcards.generate_all_failed', 'Failed to submit job'));
+        }
+        if (job.status === 'cancelled') {
+            results.innerHTML = `<div class="wc-combo-count">${I18n.t('page.wildcards.generate_all_cancelled', 'Cancelled')}</div>`;
+            return;
+        }
+        results.innerHTML = `<div class="wc-combo-count">${I18n.t('page.wildcards.generating', 'Generating...')} (${job.status})</div>`;
+    }
+    throw new Error(I18n.t('page.wildcards.generate_all_timeout', 'Still running — check back later.'));
 }
 
 async function sdExpandPrompt() {
@@ -4726,6 +4787,7 @@ function addCompareVariant() {
     styleGroup.className = 'form-group';
     const styleLabel = document.createElement('label');
     styleLabel.textContent = I18n.t('page.compare.style_label', 'スタイル');
+    styleLabel.htmlFor = `compare-variant-${seq}-style`;
     styleGroup.appendChild(styleLabel);
     styleGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-style`, COMPARE_STYLE_OPTIONS, ''));
     grid.appendChild(styleGroup);
@@ -4734,6 +4796,7 @@ function addCompareVariant() {
     toneGroup.className = 'form-group';
     const toneLabel = document.createElement('label');
     toneLabel.textContent = I18n.t('page.compare.tone_label', 'トーン');
+    toneLabel.htmlFor = `compare-variant-${seq}-tone`;
     toneGroup.appendChild(toneLabel);
     toneGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-tone`, COMPARE_TONE_OPTIONS, ''));
     grid.appendChild(toneGroup);
@@ -4742,6 +4805,7 @@ function addCompareVariant() {
     qualityGroup.className = 'form-group';
     const qualityLabel = document.createElement('label');
     qualityLabel.textContent = I18n.t('page.compare.quality_label', '品質');
+    qualityLabel.htmlFor = `compare-variant-${seq}-quality`;
     qualityGroup.appendChild(qualityLabel);
     qualityGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-quality`, COMPARE_QUALITY_OPTIONS, 'high'));
     grid.appendChild(qualityGroup);

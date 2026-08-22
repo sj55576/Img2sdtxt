@@ -48,6 +48,11 @@ LOG_FORMAT = os.getenv("LOG_FORMAT", "text").lower()
 LLM_CACHE_ENABLED = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
 LLM_CACHE_TTL = int(os.getenv("LLM_CACHE_TTL", "3600"))
 
+# OpenTelemetry tracing (optional). Leave OTEL_EXPORTER_OTLP_ENDPOINT empty to
+# disable tracing entirely; no spans are created and no OTLP connection is attempted.
+OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+OTEL_SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "img2sdtxt")
+
 # LLM Provider Selection
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai_compatible")
 
@@ -82,6 +87,9 @@ DEFAULT_NEGATIVE_TAGS = "lowres, bad anatomy, bad hands, text, error, worst qual
 
 # XY Plot Configuration
 XY_PLOT_MAX_CELLS = int(os.getenv("XY_PLOT_MAX_CELLS", "36"))
+
+# Wildcard batch generation: max images generated for one "all combinations" job.
+WILDCARD_BATCH_MAX_COMBINATIONS = int(os.getenv("WILDCARD_BATCH_MAX_COMBINATIONS", "36"))
 
 # Job Queue Configuration
 JOB_QUEUE_MAX_SIZE = int(os.getenv("JOB_QUEUE_MAX_SIZE", "20"))  # max pending (not-yet-running) jobs

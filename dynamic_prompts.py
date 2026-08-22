@@ -312,6 +312,19 @@ def count_combinations(template: str, wildcards_dir: Optional[Path] = None) -> i
     return _count_sequence_combinations(tree, resolved_dir)
 
 
+def validate_combination_count(template: str, wildcards_dir: Optional[Path] = None, max_combinations: int = 100) -> int:
+    """Ensure a template's combination count does not exceed ``max_combinations``.
+
+    Mirrors ``xy_plot.validate_cell_count``'s pre-flight-validation shape so job
+    submission can reject an oversized "all combinations" batch before it's queued,
+    the same way an oversized XY plot grid is rejected. Returns the combination count.
+    """
+    total = count_combinations(template, wildcards_dir)
+    if total > max_combinations:
+        raise ValueError(f"Template would generate {total} combinations, exceeding the maximum of {max_combinations}")
+    return total
+
+
 def expand_prompt_combinatorial(
     template: str, wildcards_dir: Optional[Path] = None, max_combinations: int = 100
 ) -> List[str]:

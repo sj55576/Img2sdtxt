@@ -10,6 +10,7 @@ from config import DEFAULT_NEGATIVE_TAGS, QUALITY_LEVELS
 from fallback import response_identity
 from llm_provider import LLMProvider
 from metrics import observe_llm_request
+from tracing import llm_span, record_llm_span_result
 
 logger = logging.getLogger("img2sdtxt.prompt")
 
@@ -117,17 +118,24 @@ class PromptGenerator:
         value to decide which cache key or history row to use.
         """
         started = time.monotonic()
-        try:
-            response = method(*args, **kwargs)
-        except Exception:
-            provider_name, model = response_identity(None, self.llm_client)
-            observe_llm_request(provider_name, model, mode, "error", time.monotonic() - started)
-            raise
+        preliminary_provider = getattr(self.llm_client, "provider_name", "") or ""
+        preliminary_model = getattr(self.llm_client, "model", "") or ""
+        with llm_span(preliminary_provider, preliminary_model, mode) as span:
+            try:
+                response = method(*args, **kwargs)
+            except Exception:
+                provider_name, model = response_identity(None, self.llm_client)
+                duration = time.monotonic() - started
+                observe_llm_request(provider_name, model, mode, "error", duration)
+                record_llm_span_result(span, provider_name, model, "error", duration)
+                raise
 
-        provider_name, model = response_identity(response, self.llm_client)
-        status = "success" if response else "empty"
-        observe_llm_request(provider_name, model, mode, status, time.monotonic() - started)
-        return response, provider_name, model
+            provider_name, model = response_identity(response, self.llm_client)
+            status = "success" if response else "empty"
+            duration = time.monotonic() - started
+            observe_llm_request(provider_name, model, mode, status, duration)
+            record_llm_span_result(span, provider_name, model, status, duration)
+            return response, provider_name, model
 
     def build_image_analysis_prompt(
         self, style: str = "", tone: str = "", quality: str = "high", tagger_tags: str = ""
