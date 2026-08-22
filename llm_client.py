@@ -8,11 +8,15 @@ from typing import Iterator, Optional
 import requests
 from PIL import Image
 
-from config import LLM_MODEL, LLM_SERVER_URL
+from config import LLM_MAX_TOKENS, LLM_MODEL, LLM_SERVER_URL
 from llm_provider import LLMProvider
 from retry import retry_with_backoff
 
 logger = logging.getLogger("img2sdtxt.llm")
+
+
+class LLMResponseTruncatedError(Exception):
+    """max_tokens に達したため応答が途中で打ち切られた"""
 
 
 class LLMClient(LLMProvider):
@@ -63,9 +67,30 @@ class LLMClient(LLMProvider):
             "top_p": 0.9,
         }
 
+    def _truncation_error(self) -> LLMResponseTruncatedError:
+        """max_tokens 到達で応答が途中終了したときの共通エラー"""
+        logger.error("LLM response truncated by max_tokens model=%s", self.model)
+        return LLMResponseTruncatedError(
+            "LLM応答が max_tokens に達して途中で打ち切られました。"
+            "推論(reasoning)を行うモデルでは思考トークンもこの上限を消費します。"
+            "LLM_MAX_TOKENS を増やしてください。"
+        )
+
+    def _extract_message_content(self, result: dict) -> Optional[str]:
+        """OpenAI互換レスポンスから本文を取り出す。打ち切られた応答は例外にする。"""
+        choices = result.get("choices") or []
+        if not choices:
+            return None
+        choice = choices[0]
+        if choice.get("finish_reason") == "length":
+            raise self._truncation_error()
+        content = (choice.get("message") or {}).get("content")
+        return content
+
     def _stream_chat(self, payload: dict, timeout: int) -> Iterator[str]:
         """OpenAI互換の SSE ストリーミングレスポンスから content の差分を逐次 yield する"""
         payload = {**payload, "stream": True}
+        truncated = False
         try:
             with requests.post(self.endpoint, json=payload, timeout=timeout, stream=True) as response:
                 response.raise_for_status()
@@ -82,6 +107,8 @@ class LLMClient(LLMProvider):
                     choices = chunk.get("choices") or []
                     if not choices:
                         continue
+                    if choices[0].get("finish_reason") == "length":
+                        truncated = True
                     content = (choices[0].get("delta") or {}).get("content")
                     if content:
                         yield content
@@ -91,13 +118,15 @@ class LLMClient(LLMProvider):
         except requests.exceptions.Timeout:
             logger.error("LLM streaming request timed out url=%s", self.endpoint)
             raise TimeoutError("LLM server request timed out")
+        if truncated:
+            raise self._truncation_error()
 
-    def generate_response_stream(self, prompt: str, max_tokens: int = 500) -> Iterator[str]:
+    def generate_response_stream(self, prompt: str, max_tokens: int = LLM_MAX_TOKENS) -> Iterator[str]:
         logger.debug("generate_response_stream url=%s model=%s", self.endpoint, self.model)
         yield from self._stream_chat(self._build_text_payload(prompt, max_tokens), timeout=30)
 
     def generate_response_with_image_stream(
-        self, prompt: str, image_bytes: bytes, max_tokens: int = 500
+        self, prompt: str, image_bytes: bytes, max_tokens: int = LLM_MAX_TOKENS
     ) -> Iterator[str]:
         logger.debug(
             "generate_response_with_image_stream url=%s model=%s image_bytes=%d",
@@ -147,7 +176,7 @@ class LLMClient(LLMProvider):
             return False
 
     @retry_with_backoff(max_retries=2, base_delay=1.0)
-    def generate_response(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
+    def generate_response(self, prompt: str, max_tokens: int = LLM_MAX_TOKENS) -> Optional[str]:
         """
         LLMサーバーに対してプロンプトを送信し、レスポンスを取得
         LM Studio/Lemonade server 互換のOpenAI互換API
@@ -160,13 +189,13 @@ class LLMClient(LLMProvider):
             response = requests.post(self.endpoint, json=payload, timeout=30)
             response.raise_for_status()
 
-            result = response.json()
-            if result.get("choices") and len(result["choices"]) > 0:
+            content = self._extract_message_content(response.json())
+            if content is not None:
                 elapsed = (time.time() - t0) * 1000
                 logger.info("LLM call succeeded model=%s %.0fms", self.model, elapsed)
-                return result["choices"][0]["message"]["content"]
-
-            return None
+            return content
+        except LLMResponseTruncatedError:
+            raise
         except requests.exceptions.ConnectionError:
             logger.error("Cannot connect to LLM server at %s", self.base_url)
             raise ConnectionError(f"Cannot connect to LLM server at {self.base_url}")
@@ -178,7 +207,9 @@ class LLMClient(LLMProvider):
             raise Exception(f"LLM server error: {str(e)}")
 
     @retry_with_backoff(max_retries=2, base_delay=1.0)
-    def generate_response_with_image(self, prompt: str, image_bytes: bytes, max_tokens: int = 500) -> Optional[str]:
+    def generate_response_with_image(
+        self, prompt: str, image_bytes: bytes, max_tokens: int = LLM_MAX_TOKENS
+    ) -> Optional[str]:
         """
         画像を含めてLLMサーバーに対してプロンプトを送信し、レスポンスを取得
         LM Studio/Lemonade server 互換のOpenAI互換API (Vision Models対応)
@@ -193,13 +224,13 @@ class LLMClient(LLMProvider):
             response = requests.post(self.endpoint, json=payload, timeout=60)
             response.raise_for_status()
 
-            result = response.json()
-            if result.get("choices") and len(result["choices"]) > 0:
+            content = self._extract_message_content(response.json())
+            if content is not None:
                 elapsed = (time.time() - t0) * 1000
                 logger.info("LLM vision call succeeded model=%s %.0fms", self.model, elapsed)
-                return result["choices"][0]["message"]["content"]
-
-            return None
+            return content
+        except LLMResponseTruncatedError:
+            raise
         except requests.exceptions.ConnectionError:
             logger.error("Cannot connect to LLM server at %s", self.base_url)
             raise ConnectionError(f"Cannot connect to LLM server at {self.base_url}")

@@ -176,6 +176,7 @@ classDiagram
 |------|-----|-------------|------|
 | `LLM_SERVER_URL` | `str` | `http://localhost:1234/v1` | LLM サーバーのベース URL |
 | `LLM_MODEL` | `str` | `gpt-3.5-turbo` | 使用する LLM モデル名 |
+| `LLM_MAX_TOKENS` | `int` | `1500` | 1応答あたりの生成トークン上限（推論モデルの思考トークンも消費する） |
 | `SD_API_URL` | `str` | `http://localhost:7860` | Stable Diffusion Web UI の URL |
 | `SD_OUTPUT_DIR` | `Path` | `outputs/` | 生成画像の保存先ディレクトリ |
 | `API_HOST` | `str` | `127.0.0.1` | FastAPI バインドホスト（Docker は明示的に `0.0.0.0`） |

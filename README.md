@@ -249,6 +249,7 @@ on the container itself (the proxy handles TLS termination).
 |----------|---------|-------------|
 | `LLM_SERVER_URL` | `http://localhost:1234/v1` | LLM server endpoint |
 | `LLM_MODEL` | `gpt-3.5-turbo` | Model name to use |
+| `LLM_MAX_TOKENS` | `1500` | Max tokens per response. Reasoning models spend part of this budget on thinking tokens, so a small value truncates the JSON output |
 | `LLM_PROVIDER` | `openai_compatible` | Active provider (`openai_compatible`, `anthropic`, or `gemini`) |
 | `LLM_CACHE_ENABLED` | `true` | Enable the persistent LLM response cache |
 | `LLM_CACHE_TTL` | `3600` | Cache lifetime in seconds |
