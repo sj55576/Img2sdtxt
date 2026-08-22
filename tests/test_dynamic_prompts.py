@@ -149,6 +149,24 @@ def test_count_combinations_with_wildcard(wildcards_dir):
 
 
 # ------------------------------------------------------------------ #
+# validate_combination_count
+# ------------------------------------------------------------------ #
+
+
+def test_validate_combination_count_at_limit_ok():
+    assert dp.validate_combination_count("{a|b|c}", max_combinations=3) == 3
+
+
+def test_validate_combination_count_under_limit_ok():
+    assert dp.validate_combination_count("{a|b|c}", max_combinations=10) == 3
+
+
+def test_validate_combination_count_over_limit_raises():
+    with pytest.raises(ValueError):
+        dp.validate_combination_count("{a|b|c|d|e} {1|2|3|4|5}", max_combinations=10)
+
+
+# ------------------------------------------------------------------ #
 # Escaped braces
 # ------------------------------------------------------------------ #
 

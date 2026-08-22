@@ -274,6 +274,7 @@ example.com {
 | `RATE_LIMIT_API` | `60` | その他APIの1分あたりリクエスト数 |
 | `JOB_QUEUE_MAX_SIZE` | `20` | 保留できるジョブの最大数 |
 | `XY_PLOT_MAX_CELLS` | `36` | XY Plotと安全なバリエーション数の上限 |
+| `WILDCARD_BATCH_MAX_COMBINATIONS` | `36` | ワイルドカードの「全組み合わせ」バッチジョブで生成できる画像数の上限 |
 | `WEBHOOK_URL` | *(空)* | Webhook送信先URL。空の場合は通知を無効化 |
 | `WEBHOOK_EVENTS` | `job_completed,job_failed,batch_completed` | 通知対象イベント（カンマ区切り）（`job_completed`, `job_failed`, `job_cancelled`, `batch_completed`） |
 | `WEBHOOK_FORMAT` | `generic` | ペイロード形式：`generic`、`discord`、`slack` のいずれか |
@@ -385,6 +386,39 @@ openssl req -x509 -newkey rsa:4096 \
 | `standard` | `best quality` |
 | `high` | `best quality, masterpiece, highly detailed` |
 | `ultra` | `best quality, masterpiece, highly detailed, 8k uhd, sharp focus, professional` |
+
+---
+
+## ダイナミックプロンプト / ワイルドカード
+
+プロンプト（Generate、SD Generate、Img2Img、Inpaint、XY Plot）では、
+`dynamic_prompts.py` が処理する sd-dynamic-prompts 互換の構文を使用できます。
+
+| 構文 | 意味 |
+|--------|---------|
+| `{a\|b\|c}` | いずれか1つをランダムに選択（`{a\|{b\|c}}` のようなネストも可） |
+| `__filename__` | `data/wildcards/filename.txt` から1行をランダムに選択 |
+| `\{` `\}` `\|` | エスケープされたリテラル文字としてそのまま出力 |
+
+ワイルドカードファイルは **Wildcards** ページ（`GET/POST /api/wildcards/`、
+`GET/PUT/DELETE /api/wildcards/{name}`）から管理でき、展開プレビューと
+組み合わせ総数のカウント（`POST /api/wildcards/expand`）もこのページから行えます。
+
+テンプレートから画像を生成する方法は3通りあります。
+
+- **生成ごとに1回展開** — SD Generate / Img2Img / Inpaint ページの「生成ごとに
+  ワイルドカードを展開」チェックボックス（`SDGenerateRequest` /
+  `SDMultiModelRequest` の `expand_wildcards`）を有効にするか、Positive Prompt
+  欄の 🃏 **Expand** ボタンで生成前にその場で1回展開します。バッチ内の各画像は
+  それぞれ個別に展開され、履歴には展開結果と元のテンプレートの両方が保存されます。
+- **全組み合わせをテキストのみ確認** — Wildcards ページの「Preview」「Count
+  combinations」ボタンは `POST /api/wildcards/expand` を呼び出し、画像を生成せずに
+  テンプレートが生成しうる内容を確認できます。
+- **全組み合わせを画像として生成** — Wildcards ページの「🎲 Generate all
+  combinations」ボタンは `wildcard_batch` ジョブ（`POST /api/jobs/submit`）を投入し、
+  組み合わせごとに1枚ずつ画像を生成します。ジョブ投入前に組み合わせ数が
+  `WILDCARD_BATCH_MAX_COMBINATIONS` を超えていないか検証され、XY Plot の
+  グリッドが大きすぎる場合に開始前に拒否されるのと同様の仕組みです。
 
 ---
 
@@ -539,7 +573,7 @@ Img2sdtxt/
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| `POST` | `/api/jobs/submit` | `txt2img`・`multi_model`・`xy_plot`を投入 |
+| `POST` | `/api/jobs/submit` | `txt2img`・`multi_model`・`xy_plot`・`wildcard_batch`を投入 |
 | `GET` | `/api/jobs` | ジョブ一覧 |
 | `GET` | `/api/jobs/{id}` | 状態・キュー位置・ETAを取得 |
 | `POST` | `/api/jobs/{id}/cancel` | ジョブをキャンセル |

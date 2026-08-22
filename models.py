@@ -56,6 +56,35 @@ class SDMultiModelRequest(BaseModel):
     expand_wildcards: bool = Field(False, description="Expand dynamic prompt syntax once per generated image")
 
 
+class WildcardBatchRequest(BaseModel):
+    """Generate one image per combinatorial expansion of a dynamic-prompt template.
+
+    ``positive`` holds the template (``{a|b|c}`` / ``__wildcard__`` syntax); each
+    combination is expanded once via ``dynamic_prompts.expand_prompt_combinatorial``
+    and generated with ``batch_size`` fixed at 1 per combination, mirroring how
+    ``SDGenerateRequest.expand_wildcards`` generates one variation per image.
+    """
+
+    positive: str = Field(..., min_length=1, description="Dynamic prompt template")
+    negative: str = Field("", description="Negative prompt")
+    width: int = Field(512, ge=64, le=2048, description="Image width")
+    height: int = Field(512, ge=64, le=2048, description="Image height")
+    steps: int = Field(20, ge=1, le=150, description="Sampling steps")
+    cfg_scale: float = Field(7.0, ge=1.0, le=30.0, description="CFG scale")
+    sampler: str = Field("Euler a", description="Sampler name")
+    seed: int = Field(-1, description="Random seed (-1 for random)")
+    model: str = Field("", description="Model checkpoint name")
+    loras: str = Field("", description="LoRA specification")
+    enable_hr: bool = Field(False, description="Enable Hires.fix")
+    hr_scale: float = Field(2.0, ge=1.0, le=4.0, description="Hires.fix scale")
+    hr_upscaler: str = Field("R-ESRGAN 4x+", description="Hires.fix upscaler")
+    hr_second_pass_steps: int = Field(0, ge=0, le=150, description="Hires.fix second pass steps")
+    hr_denoising_strength: float = Field(0.7, ge=0.0, le=1.0, description="Hires.fix denoising")
+    max_combinations: int = Field(
+        36, ge=1, le=1000, description="Safety cap checked against WILDCARD_BATCH_MAX_COMBINATIONS"
+    )
+
+
 class XYPlotAxis(BaseModel):
     type: str = Field(..., description="Axis type: steps, cfg_scale, sampler, seed, model, prompt_sr, or none")
     values: List[str] = Field(default_factory=list, description="Raw axis values (coerced per axis type)")

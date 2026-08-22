@@ -85,6 +85,9 @@ DEFAULT_NEGATIVE_TAGS = "lowres, bad anatomy, bad hands, text, error, worst qual
 # XY Plot Configuration
 XY_PLOT_MAX_CELLS = int(os.getenv("XY_PLOT_MAX_CELLS", "36"))
 
+# Wildcard batch generation: max images generated for one "all combinations" job.
+WILDCARD_BATCH_MAX_COMBINATIONS = int(os.getenv("WILDCARD_BATCH_MAX_COMBINATIONS", "36"))
+
 # Job Queue Configuration
 JOB_QUEUE_MAX_SIZE = int(os.getenv("JOB_QUEUE_MAX_SIZE", "20"))  # max pending (not-yet-running) jobs
 

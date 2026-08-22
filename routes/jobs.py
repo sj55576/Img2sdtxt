@@ -7,11 +7,12 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
+import config
 import dynamic_prompts as dp
 import xy_plot
 from deps import sd_client
 from job_queue import JobQueueFullError, JobStatus, job_queue, register_job_handler
-from models import SDGenerateRequest, SDMultiModelRequest, XYPlotRequest
+from models import SDGenerateRequest, SDMultiModelRequest, WildcardBatchRequest, XYPlotRequest
 
 logger = logging.getLogger("img2sdtxt.jobs")
 
@@ -171,6 +172,74 @@ async def handle_xy_plot(job, update_progress):
     return await xy_plot.run_xy_plot(job, update_progress)
 
 
+@register_job_handler("wildcard_batch")
+async def handle_wildcard_batch(job, update_progress):
+    """Generate one image per combinatorial expansion of a dynamic-prompt template."""
+    p = job.params
+    template = p["positive"]
+    max_combinations = min(p.get("max_combinations", 36), config.WILDCARD_BATCH_MAX_COMBINATIONS)
+    combos = dp.expand_prompt_combinatorial(template, max_combinations=max_combinations)
+    total = len(combos)
+
+    images: list[str] = []
+    saved_files: list[dict] = []
+    for i, positive in enumerate(combos):
+        if getattr(job, "status", None) == JobStatus.CANCELLED:
+            break
+        await update_progress(i / total if total else 1.0)
+        generated = await run_in_threadpool(
+            sd_client.txt2img,
+            positive=positive,
+            negative=p.get("negative", ""),
+            width=p.get("width", 512),
+            height=p.get("height", 512),
+            steps=p.get("steps", 20),
+            cfg_scale=p.get("cfg_scale", 7.0),
+            sampler=p.get("sampler", "Euler a"),
+            seed=p.get("seed", -1),
+            batch_size=1,
+            model=p.get("model", ""),
+            loras=p.get("loras", ""),
+            enable_hr=p.get("enable_hr", False),
+            hr_scale=p.get("hr_scale", 2.0),
+            hr_upscaler=p.get("hr_upscaler", "R-ESRGAN 4x+"),
+            hr_second_pass_steps=p.get("hr_second_pass_steps", 0),
+            hr_denoising_strength=p.get("hr_denoising_strength", 0.7),
+        )
+        images.extend(generated)
+        saved_files.extend(
+            await run_in_threadpool(
+                sd_client.save_images,
+                images=generated,
+                positive=positive,
+                negative=p.get("negative", ""),
+                width=p.get("width", 512),
+                height=p.get("height", 512),
+                steps=p.get("steps", 20),
+                cfg_scale=p.get("cfg_scale", 7.0),
+                sampler=p.get("sampler", "Euler a"),
+                seed=p.get("seed", -1),
+                model=_generated_model(generated, p.get("model", "")),
+                loras=p.get("loras", ""),
+                template=template,
+            )
+        )
+    await update_progress(1.0)
+
+    result: dict = {
+        "images": images,
+        "count": len(images),
+        "saved_files": saved_files,
+        "combination_count": total,
+        "expanded_prompts": combos,
+    }
+    if len(saved_files) < len(images):
+        result["warnings"] = [
+            f"{len(images) - len(saved_files)} of {len(images)} generated image(s) could not be saved to disk."
+        ]
+    return result
+
+
 # ------------------------------------------------------------------ #
 # REST endpoints
 # ------------------------------------------------------------------ #
@@ -202,7 +271,7 @@ async def submit_job(request_data: dict):
 
     if not job_type:
         raise HTTPException(status_code=400, detail="job_type is required")
-    if job_type not in ("txt2img", "multi_model", "xy_plot"):
+    if job_type not in ("txt2img", "multi_model", "xy_plot", "wildcard_batch"):
         raise HTTPException(status_code=400, detail=f"Unknown job_type: {job_type}")
 
     try:
@@ -212,6 +281,8 @@ async def submit_job(request_data: dict):
             params = _model_dump(_model_validate(SDMultiModelRequest, params))
         elif job_type == "xy_plot":
             params = _model_dump(_model_validate(XYPlotRequest, params))
+        elif job_type == "wildcard_batch":
+            params = _model_dump(_model_validate(WildcardBatchRequest, params))
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -224,6 +295,13 @@ async def submit_job(request_data: dict):
             x_values = xy_plot.parse_axis_values(x_axis["type"], x_axis.get("values", []))
             y_values = xy_plot.parse_axis_values(y_axis["type"], y_axis.get("values", []))
             xy_plot.validate_cell_count(x_values, y_values)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
+    if job_type == "wildcard_batch":
+        try:
+            max_combinations = min(params["max_combinations"], config.WILDCARD_BATCH_MAX_COMBINATIONS)
+            dp.validate_combination_count(params["positive"], max_combinations=max_combinations)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=str(e))
 

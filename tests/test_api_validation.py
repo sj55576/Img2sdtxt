@@ -235,6 +235,31 @@ def test_jobs_submit_priority_is_clamped(client):
     assert response.json()["job"]["priority"] == 10
 
 
+def test_jobs_submit_wildcard_batch_accepted(client):
+    """POST /api/jobs/submit で job_type=wildcard_batch を投入できる"""
+    payload = {"job_type": "wildcard_batch", "params": {"positive": "{red|blue} hair", "max_combinations": 10}}
+    response = client.post("/api/jobs/submit", json=payload)
+    assert response.status_code == 200
+    assert response.json()["job"]["job_type"] == "wildcard_batch"
+
+
+def test_jobs_submit_wildcard_batch_over_combination_cap_returns_422(client):
+    """組み合わせ数が max_combinations を超えると 422"""
+    payload = {
+        "job_type": "wildcard_batch",
+        "params": {"positive": "{a|b|c|d|e} {1|2|3|4|5} {x|y|z}", "max_combinations": 10},
+    }
+    response = client.post("/api/jobs/submit", json=payload)
+    assert response.status_code == 422
+
+
+def test_jobs_submit_wildcard_batch_missing_positive_returns_422(client):
+    """positive（テンプレート）が無いと 422"""
+    payload = {"job_type": "wildcard_batch", "params": {}}
+    response = client.post("/api/jobs/submit", json=payload)
+    assert response.status_code == 422
+
+
 def test_jobs_priority_endpoint_unknown_job_returns_400(client):
     """POST /api/jobs/{job_id}/priority は存在しない job_id で 400"""
     response = client.post("/api/jobs/nonexistent/priority", json={"priority": 5})
