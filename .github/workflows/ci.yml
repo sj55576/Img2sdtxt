@@ -95,6 +95,33 @@ jobs:
       - name: Run mypy
         run: python -m mypy . --config-file pyproject.toml
 
+  a11y:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m pip check
+
+      - name: Install Playwright's Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run axe-core accessibility scan
+        run: python -m pytest tests/test_a11y.py -v --tb=short
+
   dependency-audit:
     runs-on: ubuntu-latest
 

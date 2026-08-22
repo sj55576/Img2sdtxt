@@ -324,6 +324,8 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 OTEL_SERVICE_NAME=img2sdtxt
 ```
 
+`OTEL_SERVICE_NAME` (default `img2sdtxt`) sets the traced service name.
+
 When enabled, FastAPI requests and outgoing `requests` calls (Stable
 Diffusion, the OpenAI-compatible LLM provider) are auto-instrumented, and
 each LLM call is recorded as an `llm.generate` span with `llm.provider`,

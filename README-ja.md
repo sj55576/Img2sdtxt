@@ -322,6 +322,8 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 OTEL_SERVICE_NAME=img2sdtxt
 ```
 
+`OTEL_SERVICE_NAME`（デフォルト `img2sdtxt`）でトレースに記録するサービス名を設定できます。
+
 有効化すると、FastAPI のリクエストと外部への `requests` 呼び出し
 （Stable Diffusion、OpenAI互換LLMプロバイダー）が自動計装され、各 LLM 呼び出しは
 `llm.generate` スパンとして `llm.provider` / `llm.model` / `llm.mode` /

@@ -1064,8 +1064,10 @@ textarea { resize: vertical; }
     padding: 4px 8px;
     font-size: 11px;
     cursor: pointer;
-    border: 1px solid var(--primary-color, #4a90d9);
-    background: var(--primary-color, #4a90d9);
+    /* #2871be (not the lighter #4a90d9 used elsewhere) so white text meets the
+       WCAG AA 4.5:1 contrast minimum at this font size. */
+    border: 1px solid var(--primary-color-accessible, #2871be);
+    background: var(--primary-color-accessible, #2871be);
     color: #fff;
     border-radius: 4px;
     margin-top: 4px;

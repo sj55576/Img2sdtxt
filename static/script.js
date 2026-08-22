@@ -3781,6 +3781,7 @@ function openGalleryModal(imgJsonStr) {
     if (!modal.classList.contains('hidden')) _galleryModalTrigger = document.activeElement;
 
     modalImg.src = img.url;
+    modalImg.alt = img.parameters?.positive_prompt || img.filename;
     modalTitle.textContent = img.filename;
     modalDownload.href = img.url;
     modalDownload.download = img.filename;
@@ -4726,6 +4727,7 @@ function addCompareVariant() {
     styleGroup.className = 'form-group';
     const styleLabel = document.createElement('label');
     styleLabel.textContent = I18n.t('page.compare.style_label', 'スタイル');
+    styleLabel.htmlFor = `compare-variant-${seq}-style`;
     styleGroup.appendChild(styleLabel);
     styleGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-style`, COMPARE_STYLE_OPTIONS, ''));
     grid.appendChild(styleGroup);
@@ -4734,6 +4736,7 @@ function addCompareVariant() {
     toneGroup.className = 'form-group';
     const toneLabel = document.createElement('label');
     toneLabel.textContent = I18n.t('page.compare.tone_label', 'トーン');
+    toneLabel.htmlFor = `compare-variant-${seq}-tone`;
     toneGroup.appendChild(toneLabel);
     toneGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-tone`, COMPARE_TONE_OPTIONS, ''));
     grid.appendChild(toneGroup);
@@ -4742,6 +4745,7 @@ function addCompareVariant() {
     qualityGroup.className = 'form-group';
     const qualityLabel = document.createElement('label');
     qualityLabel.textContent = I18n.t('page.compare.quality_label', '品質');
+    qualityLabel.htmlFor = `compare-variant-${seq}-quality`;
     qualityGroup.appendChild(qualityLabel);
     qualityGroup.appendChild(_compareBuildSelect(`compare-variant-${seq}-quality`, COMPARE_QUALITY_OPTIONS, 'high'));
     grid.appendChild(qualityGroup);
