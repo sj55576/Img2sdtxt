@@ -147,7 +147,7 @@
 
                         <!-- Text input -->
                         <div id="tab-txt" class="inner-content">
-                            <label class="field-label" data-i18n="page.generate.description_label">画像の説明:</label>
+                            <label for="description-input" class="field-label" data-i18n="page.generate.description_label">画像の説明:</label>
                             <textarea id="description-input" rows="5" data-i18n-placeholder="page.generate.description_placeholder" placeholder="生成したい画像を説明してください..."></textarea>
                         </div>
 
@@ -269,15 +269,15 @@
                     <!-- Left: Input -->
                     <div class="col">
                         <div class="form-group">
-                            <label class="field-label">Positive Prompt <span class="required" data-i18n="page.refine.positive_required">*</span></label>
+                            <label for="refine-positive-input" class="field-label">Positive Prompt <span class="required" data-i18n="page.refine.positive_required">*</span></label>
                             <textarea id="refine-positive-input" class="prompt-ta" rows="6" data-i18n-placeholder="page.refine.positive_placeholder" placeholder="改善したいポジティブプロンプトを入力..."></textarea>
                         </div>
                         <div class="form-group">
-                            <label class="field-label">Negative Prompt</label>
+                            <label for="refine-negative-input" class="field-label">Negative Prompt</label>
                             <textarea id="refine-negative-input" class="prompt-ta" rows="4" data-i18n-placeholder="page.refine.negative_placeholder" placeholder="ネガティブプロンプト（省略可）"></textarea>
                         </div>
                         <div class="form-group">
-                            <label class="field-label" data-i18n="page.refine.instruction_label">改善の指示（オプション）</label>
+                            <label for="refine-instruction-input" class="field-label" data-i18n="page.refine.instruction_label">改善の指示（オプション）</label>
                             <input type="text" id="refine-instruction-input" class="form-input" data-i18n-placeholder="page.refine.instruction_placeholder" placeholder="例: アニメスタイルに変更して, より詳細なライティングを追加して">
                         </div>
                         <div class="customization-panel">
@@ -565,7 +565,10 @@
                         </div>
 
                         <div class="form-group">
-                            <label>Positive Prompt <button type="button" id="sd-expand-btn" class="btn btn-xs btn-ghost" title="Expand dynamic prompt">🃏 Expand</button></label>
+                            <div style="display:flex; align-items:center; justify-content:space-between;">
+                                <label for="sd-positive">Positive Prompt</label>
+                                <button type="button" id="sd-expand-btn" class="btn btn-xs btn-ghost" title="Expand dynamic prompt">🃏 Expand</button>
+                            </div>
                             <textarea id="sd-positive" rows="4" data-i18n-placeholder="page.sd.positive_placeholder" placeholder="ポジティブプロンプト... ({a|b|c} / __wildcard__ syntax supported)"></textarea>
                             <span class="token-counter" id="sd-positive-tokens"></span>
                         </div>
@@ -636,7 +639,7 @@
                             <div id="sd-hr-settings" class="hr-settings hidden">
                                 <div class="form-grid">
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.hr_scale_label">スケール倍率</label>
+                                        <label for="sd-hr-scale" data-i18n="page.sd.hr_scale_label">スケール倍率</label>
                                         <select id="sd-hr-scale">
                                             <option value="1.5">1.5x</option>
                                             <option value="2" selected>2x</option>
@@ -646,7 +649,7 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.hr_upscaler_label">アップスケーラー</label>
+                                        <label for="sd-hr-upscaler" data-i18n="page.sd.hr_upscaler_label">アップスケーラー</label>
                                         <select id="sd-hr-upscaler">
                                             <option>R-ESRGAN 4x+</option>
                                             <option>R-ESRGAN 4x+ Anime6B</option>
@@ -658,12 +661,12 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.hr_steps_label">Hiresステップ数</label>
+                                        <label for="sd-hr-steps" data-i18n="page.sd.hr_steps_label">Hiresステップ数</label>
                                         <input type="number" id="sd-hr-steps" value="0" min="0" max="150">
                                         <small data-i18n="page.sd.hr_steps_hint">0 = メインと同じステップ数</small>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.hr_denoising_label">デノイジング強度</label>
+                                        <label for="sd-hr-denoising" data-i18n="page.sd.hr_denoising_label">デノイジング強度</label>
                                         <input type="number" id="sd-hr-denoising" value="0.7" min="0" max="1" step="0.05">
                                         <small data-i18n="page.sd.hr_denoising_hint">0=忠実に拡大, 1=大きく変化</small>
                                     </div>
@@ -682,28 +685,28 @@
                             </div>
                             <div id="sd-cn-settings" class="hr-settings hidden">
                                 <div class="form-group">
-                                    <label data-i18n="page.sd.controlnet_image_label">参照画像</label>
+                                    <label for="sd-cn-image-input" data-i18n="page.sd.controlnet_image_label">参照画像</label>
                                     <input type="file" id="sd-cn-image-input" accept="image/*">
                                 </div>
                                 <div class="form-grid">
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_model_label">モデル</label>
+                                        <label for="sd-cn-model" data-i18n="page.sd.controlnet_model_label">モデル</label>
                                         <select id="sd-cn-model"><option value="">-- 選択 --</option></select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
+                                        <label for="sd-cn-module" data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
                                         <select id="sd-cn-module"><option value="none">none</option></select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_weight_label">Weight</label>
+                                        <label for="sd-cn-weight" data-i18n="page.sd.controlnet_weight_label">Weight</label>
                                         <input type="number" id="sd-cn-weight" value="1.0" min="0" max="2" step="0.05">
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
+                                        <label for="sd-cn-guidance-start" data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
                                         <input type="number" id="sd-cn-guidance-start" value="0.0" min="0" max="1" step="0.05">
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
+                                        <label for="sd-cn-guidance-end" data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
                                         <input type="number" id="sd-cn-guidance-end" value="1.0" min="0" max="1" step="0.05">
                                     </div>
                                 </div>
@@ -770,7 +773,7 @@
                     <div class="col">
                         <!-- Input Image -->
                         <div class="form-group" style="margin-bottom:12px;">
-                            <label data-i18n="page.img2img.input_image_label">入力画像</label>
+                            <label for="i2i-image-input" data-i18n="page.img2img.input_image_label">入力画像</label>
                             <div class="upload-area" id="i2i-upload-area">
                                 <div class="upload-icon">🖼️</div>
                                 <p data-i18n="page.img2img.upload_text">クリックまたはドラッグ&ドロップ</p>
@@ -789,7 +792,7 @@
 
                         <!-- Prompts -->
                         <div class="form-group">
-                            <label>Positive Prompt</label>
+                            <label for="i2i-positive">Positive Prompt</label>
                             <textarea id="i2i-positive" rows="4" data-i18n-placeholder="page.img2img.positive_placeholder" placeholder="ポジティブプロンプト..."></textarea>
                             <span class="token-counter" id="img2img-positive-tokens"></span>
                         </div>
@@ -894,7 +897,7 @@
                             <div id="i2i-hr-settings" class="hr-settings hidden">
                                 <div class="form-grid">
                                     <div class="form-group">
-                                        <label data-i18n="page.img2img.hr_scale_label">スケール倍率</label>
+                                        <label for="i2i-hr-scale" data-i18n="page.img2img.hr_scale_label">スケール倍率</label>
                                         <select id="i2i-hr-scale">
                                             <option value="1.5">1.5x</option>
                                             <option value="2" selected>2x</option>
@@ -904,7 +907,7 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.img2img.hr_upscaler_label">アップスケーラー</label>
+                                        <label for="i2i-hr-upscaler" data-i18n="page.img2img.hr_upscaler_label">アップスケーラー</label>
                                         <select id="i2i-hr-upscaler">
                                             <option>R-ESRGAN 4x+</option>
                                             <option>R-ESRGAN 4x+ Anime6B</option>
@@ -916,12 +919,12 @@
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.img2img.hr_steps_label">Hiresステップ数</label>
+                                        <label for="i2i-hr-steps" data-i18n="page.img2img.hr_steps_label">Hiresステップ数</label>
                                         <input type="number" id="i2i-hr-steps" value="0" min="0" max="150">
                                         <small data-i18n="page.img2img.hr_steps_hint">0 = メインと同じステップ数</small>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.img2img.hr_denoising_label">デノイジング強度</label>
+                                        <label for="i2i-hr-denoising" data-i18n="page.img2img.hr_denoising_label">デノイジング強度</label>
                                         <input type="number" id="i2i-hr-denoising" value="0.7" min="0" max="1" step="0.05">
                                         <small data-i18n="page.img2img.hr_denoising_hint">0=忠実に拡大, 1=大きく変化</small>
                                     </div>
@@ -940,28 +943,28 @@
                             </div>
                             <div id="i2i-cn-settings" class="hr-settings hidden">
                                 <div class="form-group">
-                                    <label data-i18n="page.sd.controlnet_image_label">参照画像</label>
+                                    <label for="i2i-cn-image-input" data-i18n="page.sd.controlnet_image_label">参照画像</label>
                                     <input type="file" id="i2i-cn-image-input" accept="image/*">
                                 </div>
                                 <div class="form-grid">
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_model_label">モデル</label>
+                                        <label for="i2i-cn-model" data-i18n="page.sd.controlnet_model_label">モデル</label>
                                         <select id="i2i-cn-model"><option value="">-- 選択 --</option></select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
+                                        <label for="i2i-cn-module" data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
                                         <select id="i2i-cn-module"><option value="none">none</option></select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_weight_label">Weight</label>
+                                        <label for="i2i-cn-weight" data-i18n="page.sd.controlnet_weight_label">Weight</label>
                                         <input type="number" id="i2i-cn-weight" value="1.0" min="0" max="2" step="0.05">
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
+                                        <label for="i2i-cn-guidance-start" data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
                                         <input type="number" id="i2i-cn-guidance-start" value="0.0" min="0" max="1" step="0.05">
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
+                                        <label for="i2i-cn-guidance-end" data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
                                         <input type="number" id="i2i-cn-guidance-end" value="1.0" min="0" max="1" step="0.05">
                                     </div>
                                 </div>
@@ -1007,7 +1010,7 @@
                     <div class="col">
                         <!-- Input Image + Canvas -->
                         <div class="form-group" style="margin-bottom:12px;">
-                            <label data-i18n="page.inpaint.input_image_label">入力画像とマスク描画</label>
+                            <label for="inpaint-image-input" data-i18n="page.inpaint.input_image_label">入力画像とマスク描画</label>
                             <div class="upload-area" id="inpaint-upload-area">
                                 <div class="upload-icon">🖼️</div>
                                 <p data-i18n="page.inpaint.upload_text">クリックまたはドラッグ&ドロップ</p>
@@ -1026,7 +1029,7 @@
                                         <button id="inpaint-tool-erase" class="btn btn-sm btn-secondary" data-i18n="page.inpaint.tool_erase" data-i18n-title="page.inpaint.tool_erase_title" title="消しゴム（黒=保持）">🧹 消去</button>
                                     </div>
                                     <div class="inpaint-tool-group">
-                                        <label class="inpaint-brush-label" data-i18n="page.inpaint.brush_size_label">ブラシサイズ</label>
+                                        <label for="inpaint-brush-size" class="inpaint-brush-label" data-i18n="page.inpaint.brush_size_label">ブラシサイズ</label>
                                         <input type="range" id="inpaint-brush-size" min="5" max="100" value="30" class="inpaint-brush-slider">
                                         <span id="inpaint-brush-size-val">30</span>px
                                     </div>
@@ -1037,7 +1040,7 @@
                                     </div>
                                 </div>
                                 <div class="inpaint-opacity-row">
-                                    <label class="inpaint-brush-label" data-i18n="page.inpaint.mask_opacity_label">マスク透明度</label>
+                                    <label for="inpaint-mask-opacity" class="inpaint-brush-label" data-i18n="page.inpaint.mask_opacity_label">マスク透明度</label>
                                     <input type="range" id="inpaint-mask-opacity" min="10" max="90" value="50" class="inpaint-brush-slider">
                                     <span id="inpaint-mask-opacity-val">50</span>%
                                 </div>
@@ -1046,7 +1049,7 @@
 
                         <!-- Prompts -->
                         <div class="form-group">
-                            <label>Positive Prompt</label>
+                            <label for="inpaint-positive">Positive Prompt</label>
                             <textarea id="inpaint-positive" rows="4" data-i18n-placeholder="page.inpaint.positive_placeholder" placeholder="描き直す領域に生成したい内容..."></textarea>
                             <span class="token-counter" id="inpaint-positive-tokens"></span>
                         </div>
@@ -1170,28 +1173,28 @@
                             </div>
                             <div id="inpaint-cn-settings" class="hr-settings hidden">
                                 <div class="form-group">
-                                    <label data-i18n="page.sd.controlnet_image_label">参照画像</label>
+                                    <label for="inpaint-cn-image-input" data-i18n="page.sd.controlnet_image_label">参照画像</label>
                                     <input type="file" id="inpaint-cn-image-input" accept="image/*">
                                 </div>
                                 <div class="form-grid">
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_model_label">モデル</label>
+                                        <label for="inpaint-cn-model" data-i18n="page.sd.controlnet_model_label">モデル</label>
                                         <select id="inpaint-cn-model"><option value="">-- 選択 --</option></select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
+                                        <label for="inpaint-cn-module" data-i18n="page.sd.controlnet_module_label">プリプロセッサ</label>
                                         <select id="inpaint-cn-module"><option value="none">none</option></select>
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_weight_label">Weight</label>
+                                        <label for="inpaint-cn-weight" data-i18n="page.sd.controlnet_weight_label">Weight</label>
                                         <input type="number" id="inpaint-cn-weight" value="1.0" min="0" max="2" step="0.05">
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
+                                        <label for="inpaint-cn-guidance-start" data-i18n="page.sd.controlnet_guidance_start_label">Guidance Start</label>
                                         <input type="number" id="inpaint-cn-guidance-start" value="0.0" min="0" max="1" step="0.05">
                                     </div>
                                     <div class="form-group">
-                                        <label data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
+                                        <label for="inpaint-cn-guidance-end" data-i18n="page.sd.controlnet_guidance_end_label">Guidance End</label>
                                         <input type="number" id="inpaint-cn-guidance-end" value="1.0" min="0" max="1" step="0.05">
                                     </div>
                                 </div>
@@ -1231,11 +1234,11 @@
                         <div class="customization-panel">
                             <h3 data-i18n="page.xyplot.base_settings_title">🎯 基本設定</h3>
                             <div class="form-group">
-                                <label data-i18n="page.xyplot.positive_label">Positive Prompt</label>
+                                <label for="xyplot-positive" data-i18n="page.xyplot.positive_label">Positive Prompt</label>
                                 <textarea id="xyplot-positive" rows="4" data-i18n-placeholder="page.xyplot.positive_placeholder" placeholder="ポジティブプロンプト..."></textarea>
                             </div>
                             <div class="form-group">
-                                <label data-i18n="page.xyplot.negative_label">Negative Prompt</label>
+                                <label for="xyplot-negative" data-i18n="page.xyplot.negative_label">Negative Prompt</label>
                                 <textarea id="xyplot-negative" rows="3" data-i18n-placeholder="page.xyplot.negative_placeholder" placeholder="ネガティブプロンプト..."></textarea>
                             </div>
                             <div class="form-grid">
@@ -1284,7 +1287,7 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label data-i18n="page.xyplot.loras_label">LoRA</label>
+                                <label for="xyplot-loras" data-i18n="page.xyplot.loras_label">LoRA</label>
                                 <input type="text" id="xyplot-loras" placeholder="&lt;lora:name:1.0&gt; ...">
                             </div>
                         </div>
@@ -1304,7 +1307,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label data-i18n="page.xyplot.x_values_label">X Values (comma-separated)</label>
+                                    <label for="xyplot-x-values" data-i18n="page.xyplot.x_values_label">X Values (comma-separated)</label>
                                     <input type="text" id="xyplot-x-values" data-i18n-placeholder="page.xyplot.x_values_placeholder" placeholder="5, 7, 9" value="5, 7, 9">
                                 </div>
                                 <div class="form-group">
@@ -1320,7 +1323,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group" id="xyplot-y-values-group">
-                                    <label data-i18n="page.xyplot.y_values_label">Y Values (comma-separated)</label>
+                                    <label for="xyplot-y-values" data-i18n="page.xyplot.y_values_label">Y Values (comma-separated)</label>
                                     <input type="text" id="xyplot-y-values" data-i18n-placeholder="page.xyplot.y_values_placeholder" placeholder="20, 30" value="20, 30">
                                 </div>
                             </div>
@@ -1430,15 +1433,15 @@
                         <h3 data-i18n="page.compare.ab_shared_title">⚙️ 共通設定</h3>
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>Steps</label>
+                                <label for="ab-steps">Steps</label>
                                 <input type="number" id="ab-steps" value="20" min="5" max="150">
                             </div>
                             <div class="form-group">
-                                <label>CFG Scale</label>
+                                <label for="ab-cfg">CFG Scale</label>
                                 <input type="number" id="ab-cfg" value="7" min="1" max="30" step="0.5">
                             </div>
                             <div class="form-group">
-                                <label>Sampler</label>
+                                <label for="ab-sampler">Sampler</label>
                                 <select id="ab-sampler">
                                     <option>Euler a</option>
                                     <option>Euler</option>
@@ -1447,7 +1450,7 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Width</label>
+                                <label for="ab-width">Width</label>
                                 <select id="ab-width">
                                     <option value="512" selected>512</option>
                                     <option value="768">768</option>
@@ -1455,7 +1458,7 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Height</label>
+                                <label for="ab-height">Height</label>
                                 <select id="ab-height">
                                     <option value="512" selected>512</option>
                                     <option value="768">768</option>
@@ -1463,7 +1466,7 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label data-i18n="page.compare.ab_seed_label">Seed (-1=random)</label>
+                                <label for="ab-seed" data-i18n="page.compare.ab_seed_label">Seed (-1=random)</label>
                                 <input type="number" id="ab-seed" value="-1">
                             </div>
                         </div>
@@ -1474,11 +1477,11 @@
                             <div class="customization-panel">
                                 <h3 data-i18n="page.compare.ab_config_a_title">🅰️ 設定 A</h3>
                                 <div class="form-group">
-                                    <label data-i18n="page.compare.positive_label">Positive Prompt</label>
+                                    <label for="ab-a-positive" data-i18n="page.compare.positive_label">Positive Prompt</label>
                                     <textarea id="ab-a-positive" rows="4"></textarea>
                                 </div>
                                 <div class="form-group">
-                                    <label data-i18n="page.compare.negative_label">Negative Prompt</label>
+                                    <label for="ab-a-negative" data-i18n="page.compare.negative_label">Negative Prompt</label>
                                     <textarea id="ab-a-negative" rows="3"></textarea>
                                 </div>
                             </div>
@@ -1487,11 +1490,11 @@
                             <div class="customization-panel">
                                 <h3 data-i18n="page.compare.ab_config_b_title">🅱️ 設定 B</h3>
                                 <div class="form-group">
-                                    <label data-i18n="page.compare.positive_label">Positive Prompt</label>
+                                    <label for="ab-b-positive" data-i18n="page.compare.positive_label">Positive Prompt</label>
                                     <textarea id="ab-b-positive" rows="4"></textarea>
                                 </div>
                                 <div class="form-group">
-                                    <label data-i18n="page.compare.negative_label">Negative Prompt</label>
+                                    <label for="ab-b-negative" data-i18n="page.compare.negative_label">Negative Prompt</label>
                                     <textarea id="ab-b-negative" rows="3"></textarea>
                                 </div>
                             </div>
@@ -1657,18 +1660,18 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label data-i18n="page.wildcards.name_label">Name</label>
+                                <label for="wc-name-input" data-i18n="page.wildcards.name_label">Name</label>
                                 <input type="text" id="wc-name-input" placeholder="e.g. hair_color" pattern="[a-zA-Z0-9_-]+" />
                             </div>
                             <div class="form-group">
-                                <label data-i18n="page.wildcards.entries_label">Entries (one per line)</label>
+                                <label for="wc-entries-input" data-i18n="page.wildcards.entries_label">Entries (one per line)</label>
                                 <textarea id="wc-entries-input" rows="12" placeholder="blonde&#10;brunette&#10;redhead"></textarea>
                             </div>
                         </div>
                         <div class="wildcards-expand-panel">
                             <h3 data-i18n="page.wildcards.expand_title">Expansion Preview</h3>
                             <div class="form-group">
-                                <label data-i18n="page.wildcards.template_label">Template</label>
+                                <label for="wc-expand-template" data-i18n="page.wildcards.template_label">Template</label>
                                 <textarea id="wc-expand-template" rows="3" placeholder="{red|blue|green} __hair_style__, __eye_color__"></textarea>
                             </div>
                             <div class="expand-actions">
