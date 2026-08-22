@@ -309,6 +309,28 @@ The endpoint exposes HTTP, LLM provider/fallback, Stable Diffusion, cache,
 rate-limit, and job-queue counters/histograms/gauges. The Prometheus client
 is included in `requirements.txt`.
 
+A ready-to-import Grafana dashboard for these metrics is included at
+[`docs/grafana/img2sdtxt-dashboard.json`](docs/grafana/img2sdtxt-dashboard.json)
+(Dashboards → New → Import, then point it at your Prometheus data source).
+
+### Distributed tracing (OpenTelemetry)
+
+Tracing is disabled by default. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to an
+OTLP/HTTP collector endpoint (e.g. `http://localhost:4318/v1/traces`) to
+enable it:
+
+```env
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
+OTEL_SERVICE_NAME=img2sdtxt
+```
+
+When enabled, FastAPI requests and outgoing `requests` calls (Stable
+Diffusion, the OpenAI-compatible LLM provider) are auto-instrumented, and
+each LLM call is recorded as an `llm.generate` span with `llm.provider`,
+`llm.model`, `llm.mode`, `llm.status`, and `llm.duration_seconds`
+attributes. If the `opentelemetry-*` packages aren't installed, tracing is
+skipped with a warning instead of failing the app.
+
 ---
 
 ## HTTPS

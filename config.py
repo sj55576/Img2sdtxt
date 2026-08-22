@@ -45,6 +45,11 @@ LOG_FORMAT = os.getenv("LOG_FORMAT", "text").lower()
 LLM_CACHE_ENABLED = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
 LLM_CACHE_TTL = int(os.getenv("LLM_CACHE_TTL", "3600"))
 
+# OpenTelemetry tracing (optional). Leave OTEL_EXPORTER_OTLP_ENDPOINT empty to
+# disable tracing entirely; no spans are created and no OTLP connection is attempted.
+OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+OTEL_SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "img2sdtxt")
+
 # LLM Provider Selection
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai_compatible")
 

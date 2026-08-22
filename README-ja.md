@@ -306,6 +306,29 @@ scrape_configs:
 HTTP、LLM provider／フォールバック、Stable Diffusion、キャッシュ、レート制限、
 ジョブキューのカウンター・ヒストグラム・ゲージを取得できます。
 
+これらのメトリクスをすぐに可視化できる Grafana ダッシュボードを
+[`docs/grafana/img2sdtxt-dashboard.json`](docs/grafana/img2sdtxt-dashboard.json)
+に同梱しています（Grafana の Dashboards → New → Import からインポートし、
+Prometheus データソースを指定してください）。
+
+### 分散トレーシング（OpenTelemetry）
+
+トレーシングはデフォルトで無効です。`OTEL_EXPORTER_OTLP_ENDPOINT` に
+OTLP/HTTP コレクターのエンドポイント（例: `http://localhost:4318/v1/traces`）
+を設定すると有効になります。
+
+```env
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
+OTEL_SERVICE_NAME=img2sdtxt
+```
+
+有効化すると、FastAPI のリクエストと外部への `requests` 呼び出し
+（Stable Diffusion、OpenAI互換LLMプロバイダー）が自動計装され、各 LLM 呼び出しは
+`llm.generate` スパンとして `llm.provider` / `llm.model` / `llm.mode` /
+`llm.status` / `llm.duration_seconds` 属性つきで記録されます。
+`opentelemetry-*` パッケージが未インストールの場合は、アプリを落とさず警告を
+出してトレーシングをスキップします。
+
 ---
 
 ## HTTPS対応

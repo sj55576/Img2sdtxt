@@ -16,6 +16,7 @@ from config import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 from deps import _validate_image_bytes
 from metrics import observe_llm_request
 from models import RefinePromptRequest, TextPromptRequest
+from tracing import llm_span, record_llm_span_result
 from validators import validate_quality, validate_style, validate_tone
 
 logger = logging.getLogger("img2sdtxt.prompts")
@@ -281,31 +282,38 @@ async def generate_prompts_stream(
             parts: List[str] = []
             last_chunk = None
             stream_started = time.monotonic()
-            try:
-                async for chunk in iterate_in_threadpool(chunk_iter):
-                    last_chunk = chunk
-                    parts.append(str(chunk))
-                    yield _sse_event("token", {"text": chunk})
-            except Exception as e:
-                observe_llm_request(prov_name, mdl, "stream", "error", time.monotonic() - stream_started)
-                logger.error("generate_prompts_stream error: %s", str(e))
-                yield _sse_event("error", {"error": str(e)})
-                return
+            with llm_span(prov_name, mdl, "stream") as span:
+                try:
+                    async for chunk in iterate_in_threadpool(chunk_iter):
+                        last_chunk = chunk
+                        parts.append(str(chunk))
+                        yield _sse_event("token", {"text": chunk})
+                except Exception as e:
+                    duration = time.monotonic() - stream_started
+                    observe_llm_request(prov_name, mdl, "stream", "error", duration)
+                    record_llm_span_result(span, prov_name, mdl, "error", duration)
+                    logger.error("generate_prompts_stream error: %s", str(e))
+                    yield _sse_event("error", {"error": str(e)})
+                    return
 
-            actual_provider = getattr(last_chunk, "provider_name", prov_name)
-            actual_model = getattr(last_chunk, "model", mdl)
-            if not isinstance(actual_provider, str):
-                actual_provider = prov_name
-            if not isinstance(actual_model, str):
-                actual_model = mdl
+                actual_provider = getattr(last_chunk, "provider_name", prov_name)
+                actual_model = getattr(last_chunk, "model", mdl)
+                if not isinstance(actual_provider, str):
+                    actual_provider = prov_name
+                if not isinstance(actual_model, str):
+                    actual_model = mdl
 
-            full_text = "".join(parts)
-            if not full_text:
-                observe_llm_request(actual_provider, actual_model, "stream", "empty", time.monotonic() - stream_started)
-                yield _sse_event("error", {"error": "LLMからレスポンスがありません"})
-                return
+                full_text = "".join(parts)
+                if not full_text:
+                    duration = time.monotonic() - stream_started
+                    observe_llm_request(actual_provider, actual_model, "stream", "empty", duration)
+                    record_llm_span_result(span, actual_provider, actual_model, "empty", duration)
+                    yield _sse_event("error", {"error": "LLMからレスポンスがありません"})
+                    return
 
-            observe_llm_request(actual_provider, actual_model, "stream", "success", time.monotonic() - stream_started)
+                duration = time.monotonic() - stream_started
+                observe_llm_request(actual_provider, actual_model, "stream", "success", duration)
+                record_llm_span_result(span, actual_provider, actual_model, "success", duration)
             result = generator.finalize_response(full_text, suffix_pos, suffix_neg)
             result["provider"] = actual_provider
             result["model"] = actual_model
